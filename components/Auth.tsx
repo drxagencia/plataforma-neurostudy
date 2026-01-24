@@ -39,10 +39,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
       <div className="w-full max-w-md p-8 rounded-3xl bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.5)] z-10 mx-4">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white text-xl mx-auto mb-4 shadow-lg shadow-indigo-500/30">
-            L
+          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <img src="/logo_neuro.png" alt="NeuroStudy AI" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Bem-vindo ao Lumina</h1>
+          <h1 className="text-2xl font-bold text-white mb-2">NeuroStudy AI</h1>
           <p className="text-slate-400 text-sm">Sua jornada rumo à aprovação começa aqui.</p>
         </div>
 

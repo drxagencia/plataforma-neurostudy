@@ -14,7 +14,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 
-export const APP_NAME = "Lumina";
+export const APP_NAME = "NeuroStudy AI";
 
 export const ANNOUNCEMENTS: Announcement[] = [
   {
@@ -52,7 +52,6 @@ export const MOCK_TOPICS: Record<string, string[]> = {
   'physics': ['Cinemática', 'Dinâmica', 'Eletrodinâmica', 'Termodinâmica', 'Óptica'],
   'math': ['Álgebra', 'Geometria Plana', 'Geometria Espacial', 'Trigonometria', 'Estatística'],
   'chem': ['Química Geral', 'Físico-Química', 'Química Orgânica', 'Atomística'],
-  // Add others as needed for demo
 };
 
 export const MOCK_SUBTOPICS: Record<string, string[]> = {

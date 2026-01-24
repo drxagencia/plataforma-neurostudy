@@ -7,6 +7,7 @@ import QuestionBank from './components/QuestionBank';
 import Community from './components/Community';
 import Simulations from './components/Simulations';
 import Settings from './components/Settings';
+import AdminPanel from './components/AdminPanel';
 import { User, View } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { auth } from './services/firebaseConfig';
@@ -45,8 +46,6 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     await AuthService.logout();
-    // User state is handled by onAuthStateChanged, but we can optimistically clear it
-    // setUser(null); 
     setCurrentView('dashboard');
   };
 
@@ -71,6 +70,7 @@ const App: React.FC = () => {
       case 'comunidade': return <Community />;
       case 'simulados': return <Simulations />;
       case 'ajustes': return <Settings user={user} onUpdateUser={setUser} />;
+      case 'admin': return user.isAdmin ? <AdminPanel /> : <Dashboard user={user} />;
       case 'provas': return (
         <div className="flex items-center justify-center h-full text-slate-500">
            <div className="text-center">
@@ -90,6 +90,7 @@ const App: React.FC = () => {
         onNavigate={setCurrentView} 
         onLogout={handleLogout}
         isMobile={isMobile}
+        isAdmin={user.isAdmin}
       />
 
       <main 

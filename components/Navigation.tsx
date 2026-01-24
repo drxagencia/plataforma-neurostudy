@@ -8,7 +8,8 @@ import {
   FileText, 
   Settings, 
   LogOut,
-  BookOpen
+  BookOpen,
+  ShieldAlert
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -16,23 +17,27 @@ interface NavigationProps {
   onNavigate: (view: View) => void;
   onLogout: () => void;
   isMobile: boolean;
+  isAdmin?: boolean;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogout, isMobile }) => {
-  const menuItems: { id: View; label: string; icon: React.ReactNode }[] = [
+const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogout, isMobile, isAdmin }) => {
+  const menuItems: { id: View; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'aulas', label: 'Aulas', icon: <BookOpen size={20} /> },
     { id: 'simulados', label: 'Simulados', icon: <GraduationCap size={20} /> },
     { id: 'questoes', label: 'Questões', icon: <FileQuestion size={20} /> },
     { id: 'comunidade', label: 'Comunidade', icon: <Users size={20} /> },
     { id: 'provas', label: 'Provas', icon: <FileText size={20} /> },
+    { id: 'admin', label: 'Admin', icon: <ShieldAlert size={20} />, adminOnly: true },
     { id: 'ajustes', label: 'Ajustes', icon: <Settings size={20} /> },
   ];
+
+  const visibleMenuItems = menuItems.filter(item => !item.adminOnly || (item.adminOnly && isAdmin));
 
   if (isMobile) {
     return (
       <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900/90 backdrop-blur-xl border-t border-white/10 flex justify-around items-center z-50 px-2">
-        {menuItems.slice(0, 5).map((item) => (
+        {visibleMenuItems.slice(0, 5).map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
@@ -44,7 +49,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
             <span className="text-[10px] mt-1 font-medium">{item.label}</span>
           </button>
         ))}
-        {/* Simple "More" menu for remaining items on mobile could go here, omitting for simplicity */}
       </nav>
     );
   }
@@ -53,16 +57,21 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
   return (
     <aside className="w-64 h-screen bg-slate-950 border-r border-white/10 flex flex-col fixed left-0 top-0 z-50">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white">
-          L
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+           <img src="/logo_neuro.png" alt="NeuroStudy AI" className="w-full h-full object-contain" onError={(e) => {
+             // Fallback if image fails
+             e.currentTarget.style.display = 'none';
+             e.currentTarget.parentElement!.classList.add('bg-indigo-600');
+             e.currentTarget.parentElement!.innerHTML = '<span class="text-white font-bold">N</span>';
+           }}/>
         </div>
-        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-          Lumina
+        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 leading-tight">
+          NeuroStudy<br/><span className="text-indigo-400 text-sm">AI Platform</span>
         </h1>
       </div>
 
       <nav className="flex-1 px-4 py-4 space-y-2">
-        {menuItems.map((item) => (
+        {visibleMenuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}

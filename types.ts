@@ -1,10 +1,16 @@
-export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'provas' | 'ajustes';
+export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'provas' | 'ajustes' | 'admin';
 
 export interface User {
   uid: string;
   displayName: string;
   email: string;
   photoURL?: string;
+  isAdmin?: boolean;
+}
+
+export interface UserProfile extends User {
+  subscriptionStatus: 'free' | 'pro';
+  subscriptionExpiry: string; // ISO Date string
 }
 
 export interface Announcement {

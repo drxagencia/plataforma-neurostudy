@@ -39,6 +39,45 @@
     "Dinâmica": ["Leis de Newton", "Força de Atrito", "Trabalho e Energia", "Impulso"],
     "Álgebra": ["Funções", "Logaritmos", "Matrizes", "Polinômios"]
   },
+  "users": {
+    "user_id_1": {
+      "displayName": "Estudante Exemplo",
+      "email": "aluno@email.com",
+      "subscriptionStatus": "free",
+      "subscriptionExpiry": "2024-12-31"
+    },
+    "user_id_admin": {
+      "displayName": "Admin Master",
+      "email": "master@admin.com",
+      "subscriptionStatus": "pro",
+      "subscriptionExpiry": "2099-12-31"
+    }
+  },
+  "lessons": {
+    "physics": {
+      "cinematica": [
+        {
+          "id": "l1",
+          "title": "Introdução aos Vetores",
+          "videoUrl": "https://youtube.com/...",
+          "duration": "15:00"
+        }
+      ]
+    }
+  },
+  "questions": {
+    "physics": {
+      "cinematica": [
+         {
+           "id": "q1",
+           "text": "Um carro percorre...",
+           "options": ["10m/s", "20m/s", "30m/s", "40m/s"],
+           "correctAnswer": 1,
+           "difficulty": "medium"
+         }
+      ]
+    }
+  },
   "posts": [
     {
       "id": "1",
