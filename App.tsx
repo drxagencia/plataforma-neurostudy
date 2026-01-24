@@ -8,12 +8,15 @@ import Community from './components/Community';
 import Simulations from './components/Simulations';
 import Settings from './components/Settings';
 import { User, View } from './types';
-import { AuthService } from './services/authService';
+import { AuthService, mapUser } from './services/authService';
+import { auth } from './services/firebaseConfig';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
   // Responsive Check
   useEffect(() => {
@@ -22,15 +25,38 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Auth Persistence
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(mapUser(firebaseUser));
+      } else {
+        setUser(null);
+      }
+      setLoadingAuth(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
   };
 
   const handleLogout = async () => {
     await AuthService.logout();
-    setUser(null);
+    // User state is handled by onAuthStateChanged, but we can optimistically clear it
+    // setUser(null); 
     setCurrentView('dashboard');
   };
+
+  if (loadingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
 
   if (!user) {
     return <Auth onLogin={handleLogin} />;
