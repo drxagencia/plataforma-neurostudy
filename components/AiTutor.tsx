@@ -130,8 +130,16 @@ const AiTutor: React.FC = () => {
   };
 
   const handleGeneratePix = () => {
-      const val = parseFloat(rechargeAmount);
-      if (!rechargeAmount || isNaN(val) || val < 10) {
+      // Normalize comma to dot for Brazilian users
+      const normalizedAmount = rechargeAmount.replace(',', '.');
+      const val = parseFloat(normalizedAmount);
+
+      if (!normalizedAmount || isNaN(val)) {
+          triggerNotification('error', 'Por favor, digite um valor válido.');
+          return;
+      }
+
+      if (val < 10) {
           triggerNotification('error', 'O valor mínimo de recarga é R$ 10,00');
           return;
       }
@@ -140,7 +148,10 @@ const AiTutor: React.FC = () => {
           const payload = PixService.generatePayload(val);
           setPixPayload(payload);
           setCopied(false);
+          // Optional: Force re-render of QR Code image if needed by clearing first
+          // setPixPayload(null); setTimeout(() => setPixPayload(payload), 10);
       } catch (e) {
+          console.error(e);
           triggerNotification('error', 'Erro ao gerar QR Code.');
       }
   };
@@ -155,11 +166,14 @@ const AiTutor: React.FC = () => {
   };
 
   const handleConfirmPayment = async () => {
-      if (!auth.currentUser || !rechargeAmount) return;
+      const normalizedAmount = rechargeAmount.replace(',', '.');
+      const val = parseFloat(normalizedAmount);
+
+      if (!auth.currentUser || isNaN(val)) return;
 
       try {
           // Send real name
-          await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'Usuário Sem Nome', parseFloat(rechargeAmount));
+          await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'Usuário Sem Nome', val);
           handleCloseRecharge();
           // Delay notification slightly for effect
           setTimeout(() => {
@@ -353,11 +367,12 @@ const AiTutor: React.FC = () => {
                             <div className="flex items-center justify-center gap-1">
                                 <span className="text-2xl text-emerald-500 font-bold">R$</span>
                                 <input 
-                                    type="number" 
+                                    type="text" 
+                                    inputMode="decimal"
                                     value={rechargeAmount}
                                     onChange={e => setRechargeAmount(e.target.value)}
-                                    className="bg-transparent text-5xl font-bold text-white outline-none w-32 text-center placeholder:text-slate-700"
-                                    placeholder="20"
+                                    className="bg-transparent text-5xl font-bold text-white outline-none w-40 text-center placeholder:text-slate-700"
+                                    placeholder="20.00"
                                 />
                             </div>
                             <p className="text-[10px] text-slate-500 mt-2">Mínimo R$ 10,00</p>
