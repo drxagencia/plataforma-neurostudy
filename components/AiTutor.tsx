@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle } from 'lucide-react';
 import { AiService, ChatMessage } from '../services/aiService';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
@@ -21,6 +21,9 @@ const AiTutor: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [showRecharge, setShowRecharge] = useState(false);
   
+  // Notification State
+  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
   // Recharge & PIX State
   const [rechargeAmount, setRechargeAmount] = useState('');
   const [pixPayload, setPixPayload] = useState<string | null>(null);
@@ -43,6 +46,14 @@ const AiTutor: React.FC = () => {
     }
   }, []);
 
+  // Auto-dismiss notification
+  useEffect(() => {
+      if (notification) {
+          const timer = setTimeout(() => setNotification(null), 4000);
+          return () => clearTimeout(timer);
+      }
+  }, [notification]);
+
   const fetchFinancialData = async () => {
       if (!auth.currentUser) return;
       const profile = await DatabaseService.getUserProfile(auth.currentUser.uid);
@@ -51,9 +62,12 @@ const AiTutor: React.FC = () => {
       setTransactions(trans);
   };
 
+  const triggerNotification = (type: 'success' | 'error', message: string) => {
+      setNotification({ type, message });
+  };
+
   // Simple Markdown Parser for visual formatting
   const renderMarkdown = (text: string) => {
-    // Bold: **text** -> <strong>text</strong>
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, i) => {
         if (part.startsWith('**') && part.endsWith('**')) {
@@ -68,8 +82,7 @@ const AiTutor: React.FC = () => {
     if (!input.trim() || isLoading) return;
 
     if (balance <= 0.05) {
-        setError("Seu saldo acabou.");
-        alert("Saldo Insuficiente. Recarregue para continuar."); // Alert User first
+        triggerNotification('error', 'Saldo Insuficiente para realizar esta ação.');
         setShowRecharge(true);
         return;
     }
@@ -99,10 +112,10 @@ const AiTutor: React.FC = () => {
       fetchFinancialData(); 
     } catch (error: any) {
       if (error.message.includes('402')) {
-          setError("Saldo insuficiente.");
+          triggerNotification('error', 'Seu saldo acabou durante a requisição.');
           setShowRecharge(true);
       } else if (error.message.includes('403')) {
-          setError("Seu plano não permite o uso do chat livre.");
+          triggerNotification('error', 'Seu plano não permite o uso do chat livre.');
       } else {
           const errorMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -119,19 +132,24 @@ const AiTutor: React.FC = () => {
   const handleGeneratePix = () => {
       const val = parseFloat(rechargeAmount);
       if (!rechargeAmount || isNaN(val) || val < 10) {
-          alert("Valor mínimo de recarga: R$ 10,00");
+          triggerNotification('error', 'O valor mínimo de recarga é R$ 10,00');
           return;
       }
       
-      const payload = PixService.generatePayload(val);
-      setPixPayload(payload);
-      setCopied(false);
+      try {
+          const payload = PixService.generatePayload(val);
+          setPixPayload(payload);
+          setCopied(false);
+      } catch (e) {
+          triggerNotification('error', 'Erro ao gerar QR Code.');
+      }
   };
 
   const handleCopyPix = () => {
       if (pixPayload) {
           navigator.clipboard.writeText(pixPayload);
           setCopied(true);
+          triggerNotification('success', 'Código PIX copiado!');
           setTimeout(() => setCopied(false), 3000);
       }
   };
@@ -142,10 +160,13 @@ const AiTutor: React.FC = () => {
       try {
           // Send real name
           await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'Usuário Sem Nome', parseFloat(rechargeAmount));
-          alert("Solicitação enviada! Seus créditos serão liberados assim que o sistema identificar o pagamento.");
           handleCloseRecharge();
+          // Delay notification slightly for effect
+          setTimeout(() => {
+              triggerNotification('success', 'Comprovante enviado! Aguarde a aprovação.');
+          }, 300);
       } catch (e) {
-          alert("Erro ao solicitar recarga.");
+          triggerNotification('error', 'Erro ao enviar solicitação.');
       }
   };
 
@@ -157,6 +178,20 @@ const AiTutor: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col max-h-[85vh] relative animate-slide-up">
+      
+      {/* GLOBAL NOTIFICATION TOAST */}
+      {notification && (
+        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl backdrop-blur-md border animate-in slide-in-from-top-4 duration-300 ${
+            notification.type === 'error' 
+            ? 'bg-red-500/90 border-red-400/50 text-white' 
+            : 'bg-emerald-500/90 border-emerald-400/50 text-white'
+        }`}>
+            {notification.type === 'error' ? <AlertCircle size={24} /> : <CheckCircle size={24} />}
+            <span className="font-bold text-sm md:text-base">{notification.message}</span>
+            <button onClick={() => setNotification(null)} className="ml-2 opacity-80 hover:opacity-100"><X size={18}/></button>
+        </div>
+      )}
+
       {/* Header & Balance Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 flex-shrink-0 gap-4">
         <div>
@@ -290,7 +325,7 @@ const AiTutor: React.FC = () => {
           {/* BEAUTIFUL RECHARGE MODAL OVERLAY */}
           {showRecharge && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
-              <div className="bg-[#0f172a] border border-indigo-500/20 rounded-3xl p-8 w-full max-w-md shadow-2xl relative overflow-hidden">
+              <div className="bg-[#0f172a] border border-indigo-500/20 rounded-3xl p-8 w-full max-w-md shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
                   {/* Decorative Glows */}
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
                   <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
