@@ -364,6 +364,48 @@ export const DatabaseService = {
   },
 
   // --- Lessons ---
+  
+  // New method: Only return subjects IDs that exist in the lessons node
+  getSubjectsWithLessons: async (): Promise<string[]> => {
+      try {
+          const snapshot = await get(ref(database, 'lessons'));
+          if (snapshot.exists()) {
+              return Object.keys(snapshot.val());
+          }
+          return [];
+      } catch (e) {
+          return [];
+      }
+  },
+
+  // Return lessons structured by Topic: { "Cinemática": [Lesson, Lesson], "Dinâmica": [...] }
+  getLessonsByTopic: async (subjectId: string): Promise<Record<string, Lesson[]>> => {
+      try {
+          const snapshot = await get(ref(database, `lessons/${subjectId}`));
+          if (snapshot.exists()) {
+              const data = snapshot.val();
+              // Validate format: It should be Topic -> Array of Lessons
+              // If it's already in that format, return it.
+              // Note: Firebase arrays might be returned as objects if keys are integers but not sequential.
+              // We should normalize it.
+              
+              const normalized: Record<string, Lesson[]> = {};
+              Object.keys(data).forEach(topic => {
+                  const val = data[topic];
+                  if (Array.isArray(val)) {
+                      normalized[topic] = val;
+                  } else {
+                      normalized[topic] = Object.values(val);
+                  }
+              });
+              return normalized;
+          }
+          return {};
+      } catch (e) {
+          return {};
+      }
+  },
+
   getLessons: async (subjectId: string): Promise<Lesson[]> => {
       try {
           const snapshot = await get(ref(database, `lessons/${subjectId}`));
