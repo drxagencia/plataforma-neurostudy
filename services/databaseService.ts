@@ -1,7 +1,7 @@
 
 import { ref, get, child, update, push, set, query, orderByChild, equalTo, limitToLast } from "firebase/database";
 import { database } from "./firebaseConfig";
-import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan } from "../types";
+import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan, SimulationResult } from "../types";
 
 export const DatabaseService = {
   // --- User Profile & XP ---
@@ -332,6 +332,44 @@ export const DatabaseService = {
     return [];
   },
 
+  // NEW: Fetch all questions regardless of hierarchy (needed for admin filtering)
+  // Warning: This is heavy, in production you'd use indexing.
+  getAllQuestionsFlat: async (): Promise<Question[]> => {
+    try {
+        const snapshot = await get(ref(database, 'questions'));
+        if (!snapshot.exists()) return [];
+        const data = snapshot.val();
+        let questions: Question[] = [];
+        
+        // Structure: Subject -> Topic -> Subtopic -> QuestionID -> QuestionObj
+        Object.keys(data).forEach(subj => {
+            Object.keys(data[subj]).forEach(topic => {
+                Object.keys(data[subj][topic]).forEach(subtopic => {
+                    Object.keys(data[subj][topic][subtopic]).forEach(qId => {
+                        questions.push({
+                            ...data[subj][topic][subtopic][qId],
+                            id: qId,
+                            subjectId: subj,
+                            topic: topic
+                        });
+                    });
+                });
+            });
+        });
+        return questions;
+    } catch (e) {
+        return [];
+    }
+  },
+
+  // NEW: Get Specific questions by IDs
+  getQuestionsByIds: async (ids: string[]): Promise<Question[]> => {
+      // In a real app, you would optimize this. Here we fetch all (cached) or iterate.
+      // Since Firebase RTDB doesn't support "WHERE IN", we fetch all flat and filter.
+      const all = await DatabaseService.getAllQuestionsFlat();
+      return all.filter(q => q.id && ids.includes(q.id));
+  },
+
   createQuestion: async (subjectId: string, topic: string, subtopic: string, question: Question): Promise<void> => {
      try {
        const questionsRef = ref(database, `questions/${subjectId}/${topic}/${subtopic}`);
@@ -365,7 +403,6 @@ export const DatabaseService = {
 
   // --- Lessons ---
   
-  // New method: Only return subjects IDs that exist in the lessons node
   getSubjectsWithLessons: async (): Promise<string[]> => {
       try {
           const snapshot = await get(ref(database, 'lessons'));
@@ -378,17 +415,11 @@ export const DatabaseService = {
       }
   },
 
-  // Return lessons structured by Topic: { "Cinemática": [Lesson, Lesson], "Dinâmica": [...] }
   getLessonsByTopic: async (subjectId: string): Promise<Record<string, Lesson[]>> => {
       try {
           const snapshot = await get(ref(database, `lessons/${subjectId}`));
           if (snapshot.exists()) {
               const data = snapshot.val();
-              // Validate format: It should be Topic -> Array of Lessons
-              // If it's already in that format, return it.
-              // Note: Firebase arrays might be returned as objects if keys are integers but not sequential.
-              // We should normalize it.
-              
               const normalized: Record<string, Lesson[]> = {};
               Object.keys(data).forEach(topic => {
                   const val = data[topic];
@@ -411,11 +442,7 @@ export const DatabaseService = {
           const snapshot = await get(ref(database, `lessons/${subjectId}`));
           if (snapshot.exists()) {
               const data = snapshot.val();
-              // Flatten topics if lessons are organized by topic
-              // Or return array if organized directly
               let lessons: Lesson[] = [];
-              
-              // Helper to recurse
               const traverse = (obj: any) => {
                   if (obj.videoUrl) {
                       lessons.push(obj);
@@ -454,7 +481,6 @@ export const DatabaseService = {
   // --- Community ---
   getPosts: async (): Promise<CommunityPost[]> => {
     try {
-      // Limit to last 50 posts to prevent overload
       const q = query(ref(database, 'posts'), limitToLast(50));
       const snapshot = await get(q);
       
@@ -496,7 +522,6 @@ export const DatabaseService = {
   },
 
   likePost: async (postId: string, uid: string): Promise<void> => {
-      // Check if already liked logic would go here ideally, but for now just increment
       const postRef = ref(database, `posts/${postId}`);
       const snap = await get(postRef);
       if (snap.exists()) {
@@ -523,12 +548,38 @@ export const DatabaseService = {
       const snapshot = await get(child(ref(database), 'simulations'));
       if (snapshot.exists()) {
         const data = snapshot.val();
-        return Object.keys(data).map(key => ({ ...data[key], id: key }));
+        return Object.keys(data).map(key => ({ 
+            ...data[key], 
+            id: key,
+            questionIds: data[key].questionIds || [] // Ensure array
+        }));
       }
     } catch (error) {
       console.warn("Error fetching simulations:", error);
     }
     return [];
+  },
+
+  createSimulation: async (simulation: Omit<Simulation, 'id'>): Promise<void> => {
+      try {
+          const simRef = push(ref(database, 'simulations'));
+          await set(simRef, simulation);
+      } catch (e) {
+          throw e;
+      }
+  },
+
+  saveSimulationResult: async (result: SimulationResult): Promise<void> => {
+      try {
+          const resRef = push(ref(database, `users/${result.userId}/simulationResults`));
+          await set(resRef, result);
+          
+          // Add XP for completing simulation
+          await DatabaseService.addXp(result.userId, result.score * 5); // 5 XP per correct answer in sim
+          await DatabaseService.incrementQuestionsAnswered(result.userId, result.totalQuestions);
+      } catch (e) {
+          console.error(e);
+      }
   },
 
   // --- Admin ---

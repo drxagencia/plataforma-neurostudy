@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial } from '../types';
+import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'content' | 'finance' | 'config'>('users');
-  const [contentTab, setContentTab] = useState<'question' | 'lesson' | 'subject'>('question');
+  const [contentTab, setContentTab] = useState<'question' | 'lesson' | 'subject' | 'simulation'>('question');
   
   // Data
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -17,8 +18,21 @@ const AdminPanel: React.FC = () => {
   
   // States
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   
+  // Simulation Creator State
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([]);
+  const [simForm, setSimForm] = useState({
+      title: '',
+      description: '',
+      duration: 60,
+      type: 'official',
+      status: 'open',
+      subjects: [] as string[],
+      selectedQuestionIds: [] as string[]
+  });
+  const [simFilter, setSimFilter] = useState({ subject: '', topic: '' });
+
   // Edit User
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [newUserMode, setNewUserMode] = useState(false);
@@ -68,7 +82,7 @@ const AdminPanel: React.FC = () => {
         DatabaseService.getAiConfig()
     ]);
     
-    // Filter out seed/placeholder users if they exist
+    // Filter out seed/placeholder users
     const realUsers = u.filter(user => 
         user.uid !== 'student_uid_placeholder' && 
         user.uid !== 'admin_uid_placeholder'
@@ -82,6 +96,26 @@ const AdminPanel: React.FC = () => {
     setAiConfig(ac);
     setLoading(false);
   };
+
+  // Fetch questions only when needed (Simulations tab)
+  const fetchQuestionsForSim = async () => {
+      const q = await DatabaseService.getAllQuestionsFlat();
+      setAllQuestions(q);
+      setFilteredQuestions(q);
+  };
+
+  useEffect(() => {
+      if (contentTab === 'simulation') {
+          fetchQuestionsForSim();
+      }
+  }, [contentTab]);
+
+  useEffect(() => {
+      let filtered = allQuestions;
+      if (simFilter.subject) filtered = filtered.filter(q => q.subjectId === simFilter.subject);
+      if (simFilter.topic) filtered = filtered.filter(q => q.topic === simFilter.topic);
+      setFilteredQuestions(filtered);
+  }, [simFilter, allQuestions]);
 
   // --- USER LOGIC ---
   const handleSaveUser = async (uid: string | null) => {
@@ -104,30 +138,11 @@ const AdminPanel: React.FC = () => {
     fetchInitialData();
   };
 
-  const startEditUser = (user: UserProfile) => {
-      setEditingUserId(user.uid);
-      setUserDataForm({
-          displayName: user.displayName,
-          email: user.email,
-          plan: user.plan || 'basic',
-          expiry: user.subscriptionExpiry,
-          isAdmin: user.isAdmin || false
-      });
-  };
-
   // --- FINANCIAL LOGIC ---
   const handleProcessRecharge = async (id: string, status: 'approved' | 'rejected') => {
       if (!confirm(`Tem certeza que deseja marcar como ${status}?`)) return;
       await DatabaseService.processRecharge(id, status);
       fetchInitialData();
-  };
-
-  // --- CONFIG LOGIC ---
-  const handleSaveConfig = async () => {
-      if (aiConfig) {
-          await DatabaseService.updateAiConfig(aiConfig);
-          alert("Configurações salvas!");
-      }
   };
 
   // --- CONTENT LOGIC ---
@@ -157,6 +172,26 @@ const AdminPanel: React.FC = () => {
           return;
       }
 
+      if (contentTab === 'simulation') {
+          if (!simForm.title || !simForm.description) return alert("Preencha título e descrição");
+          if (simForm.selectedQuestionIds.length === 0) return alert("Adicione pelo menos uma questão");
+
+          await DatabaseService.createSimulation({
+              title: simForm.title,
+              description: simForm.description,
+              durationMinutes: Number(simForm.duration),
+              type: simForm.type as any,
+              status: simForm.status as any,
+              subjects: simForm.subjects, // You might want to auto-calculate this based on questions
+              questionIds: simForm.selectedQuestionIds,
+              questionCount: simForm.selectedQuestionIds.length
+          } as any);
+          
+          alert("Simulado Criado com Sucesso!");
+          setSimForm({ title: '', description: '', duration: 60, type: 'official', status: 'open', subjects: [], selectedQuestionIds: [] });
+          return;
+      }
+
       if (!contentForm.subjectId || !contentForm.topicName) {
           alert("Selecione Matéria e Tópico");
           return;
@@ -179,9 +214,7 @@ const AdminPanel: React.FC = () => {
               };
               
               await DatabaseService.createQuestion(contentForm.subjectId, contentForm.topicName, contentForm.subtopicName, newQuestion);
-              
               await fetchInitialData(); 
-              
               alert("Questão criada com sucesso e estrutura atualizada!");
           } else {
               if (!contentForm.lTitle) return;
@@ -189,17 +222,25 @@ const AdminPanel: React.FC = () => {
                   title: contentForm.lTitle,
                   videoUrl: contentForm.lUrl,
                   duration: contentForm.lDuration,
-                  materials: materials // Add materials
+                  materials: materials 
               };
               await DatabaseService.createLesson(contentForm.subjectId, contentForm.topicName, newLesson);
               alert("Aula criada com sucesso!");
-              setMaterials([]); // Reset materials
+              setMaterials([]);
           }
           setContentForm(prev => ({...prev, qText: '', qImageUrl: '', lTitle: '', qOptions: ['', '', '', ''], qExplanation: ''}));
       } catch (e) {
           console.error(e);
           alert("Erro ao salvar conteúdo.");
       }
+  };
+
+  const toggleQuestionInSim = (qId: string) => {
+      setSimForm(prev => {
+          const exists = prev.selectedQuestionIds.includes(qId);
+          if (exists) return { ...prev, selectedQuestionIds: prev.selectedQuestionIds.filter(id => id !== qId) };
+          return { ...prev, selectedQuestionIds: [...prev.selectedQuestionIds, qId] };
+      });
   };
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
@@ -229,17 +270,6 @@ const AdminPanel: React.FC = () => {
             ))}
         </div>
       </header>
-
-      {/* --- USERS TAB --- */}
-      {activeTab === 'users' && (
-          <div className="space-y-6">
-              {/* User Table (Previous Code) */}
-              {/* Simplified for brevity in this specific update, reusing existing structure would be here */}
-              <div className="glass-card p-4 text-center text-slate-400">
-                  <p>Gerenciamento de usuários disponível.</p>
-              </div>
-          </div>
-      )}
 
       {/* --- FINANCE TAB --- */}
       {activeTab === 'finance' && (
@@ -299,9 +329,65 @@ const AdminPanel: React.FC = () => {
                           <button onClick={() => setContentTab('question')} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'question' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><FilePlus size={18} /> Criar Questão</button>
                           <button onClick={() => setContentTab('lesson')} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'lesson' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><Layers size={18} /> Adicionar Aula</button>
                           <button onClick={() => setContentTab('subject')} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'subject' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><PenTool size={18} /> Nova Matéria</button>
+                          <button onClick={() => setContentTab('simulation')} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'simulation' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><LayoutList size={18} /> Novo Simulado</button>
                       </div>
 
-                      {contentTab !== 'subject' && (
+                      {contentTab === 'simulation' && (
+                          <div className="space-y-6 animate-fade-in">
+                              <div className="space-y-4">
+                                  <input className="w-full glass-input p-3 rounded-lg" placeholder="Título do Simulado" value={simForm.title} onChange={e => setSimForm({...simForm, title: e.target.value})} />
+                                  <textarea className="w-full glass-input p-3 rounded-lg" placeholder="Descrição" value={simForm.description} onChange={e => setSimForm({...simForm, description: e.target.value})} />
+                                  <div className="flex gap-4">
+                                      <input type="number" className="flex-1 glass-input p-3 rounded-lg" placeholder="Duração (min)" value={simForm.duration} onChange={e => setSimForm({...simForm, duration: Number(e.target.value)})} />
+                                      <select className="flex-1 glass-input p-3 rounded-lg" value={simForm.status} onChange={e => setSimForm({...simForm, status: e.target.value})}>
+                                          <option value="open">Aberto</option>
+                                          <option value="coming_soon">Em Breve</option>
+                                          <option value="closed">Fechado</option>
+                                      </select>
+                                      <select className="flex-1 glass-input p-3 rounded-lg" value={simForm.type} onChange={e => setSimForm({...simForm, type: e.target.value})}>
+                                          <option value="official">Oficial</option>
+                                          <option value="training">Treino</option>
+                                      </select>
+                                  </div>
+                              </div>
+
+                              <div className="border-t border-white/5 pt-4">
+                                  <h4 className="font-bold text-white mb-2">Selecionar Questões ({simForm.selectedQuestionIds.length})</h4>
+                                  
+                                  <div className="flex gap-2 mb-4">
+                                      <select className="glass-input p-2 rounded-lg text-sm" value={simFilter.subject} onChange={e => setSimFilter({...simFilter, subject: e.target.value})}>
+                                          <option value="">Todas Matérias</option>
+                                          {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                      </select>
+                                      <select className="glass-input p-2 rounded-lg text-sm" value={simFilter.topic} onChange={e => setSimFilter({...simFilter, topic: e.target.value})}>
+                                          <option value="">Todos Tópicos</option>
+                                          {simFilter.subject && topics[simFilter.subject]?.map(t => <option key={t} value={t}>{t}</option>)}
+                                      </select>
+                                  </div>
+
+                                  <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-2 p-1">
+                                      {filteredQuestions.map(q => (
+                                          <div 
+                                            key={q.id} 
+                                            onClick={() => q.id && toggleQuestionInSim(q.id)}
+                                            className={`p-3 rounded-lg border cursor-pointer transition-all ${simForm.selectedQuestionIds.includes(q.id!) ? 'bg-indigo-600/20 border-indigo-500' : 'bg-slate-900 border-white/5 hover:border-white/20'}`}
+                                          >
+                                              <p className="text-sm text-white line-clamp-2">{q.text}</p>
+                                              <div className="flex gap-2 text-[10px] text-slate-400 mt-1">
+                                                  <span className="bg-white/5 px-1 rounded">{q.topic}</span>
+                                                  <span className="bg-white/5 px-1 rounded">{q.difficulty}</span>
+                                              </div>
+                                          </div>
+                                      ))}
+                                      {filteredQuestions.length === 0 && <p className="text-slate-500 text-sm">Nenhuma questão encontrada.</p>}
+                                  </div>
+                              </div>
+
+                              <button onClick={handleSaveContent} className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 transition-all">Salvar Simulado</button>
+                          </div>
+                      )}
+
+                      {contentTab !== 'subject' && contentTab !== 'simulation' && (
                           <div className="grid grid-cols-2 gap-4 mb-6">
                             <div className="space-y-1">
                                 <label className="text-xs text-slate-400">Matéria</label>
@@ -340,7 +426,6 @@ const AdminPanel: React.FC = () => {
 
                       {contentTab === 'question' && (
                           <div className="space-y-4 animate-fade-in">
-                              {/* Subtopic Input - Critical for new structure */}
                               <div className="space-y-1">
                                   <label className="text-xs text-slate-400">Subtópico</label>
                                   <input 
@@ -378,7 +463,6 @@ const AdminPanel: React.FC = () => {
                               <input className="w-full glass-input p-3 rounded-lg" placeholder="URL do Vídeo (YouTube)" value={contentForm.lUrl} onChange={e => setContentForm({...contentForm, lUrl: e.target.value})} />
                               <input className="w-full glass-input p-3 rounded-lg" placeholder="Duração (ex: 15:00)" value={contentForm.lDuration} onChange={e => setContentForm({...contentForm, lDuration: e.target.value})} />
                               
-                              {/* Materials Section */}
                               <div className="p-4 bg-slate-900/50 rounded-xl border border-white/5 space-y-3">
                                   <label className="text-xs text-slate-400 font-bold uppercase flex items-center gap-2"><FileText size={14}/> Materiais de Apoio (Opcional)</label>
                                   

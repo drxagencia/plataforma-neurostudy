@@ -105,9 +105,21 @@ export interface Simulation {
   id: string;
   title: string;
   description: string;
-  questionCount: number;
+  questionIds: string[]; // List of Question IDs included in this simulation
   durationMinutes: number;
   type: 'official' | 'training';
   status: 'open' | 'closed' | 'coming_soon';
-  subjects: string[]; 
+  subjects: string[]; // Tags for display
+}
+
+export interface SimulationResult {
+  id?: string;
+  userId: string;
+  simulationId: string;
+  score: number;
+  totalQuestions: number;
+  timeSpentSeconds: number;
+  answers: Record<string, boolean>; // QuestionID -> Correct(true/false)
+  timestamp: number;
+  topicPerformance?: Record<string, { correct: number; total: number }>; // Analysis data
 }
