@@ -34,22 +34,17 @@ const App: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Check if user exists in Realtime Database under users/[uid]
-        let dbUser = await DatabaseService.getUserProfile(firebaseUser.uid);
         const mappedUser = mapUser(firebaseUser);
         
-        // If user doesn't exist in DB, create the structure now
-        if (!dbUser) {
-           await DatabaseService.createUserProfile(firebaseUser.uid, {
+        // Ensure user exists in Realtime Database under users/[uid]
+        // This prevents the 404 User Not Found error in API calls
+        const dbUser = await DatabaseService.ensureUserProfile(firebaseUser.uid, {
                displayName: mappedUser.displayName,
                email: mappedUser.email,
                photoURL: mappedUser.photoURL || '',
                plan: mappedUser.isAdmin ? 'admin' : 'basic',
                isAdmin: mappedUser.isAdmin
-           });
-           // Fetch again to ensure consistency
-           dbUser = await DatabaseService.getUserProfile(firebaseUser.uid);
-        }
+        });
 
         setUser({
             ...mappedUser,

@@ -36,6 +36,21 @@ export const DatabaseService = {
     }
   },
 
+  ensureUserProfile: async (uid: string, authData: Partial<UserProfile>): Promise<UserProfile> => {
+     try {
+         let profile = await DatabaseService.getUserProfile(uid);
+         if (!profile) {
+             console.log("User profile missing, creating...", uid);
+             await DatabaseService.createUserProfile(uid, authData);
+             profile = await DatabaseService.getUserProfile(uid);
+         }
+         return profile!;
+     } catch (e) {
+         console.error("Failed to ensure user profile", e);
+         throw e;
+     }
+  },
+
   saveUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
     try {
       await update(ref(database, `users/${uid}`), data);

@@ -93,13 +93,20 @@ const QuestionBank: React.FC = () => {
   const handleRequestExplanation = async () => {
     setShowExplanationPrompt(false);
     setIsExplaining(true);
-    const question = questions[currentQuestionIndex];
-    const wrongAnswer = question.options[selectedOption!];
-    const correctAnswer = question.options[question.correctAnswer];
     
-    const explanation = await AiService.explainError(question.text, wrongAnswer, correctAnswer);
-    setAiExplanation(explanation);
-    setIsExplaining(false);
+    try {
+        const question = questions[currentQuestionIndex];
+        const wrongAnswer = question.options[selectedOption!];
+        const correctAnswer = question.options[question.correctAnswer];
+        
+        const explanation = await AiService.explainError(question.text, wrongAnswer, correctAnswer);
+        setAiExplanation(explanation);
+    } catch (error: any) {
+        console.error("Failed to explain:", error);
+        alert(error.message || "Erro ao gerar explicação. Verifique seu saldo ou tente novamente.");
+    } finally {
+        setIsExplaining(false);
+    }
   };
 
   const handleNext = async () => {
