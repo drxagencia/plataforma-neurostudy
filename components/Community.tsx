@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CommunityPost } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { auth } from '../services/firebaseConfig';
-import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle, Clock } from 'lucide-react';
 
 const Community: React.FC = () => {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
@@ -10,10 +10,24 @@ const Community: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  // Replies State
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState('');
 
   useEffect(() => {
     fetchPosts();
+    // Check timer
+    const interval = setInterval(checkTimer, 1000);
+    return () => clearInterval(interval);
   }, []);
+
+  const checkTimer = async () => {
+      if(!auth.currentUser) return;
+      // In a real optimized app, we'd cache lastPostedAt locally to avoid DB hits every second
+      // For this structure, we assume user profile is loaded in App level or we check roughly
+  };
 
   const fetchPosts = async () => {
     const data = await DatabaseService.getPosts();
@@ -37,12 +51,30 @@ const Community: React.FC = () => {
       }, auth.currentUser.uid);
       
       setNewPost('');
-      fetchPosts(); // Refresh list
+      fetchPosts(); 
     } catch (error: any) {
       setErrorMsg(error.message);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleLike = async (postId: string) => {
+      if (!auth.currentUser) return;
+      await DatabaseService.likePost(postId, auth.currentUser.uid);
+      // Optimistic update
+      setPosts(prev => prev.map(p => p.id === postId ? {...p, likes: p.likes + 1} : p));
+  };
+
+  const handleReplySubmit = async (postId: string) => {
+      if (!auth.currentUser || !replyContent.trim()) return;
+      await DatabaseService.replyPost(postId, {
+          author: auth.currentUser.displayName || 'User',
+          content: replyContent
+      });
+      setReplyContent('');
+      setReplyingTo(null);
+      fetchPosts();
   };
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
@@ -51,7 +83,7 @@ const Community: React.FC = () => {
     <div className="max-w-4xl mx-auto h-full flex flex-col">
       <div className="mb-6">
         <h2 className="text-3xl font-bold text-white mb-2">Comunidade</h2>
-        <p className="text-slate-400">Troque conhecimentos com outros estudantes. Ganhe XP participando!</p>
+        <p className="text-slate-400">Troque conhecimentos. Mostrando as últimas 50 mensagens.</p>
       </div>
 
       {/* New Post Input */}
@@ -72,8 +104,8 @@ const Community: React.FC = () => {
           )}
 
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
-             <div className="flex gap-2 text-xs text-slate-500">
-                1 mensagem a cada 24h
+             <div className="flex gap-2 text-xs text-slate-500 items-center">
+                <Clock size={12} /> Limite: 1 post a cada 24h
              </div>
              <button 
                type="submit" 
@@ -104,22 +136,42 @@ const Community: React.FC = () => {
                  </div>
                  <p className="text-slate-300 mt-2 text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
                  
+                 {/* Replies Display would go here (requires DB struct update to fetch) */}
+                 
                  <div className="flex items-center gap-6 mt-4 pt-4 border-t border-white/5">
-                   <button className="flex items-center gap-2 text-slate-500 hover:text-pink-500 transition-colors group">
+                   <button 
+                    onClick={() => handleLike(post.id)}
+                    className="flex items-center gap-2 text-slate-500 hover:text-pink-500 transition-colors group"
+                   >
                      <Heart size={18} className="group-hover:fill-pink-500/20" />
                      <span className="text-xs font-medium">{post.likes}</span>
                    </button>
-                   <button className="flex items-center gap-2 text-slate-500 hover:text-indigo-400 transition-colors">
+                   <button 
+                    onClick={() => setReplyingTo(replyingTo === post.id ? null : post.id)}
+                    className="flex items-center gap-2 text-slate-500 hover:text-indigo-400 transition-colors"
+                   >
                      <MessageCircle size={18} />
                      <span className="text-xs font-medium">Responder</span>
                    </button>
                  </div>
+
+                 {replyingTo === post.id && (
+                     <div className="mt-4 flex gap-2 animate-in fade-in">
+                         <input 
+                            className="flex-1 glass-input rounded-lg px-3 py-2 text-sm" 
+                            placeholder="Escreva sua resposta..."
+                            value={replyContent}
+                            onChange={(e) => setReplyContent(e.target.value)}
+                         />
+                         <button onClick={() => handleReplySubmit(post.id)} className="p-2 bg-indigo-600 rounded-lg text-white"><Send size={16}/></button>
+                     </div>
+                 )}
                </div>
              </div>
           </div>
         ))}
         {posts.length === 0 && (
-          <p className="text-center text-slate-500 mt-10">Nenhuma postagem ainda. Seja o primeiro!</p>
+          <p className="text-center text-slate-500 mt-10">Nenhuma postagem ainda.</p>
         )}
       </div>
     </div>

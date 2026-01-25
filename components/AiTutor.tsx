@@ -51,12 +51,25 @@ const AiTutor: React.FC = () => {
       setTransactions(trans);
   };
 
+  // Simple Markdown Parser for visual formatting
+  const renderMarkdown = (text: string) => {
+    // Bold: **text** -> <strong>text</strong>
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="text-indigo-200">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+    });
+  };
+
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim() || isLoading) return;
 
     if (balance <= 0.05) {
-        setError("Saldo insuficiente para enviar mensagem.");
+        setError("Seu saldo acabou.");
+        alert("Saldo Insuficiente. Recarregue para continuar."); // Alert User first
         setShowRecharge(true);
         return;
     }
@@ -83,11 +96,10 @@ const AiTutor: React.FC = () => {
       };
       
       setMessages(prev => [...prev, aiMsg]);
-      // Refresh balance after cost deduction
       fetchFinancialData(); 
     } catch (error: any) {
       if (error.message.includes('402')) {
-          setError("Saldo insuficiente. Por favor, recarregue.");
+          setError("Saldo insuficiente.");
           setShowRecharge(true);
       } else if (error.message.includes('403')) {
           setError("Seu plano não permite o uso do chat livre.");
@@ -105,12 +117,13 @@ const AiTutor: React.FC = () => {
   };
 
   const handleGeneratePix = () => {
-      if (!rechargeAmount || isNaN(parseFloat(rechargeAmount)) || parseFloat(rechargeAmount) < 1) {
-          alert("Digite um valor válido (mínimo R$ 1,00)");
+      const val = parseFloat(rechargeAmount);
+      if (!rechargeAmount || isNaN(val) || val < 10) {
+          alert("Valor mínimo de recarga: R$ 10,00");
           return;
       }
       
-      const payload = PixService.generatePayload(parseFloat(rechargeAmount));
+      const payload = PixService.generatePayload(val);
       setPixPayload(payload);
       setCopied(false);
   };
@@ -127,7 +140,8 @@ const AiTutor: React.FC = () => {
       if (!auth.currentUser || !rechargeAmount) return;
 
       try {
-          await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'User', parseFloat(rechargeAmount));
+          // Send real name
+          await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'Usuário Sem Nome', parseFloat(rechargeAmount));
           alert("Solicitação enviada! Seus créditos serão liberados assim que o sistema identificar o pagamento.");
           handleCloseRecharge();
       } catch (e) {
@@ -207,7 +221,7 @@ const AiTutor: React.FC = () => {
                         ? 'bg-slate-800/80 border border-white/5 text-slate-100 rounded-tl-none' 
                         : 'bg-indigo-600 text-white rounded-tr-none'
                     }`}>
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
                     </div>
                 </div>
                 ))}
@@ -218,7 +232,7 @@ const AiTutor: React.FC = () => {
                         <Loader2 size={20} className="animate-spin" />
                     </div>
                     <div className="bg-slate-800/80 border border-white/5 p-4 rounded-2xl rounded-tl-none flex items-center gap-2 text-slate-400 text-sm">
-                        <span>Processando resposta e calculando custos...</span>
+                        <span>Processando...</span>
                     </div>
                 </div>
                 )}
@@ -264,7 +278,6 @@ const AiTutor: React.FC = () => {
                                   </div>
                                   <div className="flex justify-between items-center text-[10px] text-slate-500">
                                       <span>{new Date(t.timestamp).toLocaleDateString()} {new Date(t.timestamp).toLocaleTimeString()}</span>
-                                      {t.tokensUsed && <span>{Math.round(t.tokensUsed)} tokens</span>}
                                   </div>
                               </div>
                           ))}
@@ -274,67 +287,75 @@ const AiTutor: React.FC = () => {
               </div>
           )}
 
-          {/* RECHARGE MODAL OVERLAY */}
+          {/* BEAUTIFUL RECHARGE MODAL OVERLAY */}
           {showRecharge && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
+              <div className="bg-[#0f172a] border border-indigo-500/20 rounded-3xl p-8 w-full max-w-md shadow-2xl relative overflow-hidden">
+                  {/* Decorative Glows */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
                   <button 
                     onClick={handleCloseRecharge}
-                    className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+                    className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors bg-white/5 p-2 rounded-full"
                   >
                     <X size={20} />
                   </button>
 
-                  <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                      <Wallet className="text-emerald-400" /> 
-                      Recarregar Saldo
-                  </h3>
+                  <div className="text-center mb-6">
+                      <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/20 text-emerald-400">
+                          <Wallet size={32} />
+                      </div>
+                      <h3 className="text-2xl font-bold text-white">Recarregar Saldo</h3>
+                      <p className="text-slate-400 text-sm">Adicione créditos para usar a IA.</p>
+                  </div>
 
                   {!pixPayload ? (
                     // Step 1: Input Amount
-                    <div className="space-y-6">
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl">
-                            <label className="text-xs text-emerald-300 font-bold uppercase mb-2 block">Quanto deseja recarregar?</label>
-                            <div className="flex items-center gap-2">
-                                <span className="text-2xl text-emerald-400 font-bold">R$</span>
+                    <div className="space-y-6 relative z-10">
+                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl text-center hover:border-emerald-500/50 transition-colors">
+                            <label className="text-xs text-slate-400 font-bold uppercase mb-2 block tracking-widest">Valor da Recarga</label>
+                            <div className="flex items-center justify-center gap-1">
+                                <span className="text-2xl text-emerald-500 font-bold">R$</span>
                                 <input 
                                     type="number" 
                                     value={rechargeAmount}
                                     onChange={e => setRechargeAmount(e.target.value)}
-                                    className="bg-transparent text-4xl font-bold text-white outline-none w-full placeholder:text-slate-700"
-                                    placeholder="50.00"
+                                    className="bg-transparent text-5xl font-bold text-white outline-none w-32 text-center placeholder:text-slate-700"
+                                    placeholder="20"
                                 />
                             </div>
+                            <p className="text-[10px] text-slate-500 mt-2">Mínimo R$ 10,00</p>
                         </div>
                         <button 
                             onClick={handleGeneratePix}
-                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] hover:-translate-y-1"
                         >
-                            <QrCode size={20} /> Gerar QR Code PIX
+                            <QrCode size={20} /> Gerar PIX
                         </button>
                     </div>
                   ) : (
                     // Step 2: Show QR Code
-                    <div className="space-y-6 text-center animate-in slide-in-from-bottom-4">
-                        <div className="bg-white p-4 rounded-xl inline-block shadow-xl">
+                    <div className="space-y-6 text-center animate-in slide-in-from-bottom-4 relative z-10">
+                        <div className="bg-white p-4 rounded-xl inline-block shadow-xl border-4 border-white">
                              <img 
                                 src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload)}`}
                                 alt="QR Code PIX"
-                                className="w-48 h-48 mix-blend-multiply" 
+                                className="w-40 h-40 mix-blend-multiply" 
                              />
                         </div>
                         
-                        <div className="space-y-2">
-                            <p className="text-slate-400 text-sm">Escaneie o QR Code ou copie o código abaixo:</p>
+                        <div className="space-y-2 text-left">
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Copia e Cola</p>
                             <div className="flex gap-2">
                                 <input 
                                     readOnly 
                                     value={pixPayload}
-                                    className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-400 font-mono truncate"
+                                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 text-xs text-slate-400 font-mono truncate"
                                 />
                                 <button 
                                     onClick={handleCopyPix}
-                                    className={`p-2 rounded-lg transition-colors border ${copied ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-white'}`}
+                                    className={`p-3 rounded-lg transition-colors border ${copied ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-white'}`}
                                 >
                                     {copied ? <Check size={18} /> : <Copy size={18} />}
                                 </button>
@@ -344,12 +365,12 @@ const AiTutor: React.FC = () => {
                         <div className="pt-4 border-t border-white/5">
                             <button 
                                 onClick={handleConfirmPayment}
-                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
                             >
                                 <Check size={20} /> Já fiz o pagamento
                             </button>
-                            <p className="text-[10px] text-slate-500 mt-2">
-                                Ao confirmar, um administrador verificará seu pagamento e liberará os créditos.
+                            <p className="text-[10px] text-slate-500 mt-3">
+                                A liberação ocorre após verificação do administrador.
                             </p>
                         </div>
                     </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
 import { Subject, Question } from '../types';
-import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, Trophy, Bot, Sparkles } from 'lucide-react';
+import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, Trophy, Bot, Sparkles, ArrowLeft } from 'lucide-react';
 import { auth } from '../services/firebaseConfig';
 
 const QuestionBank: React.FC = () => {
@@ -10,6 +10,7 @@ const QuestionBank: React.FC = () => {
   const [topics, setTopics] = useState<Record<string, string[]>>({});
   const [subtopics, setSubtopics] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
+  const [answeredMap, setAnsweredMap] = useState<Record<string, {correct: boolean}>>({});
 
   // Selection State
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
@@ -33,18 +34,34 @@ const QuestionBank: React.FC = () => {
 
   useEffect(() => {
     const initData = async () => {
-      const [subs, tops, subtops] = await Promise.all([
+      const [subs, tops, subtops, answered] = await Promise.all([
         DatabaseService.getSubjects(),
         DatabaseService.getTopics(),
-        DatabaseService.getSubTopics()
+        DatabaseService.getSubTopics(),
+        auth.currentUser ? DatabaseService.getAnsweredQuestions(auth.currentUser.uid) : Promise.resolve({})
       ]);
       setSubjects(subs);
       setTopics(tops);
       setSubtopics(subtops);
+      setAnsweredMap(answered);
       setLoading(false);
     };
     initData();
   }, []);
+
+  // Simple parser to handle **bold** and newlines from AI
+  const renderMarkdown = (text: string) => {
+    if(!text) return null;
+    return text.split('\n').map((line, i) => (
+        <p key={i} className="mb-2">
+            {line.split(/(\*\*.*?\*\*)/g).map((part, j) => 
+                part.startsWith('**') && part.endsWith('**') 
+                ? <strong key={j} className="text-indigo-200">{part.slice(2, -2)}</strong> 
+                : part
+            )}
+        </p>
+    ));
+  };
 
   const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
   const subTopicOptions = selectedTopic ? subtopics[selectedTopic] || [] : [];
@@ -62,13 +79,17 @@ const QuestionBank: React.FC = () => {
         setScore(0);
         setShowResult(false);
         setXpEarned(0);
-        resetQuestionState();
+        resetQuestionState(fetchedQuestions[0].id);
     } else {
         alert("Nenhuma questão encontrada para este filtro no momento.");
     }
   };
 
-  const resetQuestionState = () => {
+  const resetQuestionState = (questionId?: string) => {
+    // Check if previously answered
+    if (questionId && answeredMap[questionId]) {
+        // Could technically auto-fill here, but for quiz mode maybe not
+    }
     setSelectedOption(null);
     setIsAnswered(false);
     setShowExplanationPrompt(false);
@@ -76,16 +97,24 @@ const QuestionBank: React.FC = () => {
     setIsExplaining(false);
   };
 
-  const handleAnswer = (index: number) => {
+  const handleAnswer = async (index: number) => {
     if (isAnswered) return;
     setSelectedOption(index);
     setIsAnswered(true);
 
-    const isCorrect = index === questions[currentQuestionIndex].correctAnswer;
+    const question = questions[currentQuestionIndex];
+    const isCorrect = index === question.correctAnswer;
+    
+    // Save to DB
+    if (auth.currentUser && question.id) {
+        await DatabaseService.markQuestionAsAnswered(auth.currentUser.uid, question.id, isCorrect);
+        // Update local map
+        setAnsweredMap(prev => ({...prev, [question.id!]: {correct: isCorrect}}));
+    }
+
     if (isCorrect) {
         setScore(score + 1);
     } else {
-        // Wrong answer: Trigger AI help prompt
         setShowExplanationPrompt(true);
     }
   };
@@ -102,8 +131,7 @@ const QuestionBank: React.FC = () => {
         const explanation = await AiService.explainError(question.text, wrongAnswer, correctAnswer);
         setAiExplanation(explanation);
     } catch (error: any) {
-        console.error("Failed to explain:", error);
-        alert(error.message || "Erro ao gerar explicação. Verifique seu saldo ou tente novamente.");
+        alert(error.message);
     } finally {
         setIsExplaining(false);
     }
@@ -111,16 +139,16 @@ const QuestionBank: React.FC = () => {
 
   const handleNext = async () => {
     if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1);
-        resetQuestionState();
+        const nextIdx = currentQuestionIndex + 1;
+        setCurrentQuestionIndex(nextIdx);
+        resetQuestionState(questions[nextIdx].id);
     } else {
         // Finish Quiz
-        const finalXp = score * 10; // 10 XP per correct answer
+        const finalXp = score * 10; 
         if (auth.currentUser) {
             if (finalXp > 0) {
                 await DatabaseService.addXp(auth.currentUser.uid, finalXp);
             }
-            // Increment Stats
             await DatabaseService.incrementQuestionsAnswered(auth.currentUser.uid, questions.length);
         }
         setXpEarned(finalXp);
@@ -130,7 +158,6 @@ const QuestionBank: React.FC = () => {
 
   const resetQuiz = () => {
     setQuizActive(false);
-    resetQuestionState();
     setShowResult(false);
   };
 
@@ -147,13 +174,6 @@ const QuestionBank: React.FC = () => {
                     </div>
                     <h2 className="text-3xl font-bold text-white mb-2">Quiz Finalizado!</h2>
                     <p className="text-slate-400 mb-6">Você acertou <strong className="text-white">{score}</strong> de <strong className="text-white">{questions.length}</strong> questões.</p>
-                    
-                    {xpEarned > 0 && (
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-8">
-                            <p className="text-emerald-400 font-bold text-lg">+{xpEarned} XP Ganho!</p>
-                        </div>
-                    )}
-
                     <button 
                         onClick={resetQuiz}
                         className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors"
@@ -166,11 +186,24 @@ const QuestionBank: React.FC = () => {
     }
 
     const question = questions[currentQuestionIndex];
+    const prevAnswer = question.id ? answeredMap[question.id] : null;
+
     return (
         <div className="max-w-3xl mx-auto h-full flex flex-col pt-4 animate-slide-up">
             <div className="flex justify-between items-center mb-6">
-                <button onClick={resetQuiz} className="text-slate-500 hover:text-white text-sm">Cancelar</button>
-                <div className="text-slate-400 text-sm font-medium bg-white/5 px-3 py-1 rounded-full">Questão {currentQuestionIndex + 1} / {questions.length}</div>
+                <button onClick={resetQuiz} className="text-slate-500 hover:text-white text-sm flex items-center gap-1">
+                    <ArrowLeft size={16} /> Voltar aos Filtros
+                </button>
+                <div className="flex items-center gap-2">
+                    {prevAnswer && (
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${prevAnswer.correct ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {prevAnswer.correct ? 'JÁ ACERTOU ANTES' : 'JÁ ERROU ANTES'}
+                        </span>
+                    )}
+                    <div className="text-slate-400 text-sm font-medium bg-white/5 px-3 py-1 rounded-full">
+                        {currentQuestionIndex + 1} / {questions.length}
+                    </div>
+                </div>
             </div>
 
             {/* Progress Bar */}
@@ -182,15 +215,14 @@ const QuestionBank: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar">
-                <div className="glass-card rounded-2xl p-6 md:p-8 mb-6">
-                    {/* Optional Image */}
+                <div className="glass-card rounded-2xl p-6 md:p-8 mb-6 relative">
                     {question.imageUrl && (
                         <div className="mb-6 rounded-xl overflow-hidden border border-white/10">
                             <img src={question.imageUrl} alt="Questão" className="w-full h-auto max-h-[400px] object-contain bg-black/40" />
                         </div>
                     )}
                     <p className="text-lg md:text-xl text-white leading-relaxed font-medium">
-                        {question.text}
+                        {renderMarkdown(question.text)}
                     </p>
                 </div>
 
@@ -229,13 +261,13 @@ const QuestionBank: React.FC = () => {
                                     <div className="glass-card bg-indigo-600/20 border-indigo-500/30 p-4 rounded-xl flex items-center justify-between animate-pulse-slow">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 bg-indigo-500 rounded-full text-white"><Bot size={20}/></div>
-                                            <span className="text-indigo-200 font-bold">Quer saber porque tu errou essa, chefe?</span>
+                                            <span className="text-indigo-200 font-bold">Quer saber porque errou?</span>
                                         </div>
                                         <button 
                                             onClick={handleRequestExplanation}
                                             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm transition-colors"
                                         >
-                                            Sim, explica aí
+                                            Explicar
                                         </button>
                                     </div>
                                 )}
@@ -256,13 +288,15 @@ const QuestionBank: React.FC = () => {
                                             <Sparkles className="text-purple-400 shrink-0 mt-1" size={20} />
                                             <div>
                                                 <h4 className="font-bold text-purple-300 mb-2 text-sm uppercase tracking-wide">Explicação do Tutor</h4>
-                                                <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{aiExplanation}</p>
+                                                <div className="text-slate-200 text-sm leading-relaxed">
+                                                    {renderMarkdown(aiExplanation)}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Standard Static Explanation (Fallback) */}
+                                {/* Standard Static Explanation */}
                                 {!aiExplanation && !isExplaining && (
                                      <div className="p-4 bg-slate-900/50 border border-slate-700/50 rounded-xl">
                                          <p className="text-sm text-slate-400">

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
-import { DatabaseService } from '../services/databaseService';
 import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, Brain, ArrowRight } from 'lucide-react';
 
 interface DashboardProps {
-  user: UserProfile; // Using UserProfile to get access to XP/Questions
+  user: UserProfile; 
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user }) => {
@@ -53,7 +52,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Hero Card - Replaces Carousel */}
+      {/* Hero Card - Dynamic Content */}
       <div className="relative w-full rounded-3xl overflow-hidden glass-card p-8 md:p-10 group transition-all duration-500 hover:shadow-[0_0_50px_rgba(79,70,229,0.15)]">
         {/* Abstract Background */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 animate-pulse-slow" />
@@ -67,17 +66,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                     </span>
                     <span className="text-indigo-300 font-semibold tracking-wide text-sm">FOCO DIÁRIO</span>
                 </div>
+                
+                {/* Logic: Show generic welcome if no history, otherwise show last activity (To be implemented in future with history tracking) */}
                 <h3 className="text-3xl font-bold text-white mb-4 leading-tight">
-                    Continue sua jornada em <br/>
-                    <span className="text-white/90">Física - Termodinâmica</span>
+                    Pronto para começar?
                 </h3>
                 <p className="text-slate-300 mb-8 text-lg leading-relaxed">
-                    Você parou na aula de Introdução. Complete o módulo para ganhar <strong className="text-indigo-400">+150 XP</strong>.
+                    Acesse o banco de questões ou inicie uma nova aula para começar a ganhar XP.
                 </p>
-                <button className="px-8 py-4 bg-white text-slate-950 font-bold rounded-2xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 flex items-center gap-2">
-                    Continuar Estudando
-                    <ArrowRight size={20} />
-                </button>
+                
+                <div className="flex gap-4">
+                    <button className="px-8 py-4 bg-white text-slate-950 font-bold rounded-2xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 flex items-center gap-2">
+                        Explorar Conteúdos
+                        <ArrowRight size={20} />
+                    </button>
+                </div>
             </div>
 
             {/* Level Circle Progress */}
@@ -124,7 +127,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           { 
               icon: <Trophy className="text-yellow-400" />, 
               label: 'Sua Classificação', 
-              value: 'Top 10%',
+              value: '---', // Needs leaderboard context
               sub: 'Ranking mensal'
           },
         ].map((stat, i) => (
@@ -139,46 +142,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <p className="text-xs text-slate-500 font-medium">{stat.sub}</p>
           </div>
         ))}
-      </div>
-
-      {/* Mini Modules Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="glass-card rounded-2xl p-6">
-              <h4 className="font-bold text-white mb-4 flex items-center gap-2">
-                  <Brain size={20} className="text-pink-400" />
-                  Sugestões para você
-              </h4>
-              <div className="space-y-3">
-                  {[1,2,3].map((_, i) => (
-                      <div key={i} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
-                          <div className="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-400 font-bold text-xs border border-pink-500/20 group-hover:scale-110 transition-transform">
-                              {i === 0 ? 'MAT' : i === 1 ? 'BIO' : 'HIS'}
-                          </div>
-                          <div>
-                              <p className="text-sm font-bold text-slate-200">Revisão Rápida: {i === 0 ? 'Logaritmos' : i === 1 ? 'Citologia' : 'Guerra Fria'}</p>
-                              <p className="text-xs text-slate-500">15 min • Vídeo + Questões</p>
-                          </div>
-                          <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                              <ArrowRight size={16} className="text-pink-400" />
-                          </div>
-                      </div>
-                  ))}
-              </div>
-          </div>
-          
-           <div className="glass-card rounded-2xl p-6 relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl" />
-               <h4 className="font-bold text-white mb-2 relative z-10">Desafio Diário</h4>
-               <p className="text-sm text-slate-400 mb-6 relative z-10">Responda 5 perguntas de Atualidades e ganhe 50 XP bônus.</p>
-               
-               <div className="flex items-center justify-between bg-slate-950/50 p-4 rounded-xl border border-white/5 relative z-10">
-                   <div className="flex items-center gap-3">
-                       <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                       <span className="text-sm font-bold text-white">Disponível agora</span>
-                   </div>
-                   <button className="text-xs font-bold text-emerald-400 hover:text-emerald-300">Começar</button>
-               </div>
-           </div>
       </div>
     </div>
   );

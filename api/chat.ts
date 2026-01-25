@@ -2,16 +2,13 @@ import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, get, update, push, set } from "firebase/database";
 
-// Initialize Firebase Admin logic (using client SDK for Vercel simplicity in this demo)
-// In a real prod env, use firebase-admin with Service Account
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyDbNCUqJIR0OfuqoI6uh_gg6Htp2yh3fBo", // Fallback for dev
+  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyDbNCUqJIR0OfuqoI6uh_gg6Htp2yh3fBo",
   authDomain: "neurostudy-d8a00.firebaseapp.com",
   databaseURL: "https://neurostudy-d8a00-default-rtdb.firebaseio.com",
   projectId: "neurostudy-d8a00",
 };
 
-// Singleton-ish app init
 let app;
 try {
     app = initializeApp(firebaseConfig, "serverless_worker");
@@ -42,7 +39,6 @@ export default async function handler(req: any, res: any) {
 
     if (!uid) return res.status(401).json({ error: 'User ID required' });
 
-    // 1. Fetch User Data & AI Config
     const userRef = ref(db, `users/${uid}`);
     const configRef = ref(db, `config/ai`);
     
@@ -53,42 +49,41 @@ export default async function handler(req: any, res: any) {
     const user = userSnap.val();
     const config = configSnap.val() || { intermediateLimits: { canUseChat: false, canUseExplanation: true } };
 
-    // 2. Access Control Logic
     if (user.plan === 'basic') {
-        return res.status(403).json({ error: 'Plano Básico não permite acesso à IA. Faça upgrade.' });
+        return res.status(403).json({ error: 'Plano Básico não permite acesso à IA.' });
     }
 
     if (user.plan === 'intermediate') {
         if (mode === 'explanation' && !config.intermediateLimits.canUseExplanation) {
-            return res.status(403).json({ error: 'Seu plano não permite explicação de questões.' });
+            return res.status(403).json({ error: 'Plano não permite explicação.' });
         }
         if ((!mode || mode === 'chat') && !config.intermediateLimits.canUseChat) {
-            return res.status(403).json({ error: 'Seu plano não permite chat livre.' });
+            return res.status(403).json({ error: 'Plano não permite chat.' });
         }
     }
 
-    // 3. Balance Check
     const currentBalance = user.balance || 0;
-    if (currentBalance <= 0.05) { // Minimum threshold
-        return res.status(402).json({ error: 'Saldo insuficiente. Recarregue seus créditos.' });
+    if (currentBalance <= 0.05) {
+        return res.status(402).json({ error: 'Saldo insuficiente.' });
     }
 
-    // 4. Call Gemini AI
     const ai = new GoogleGenAI({ apiKey: apiKey });
     const modelId = 'gemini-flash-lite-latest'; 
 
     let fullPrompt = "";
     if (mode === 'explanation') {
       fullPrompt = `
-      Você é um tutor focado em corrigir erros.
-      CONTEXTO: Aluno errou uma questão.
-      OBJETIVO: Explicar PORQUE a alternativa marcada está errada e PORQUE a correta é a certa.
-      TOM: Simples, didático, amigável.
+      Você é um tutor.
+      TAREFA: Explicar o erro na questão.
+      REGRAS: 
+      1. Seja direto e curto (max 100 palavras).
+      2. Use **negrito** para destacar conceitos chave.
+      3. Não use blocos de código ou markdown complexo.
       DADOS: ${message}`;
     } else {
-      fullPrompt = "Você é o Tutor IA da NeuroStudy. Responda de forma didática e direta.\n\n";
+      fullPrompt = "Você é o NeuroTutor. Responda de forma didática e curta. Use **negrito** para destaques.\n\n";
       if (history && Array.isArray(history)) {
-        history.forEach((msg: any) => {
+        history.slice(-5).forEach((msg: any) => { // Limit context to 5 msgs for tokens
           fullPrompt += `${msg.role === 'user' ? 'Aluno' : 'Tutor'}: ${msg.content}\n`;
         });
       }
@@ -100,26 +95,18 @@ export default async function handler(req: any, res: any) {
       contents: fullPrompt,
     });
 
-    // 5. Cost Calculation & Markup (The "Hidden" Tax)
     const usage = response.usageMetadata;
-    const inputTokens = usage?.promptTokenCount || fullPrompt.length / 4; // Fallback approx
+    const inputTokens = usage?.promptTokenCount || fullPrompt.length / 4;
     const outputTokens = usage?.candidatesTokenCount || response.text.length / 4;
 
-    // Pricing (Approximate Flash Lite in USD -> converted to BRL)
-    // $0.075 per 1M input | $0.30 per 1M output
-    // Exchange Rate assumed fixed at 6.00 BRL
     const pricePerMillionInputBRL = 0.075 * 6;
     const pricePerMillionOutputBRL = 0.30 * 6;
 
     const rawCost = (inputTokens * (pricePerMillionInputBRL / 1000000)) + (outputTokens * (pricePerMillionOutputBRL / 1000000));
     
-    // Apply 10% Markup
     const finalCostToUser = rawCost * 1.10;
-    
-    // Ensure minimum charge to avoid floating point zeros issues (e.g., minimum R$ 0.0001)
     const chargeAmount = Math.max(finalCostToUser, 0.00001);
 
-    // 6. Deduct Balance & Log Transaction
     const newBalance = currentBalance - chargeAmount;
     
     await update(userRef, { balance: newBalance });
@@ -129,7 +116,7 @@ export default async function handler(req: any, res: any) {
         id: transRef.key,
         type: 'debit',
         amount: chargeAmount,
-        description: mode === 'explanation' ? 'IA: Explicação de Questão' : 'IA: Chat Tutor',
+        description: mode === 'explanation' ? 'Explicação IA' : 'Chat IA',
         timestamp: Date.now(),
         tokensUsed: inputTokens + outputTokens
     });
@@ -141,7 +128,7 @@ export default async function handler(req: any, res: any) {
     });
 
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    return res.status(500).json({ error: 'Failed to generate response', details: error.message });
+    console.error("API Error:", error);
+    return res.status(500).json({ error: 'Erro no servidor' });
   }
 }

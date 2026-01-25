@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User, UserProfile } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Camera, Save, Loader2, CheckCircle } from 'lucide-react';
+import { Camera, Save, Loader2, CheckCircle, Moon, Sun, Palette } from 'lucide-react';
 
 interface SettingsProps {
   user: UserProfile;
@@ -15,17 +15,30 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Theme Logic
+  const handleThemeChange = (theme: 'dark' | 'light' | 'midnight') => {
+      const root = document.documentElement;
+      root.classList.remove('theme-dark', 'theme-light', 'theme-midnight');
+      root.classList.add(`theme-${theme}`);
+      
+      // For simple tailwind dark mode toggle
+      if (theme === 'light') root.classList.remove('dark');
+      else root.classList.add('dark');
+      
+      // In a real app, save this to localStorage
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     setSuccess(false);
     try {
-      // 1. Update Firebase Auth (for login session consistency)
+      // 1. Update Firebase Auth 
       const updatedAuthUser = await AuthService.updateProfile(user, {
         displayName,
         photoURL
       });
 
-      // 2. Update Realtime Database (for persistence and admin view)
+      // 2. Update Realtime Database
       await DatabaseService.saveUserProfile(user.uid, {
         displayName,
         photoURL
@@ -47,10 +60,18 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-       // In production: Upload to Firebase Storage and get URL
-       // For this environment: Create local blob URL
-       const fakeUrl = URL.createObjectURL(e.target.files[0]);
-       setPhotoURL(fakeUrl);
+       const file = e.target.files[0];
+       // Limit size to 500KB for Base64 storage performance
+       if (file.size > 500000) {
+           alert("A imagem deve ter no máximo 500KB.");
+           return;
+       }
+
+       const reader = new FileReader();
+       reader.onloadend = () => {
+           setPhotoURL(reader.result as string);
+       };
+       reader.readAsDataURL(file);
     }
   };
 
@@ -101,12 +122,28 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
           />
         </div>
 
-         {/* Mock Section for Theme */}
+         {/* Theme Section */}
          <div className="space-y-3 pt-4 border-t border-white/5">
-            <span className="text-sm font-medium text-slate-300">Tema da Interface</span>
+            <span className="text-sm font-medium text-slate-300 flex items-center gap-2"><Palette size={16}/> Tema da Interface</span>
             <div className="grid grid-cols-3 gap-3">
-                <button className="p-3 rounded-xl bg-slate-950 border-2 border-indigo-500 text-indigo-400 text-sm font-medium">Escuro Premium</button>
-                <button className="p-3 rounded-xl bg-white border border-slate-200 text-slate-900 text-sm font-medium opacity-50 cursor-not-allowed">Claro (Em breve)</button>
+                <button 
+                    onClick={() => handleThemeChange('midnight')}
+                    className="p-3 rounded-xl bg-[#020617] border-2 border-indigo-500 text-indigo-400 text-xs font-bold"
+                >
+                    Azul Escuro
+                </button>
+                <button 
+                    onClick={() => handleThemeChange('dark')}
+                    className="p-3 rounded-xl bg-[#18181b] border border-slate-700 text-slate-400 text-xs font-bold hover:text-white"
+                >
+                    Dark Mode
+                </button>
+                <button 
+                    onClick={() => handleThemeChange('light')}
+                    className="p-3 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold hover:bg-slate-50"
+                >
+                    Light Mode
+                </button>
             </div>
          </div>
 

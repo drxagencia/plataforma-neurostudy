@@ -1,4 +1,5 @@
-import { ref, get, child, update, push, set, query, orderByChild, equalTo } from "firebase/database";
+
+import { ref, get, child, update, push, set, query, orderByChild, equalTo, limitToLast } from "firebase/database";
 import { database } from "./firebaseConfig";
 import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan } from "../types";
 
@@ -40,7 +41,6 @@ export const DatabaseService = {
      try {
          let profile = await DatabaseService.getUserProfile(uid);
          if (!profile) {
-             console.log("User profile missing, creating...", uid);
              await DatabaseService.createUserProfile(uid, authData);
              profile = await DatabaseService.getUserProfile(uid);
          }
@@ -89,9 +89,29 @@ export const DatabaseService = {
     }
   },
 
+  markQuestionAsAnswered: async (uid: string, questionId: string, isCorrect: boolean): Promise<void> => {
+      try {
+          await update(ref(database, `users/${uid}/answeredQuestions/${questionId}`), {
+              timestamp: Date.now(),
+              correct: isCorrect
+          });
+      } catch (e) {
+          console.error("Error marking question", e);
+      }
+  },
+
+  getAnsweredQuestions: async (uid: string): Promise<Record<string, { correct: boolean }>> => {
+      try {
+          const snap = await get(ref(database, `users/${uid}/answeredQuestions`));
+          return snap.exists() ? snap.val() : {};
+      } catch (e) {
+          return {};
+      }
+  },
+
   getLeaderboard: async (): Promise<UserProfile[]> => {
     try {
-      const usersRef = ref(database, 'users');
+      const usersRef = query(ref(database, 'users'), orderByChild('xp'));
       const snapshot = await get(usersRef);
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -99,7 +119,8 @@ export const DatabaseService = {
           ...data[key],
           uid: key
         })) as UserProfile[];
-        return users.sort((a, b) => (b.xp || 0) - (a.xp || 0));
+        // Firebase sorts ascending by default for numbers, reverse for leaderboard
+        return users.sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 50);
       }
     } catch (error) {
       console.error("Error fetching leaderboard:", error);
@@ -114,7 +135,7 @@ export const DatabaseService = {
         const request: RechargeRequest = {
             id: reqRef.key!,
             uid,
-            userDisplayName,
+            userDisplayName, // Ensure real name is passed
             amount,
             status: 'pending',
             timestamp: Date.now()
@@ -234,6 +255,26 @@ export const DatabaseService = {
     return [];
   },
 
+  createSubject: async (subject: Subject): Promise<void> => {
+      try {
+          // Check if subjects exists, if array or object map
+          const subjectsRef = ref(database, 'subjects');
+          const snapshot = await get(subjectsRef);
+          let currentSubjects: Subject[] = [];
+          
+          if (snapshot.exists()) {
+             const val = snapshot.val();
+             currentSubjects = Array.isArray(val) ? val : Object.values(val);
+          }
+          
+          currentSubjects.push(subject);
+          await set(subjectsRef, currentSubjects);
+      } catch (e) {
+          console.error("Error creating subject", e);
+          throw e;
+      }
+  },
+
   // --- Topics & Subtopics ---
   getTopics: async (): Promise<Record<string, string[]>> => {
     try {
@@ -258,11 +299,8 @@ export const DatabaseService = {
   // --- Questions (Hierarchical) ---
   getQuestions: async (subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
     try {
-      // Structure: questions/{subjectId}/{topic}/{subtopic}/{questionId}
       let path = `questions/${subjectId}/${topic}`;
-      
       if (subtopic) {
-        // Fetch specific subtopic folder
         path += `/${subtopic}`;
       }
       
@@ -272,16 +310,9 @@ export const DatabaseService = {
       const data = snapshot.val();
 
       if (subtopic) {
-        // Data is object of questions { q1: {}, q2: {} }
-        return Object.keys(data).map(key => ({
-            ...data[key],
-            id: key
-        }));
+        return Object.keys(data).map(key => ({ ...data[key], id: key }));
       } else {
-        // Data is object of subtopics { subtopic1: {q1, q2}, subtopic2: {q3, q4} }
-        // We need to flatten to get all questions in the topic
         let allQuestions: Question[] = [];
-        
         Object.keys(data).forEach(subtopicKey => {
             const questionsInSubtopic = data[subtopicKey];
             if (typeof questionsInSubtopic === 'object') {
@@ -293,7 +324,6 @@ export const DatabaseService = {
                 });
             }
         });
-        
         return allQuestions;
       }
     } catch (error) {
@@ -304,37 +334,29 @@ export const DatabaseService = {
 
   createQuestion: async (subjectId: string, topic: string, subtopic: string, question: Question): Promise<void> => {
      try {
-       // 1. Save Question to Hierarchy
        const questionsRef = ref(database, `questions/${subjectId}/${topic}/${subtopic}`);
        const newQuestionRef = push(questionsRef);
        await set(newQuestionRef, question);
 
-       // 2. Update Metadata: Topics List
-       // Check if topic exists in subjects list, if not add it
+       // Update Topics
        const topicsRef = ref(database, `topics/${subjectId}`);
        const topicsSnap = await get(topicsRef);
        let currentTopics: string[] = [];
-       if (topicsSnap.exists()) {
-           currentTopics = topicsSnap.val();
-       }
+       if (topicsSnap.exists()) currentTopics = topicsSnap.val();
        if (!currentTopics.includes(topic)) {
            currentTopics.push(topic);
            await set(topicsRef, currentTopics);
        }
 
-       // 3. Update Metadata: Subtopics List
-       // Check if subtopic exists in topics list, if not add it
+       // Update Subtopics
        const subtopicsRef = ref(database, `subtopics/${topic}`);
        const subtopicsSnap = await get(subtopicsRef);
        let currentSubtopics: string[] = [];
-       if (subtopicsSnap.exists()) {
-           currentSubtopics = subtopicsSnap.val();
-       }
+       if (subtopicsSnap.exists()) currentSubtopics = subtopicsSnap.val();
        if (!currentSubtopics.includes(subtopic)) {
            currentSubtopics.push(subtopic);
            await set(subtopicsRef, currentSubtopics);
        }
-
      } catch (error) {
        console.error("Error creating question:", error);
        throw error;
@@ -342,6 +364,34 @@ export const DatabaseService = {
   },
 
   // --- Lessons ---
+  getLessons: async (subjectId: string): Promise<Lesson[]> => {
+      try {
+          const snapshot = await get(ref(database, `lessons/${subjectId}`));
+          if (snapshot.exists()) {
+              const data = snapshot.val();
+              // Flatten topics if lessons are organized by topic
+              // Or return array if organized directly
+              let lessons: Lesson[] = [];
+              
+              // Helper to recurse
+              const traverse = (obj: any) => {
+                  if (obj.videoUrl) {
+                      lessons.push(obj);
+                      return;
+                  }
+                  if (typeof obj === 'object') {
+                      Object.values(obj).forEach(val => traverse(val));
+                  }
+              };
+              traverse(data);
+              return lessons;
+          }
+          return [];
+      } catch (e) {
+          return [];
+      }
+  },
+
   createLesson: async (subjectId: string, topic: string, lesson: Lesson): Promise<void> => {
     try {
       const lessonsRef = ref(database, `lessons/${subjectId}/${topic}`);
@@ -362,7 +412,10 @@ export const DatabaseService = {
   // --- Community ---
   getPosts: async (): Promise<CommunityPost[]> => {
     try {
-      const snapshot = await get(child(ref(database), 'posts'));
+      // Limit to last 50 posts to prevent overload
+      const q = query(ref(database, 'posts'), limitToLast(50));
+      const snapshot = await get(q);
+      
       if (snapshot.exists()) {
         const data = snapshot.val();
         const posts = Object.keys(data).map(key => ({
@@ -385,7 +438,7 @@ export const DatabaseService = {
       if (userProfile?.lastPostedAt) {
         const hoursSinceLastPost = (now - userProfile.lastPostedAt) / (1000 * 60 * 60);
         if (hoursSinceLastPost < 24) {
-          throw new Error("Você só pode enviar uma mensagem a cada 24 horas.");
+          throw new Error("Aguarde o timer para postar novamente.");
         }
       }
 
@@ -396,9 +449,30 @@ export const DatabaseService = {
       await update(ref(database, `users/${uid}`), { lastPostedAt: now });
       await DatabaseService.addXp(uid, 50); 
     } catch (error) {
-      console.error("Error creating post:", error);
       throw error;
     }
+  },
+
+  likePost: async (postId: string, uid: string): Promise<void> => {
+      // Check if already liked logic would go here ideally, but for now just increment
+      const postRef = ref(database, `posts/${postId}`);
+      const snap = await get(postRef);
+      if (snap.exists()) {
+          const currentLikes = snap.val().likes || 0;
+          await update(postRef, { likes: currentLikes + 1 });
+      }
+  },
+
+  replyPost: async (postId: string, reply: { author: string, content: string }): Promise<void> => {
+      const repliesRef = ref(database, `posts/${postId}/replies`);
+      const snap = await get(repliesRef);
+      let replies = [];
+      if (snap.exists()) {
+          replies = snap.val();
+          if(!Array.isArray(replies)) replies = Object.values(replies);
+      }
+      replies.push({ ...reply, timestamp: Date.now() });
+      await set(repliesRef, replies);
   },
 
   // --- Simulations ---
