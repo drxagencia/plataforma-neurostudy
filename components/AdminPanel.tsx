@@ -60,7 +60,14 @@ const AdminPanel: React.FC = () => {
         DatabaseService.getRechargeRequests(),
         DatabaseService.getAiConfig()
     ]);
-    setUsers(u);
+    
+    // Filter out seed/placeholder users if they exist
+    const realUsers = u.filter(user => 
+        user.uid !== 'student_uid_placeholder' && 
+        user.uid !== 'admin_uid_placeholder'
+    );
+    
+    setUsers(realUsers);
     setSubjects(s);
     setTopics(t);
     setSubtopics(st);

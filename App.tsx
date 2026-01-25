@@ -30,14 +30,27 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Auth Persistence
+  // Auth Persistence & DB Structure Enforcement
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Fetch full profile from DB
-        const dbUser = await DatabaseService.getUserProfile(firebaseUser.uid);
+        // Check if user exists in Realtime Database under users/[uid]
+        let dbUser = await DatabaseService.getUserProfile(firebaseUser.uid);
         const mappedUser = mapUser(firebaseUser);
         
+        // If user doesn't exist in DB, create the structure now
+        if (!dbUser) {
+           await DatabaseService.createUserProfile(firebaseUser.uid, {
+               displayName: mappedUser.displayName,
+               email: mappedUser.email,
+               photoURL: mappedUser.photoURL || '',
+               plan: mappedUser.isAdmin ? 'admin' : 'basic',
+               isAdmin: mappedUser.isAdmin
+           });
+           // Fetch again to ensure consistency
+           dbUser = await DatabaseService.getUserProfile(firebaseUser.uid);
+        }
+
         setUser({
             ...mappedUser,
             ...dbUser, 
