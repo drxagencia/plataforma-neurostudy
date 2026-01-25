@@ -35,6 +35,7 @@ export interface Subject {
 export interface Question {
   id?: string;
   text: string;
+  imageUrl?: string; // New field for question image
   options: string[];
   correctAnswer: number; // Index 0-3
   difficulty: 'easy' | 'medium' | 'hard';

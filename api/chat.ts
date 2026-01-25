@@ -26,23 +26,39 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { message, history } = req.body;
+    const { message, history, mode } = req.body;
 
     const ai = new GoogleGenAI({ apiKey: apiKey });
     
-    // Usando o modelo Flash Lite (mais econômico) conforme solicitado
+    // Usando o modelo Flash Lite (mais econômico)
     const modelId = 'gemini-flash-lite-latest'; 
 
-    // Construção do prompt com histórico simples
-    let fullPrompt = "Você é o Tutor IA da NeuroStudy. Responda de forma didática, direta e motivadora para estudantes do ENEM/Vestibulares.\n\n";
-    
-    if (history && Array.isArray(history)) {
-      history.forEach((msg: any) => {
-        fullPrompt += `${msg.role === 'user' ? 'Aluno' : 'Tutor'}: ${msg.content}\n`;
-      });
+    let fullPrompt = "";
+
+    if (mode === 'explanation') {
+      // Modo específico para explicar erro (Teacher Persona)
+      fullPrompt = `
+      Você é um tutor focado em corrigir erros de estudantes.
+      CONTEXTO: O aluno errou uma questão de múltipla escolha.
+      OBJETIVO: Explicar PORQUE a alternativa que ele marcou está errada e PORQUE a alternativa correta é a certa.
+      TOM DE VOZ: Explique de forma extremamente simples, didática e direta, como se estivesse explicando para uma criança que tem dificuldade de entender (use analogias simples se precisar). Seja amigável mas firme no erro. Não dê a resposta direto, construa o raciocínio.
+      
+      DADOS DA QUESTÃO:
+      ${message}
+      
+      Explicação:`;
+    } else {
+      // Modo Chat Padrão
+      fullPrompt = "Você é o Tutor IA da NeuroStudy. Responda de forma didática, direta e motivadora para estudantes do ENEM/Vestibulares.\n\n";
+      
+      if (history && Array.isArray(history)) {
+        history.forEach((msg: any) => {
+          fullPrompt += `${msg.role === 'user' ? 'Aluno' : 'Tutor'}: ${msg.content}\n`;
+        });
+      }
+      
+      fullPrompt += `Aluno: ${message}\nTutor:`;
     }
-    
-    fullPrompt += `Aluno: ${message}\nTutor:`;
 
     const response = await ai.models.generateContent({
       model: modelId,

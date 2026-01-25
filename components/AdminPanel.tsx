@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Subject, Question, Lesson } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'content'>('users');
@@ -33,6 +33,7 @@ const AdminPanel: React.FC = () => {
       topicName: '',
       // Question specific
       qText: '',
+      qImageUrl: '', // New field
       qOptions: ['', '', '', ''],
       qCorrect: 0,
       qDifficulty: 'medium',
@@ -105,6 +106,7 @@ const AdminPanel: React.FC = () => {
               if (!contentForm.qText) return;
               const newQuestion: Question = {
                   text: contentForm.qText,
+                  imageUrl: contentForm.qImageUrl || undefined,
                   options: contentForm.qOptions.filter(o => o.trim() !== ''),
                   correctAnswer: contentForm.qCorrect,
                   difficulty: contentForm.qDifficulty as any,
@@ -123,7 +125,7 @@ const AdminPanel: React.FC = () => {
               alert("Aula criada com sucesso!");
           }
           // Reset relevant fields
-          setContentForm(prev => ({...prev, qText: '', lTitle: '', qOptions: ['', '', '', '']}));
+          setContentForm(prev => ({...prev, qText: '', qImageUrl: '', lTitle: '', qOptions: ['', '', '', '']}));
       } catch (e) {
           alert("Erro ao salvar conteúdo.");
       }
@@ -311,6 +313,16 @@ const AdminPanel: React.FC = () => {
                                   value={contentForm.qText}
                                   onChange={e => setContentForm({...contentForm, qText: e.target.value})}
                               />
+
+                              <div className="space-y-1">
+                                <label className="text-xs text-slate-400 flex items-center gap-2"><ImageIcon size={12}/> URL da Imagem (Opcional)</label>
+                                <input 
+                                  className="w-full glass-input p-3 rounded-lg"
+                                  placeholder="https://exemplo.com/imagem.png"
+                                  value={contentForm.qImageUrl}
+                                  onChange={e => setContentForm({...contentForm, qImageUrl: e.target.value})}
+                                />
+                              </div>
                               
                               <div className="space-y-2">
                                   <label className="text-xs text-slate-400">Alternativas (Marque a correta)</label>

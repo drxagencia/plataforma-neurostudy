@@ -7,7 +7,6 @@ export interface ChatMessage {
 export const AiService = {
   sendMessage: async (message: string, history: ChatMessage[]): Promise<string> => {
     try {
-      // Chamada para a nossa Serverless Function
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -15,7 +14,7 @@ export const AiService = {
         },
         body: JSON.stringify({ 
           message,
-          history: history.map(h => ({ role: h.role, content: h.content })) // Envia apenas o necessário
+          history: history.map(h => ({ role: h.role, content: h.content }))
         }),
       });
 
@@ -28,6 +27,33 @@ export const AiService = {
     } catch (error) {
       console.error("AI Service Error:", error);
       throw error;
+    }
+  },
+
+  explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string): Promise<string> => {
+    try {
+      const promptContext = `
+        Questão: "${questionText}"
+        Aluno marcou (Errada): "${wrongAnswerText}"
+        A correta era: "${correctAnswerText}"
+      `;
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: promptContext,
+          mode: 'explanation' 
+        }),
+      });
+
+      if (!response.ok) throw new Error("Erro ao gerar explicação");
+      
+      const data = await response.json();
+      return data.text;
+    } catch (error) {
+      console.error("AI Explanation Error:", error);
+      return "Ops, não consegui analisar seu erro agora. Tente novamente mais tarde.";
     }
   }
 };

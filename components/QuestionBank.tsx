@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
+import { AiService } from '../services/aiService';
 import { Subject, Question } from '../types';
-import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, Trophy } from 'lucide-react';
+import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, Trophy, Bot, Sparkles } from 'lucide-react';
 import { auth } from '../services/firebaseConfig';
 
 const QuestionBank: React.FC = () => {
@@ -24,6 +25,11 @@ const QuestionBank: React.FC = () => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [xpEarned, setXpEarned] = useState(0);
+
+  // AI Explanation State
+  const [showExplanationPrompt, setShowExplanationPrompt] = useState(false);
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
 
   useEffect(() => {
     const initData = async () => {
@@ -56,9 +62,18 @@ const QuestionBank: React.FC = () => {
         setScore(0);
         setShowResult(false);
         setXpEarned(0);
+        resetQuestionState();
     } else {
         alert("Nenhuma questão encontrada para este filtro no momento.");
     }
+  };
+
+  const resetQuestionState = () => {
+    setSelectedOption(null);
+    setIsAnswered(false);
+    setShowExplanationPrompt(false);
+    setAiExplanation(null);
+    setIsExplaining(false);
   };
 
   const handleAnswer = (index: number) => {
@@ -67,14 +82,30 @@ const QuestionBank: React.FC = () => {
     setIsAnswered(true);
 
     const isCorrect = index === questions[currentQuestionIndex].correctAnswer;
-    if (isCorrect) setScore(score + 1);
+    if (isCorrect) {
+        setScore(score + 1);
+    } else {
+        // Wrong answer: Trigger AI help prompt
+        setShowExplanationPrompt(true);
+    }
+  };
+
+  const handleRequestExplanation = async () => {
+    setShowExplanationPrompt(false);
+    setIsExplaining(true);
+    const question = questions[currentQuestionIndex];
+    const wrongAnswer = question.options[selectedOption!];
+    const correctAnswer = question.options[question.correctAnswer];
+    
+    const explanation = await AiService.explainError(question.text, wrongAnswer, correctAnswer);
+    setAiExplanation(explanation);
+    setIsExplaining(false);
   };
 
   const handleNext = async () => {
     if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
-        setSelectedOption(null);
-        setIsAnswered(false);
+        resetQuestionState();
     } else {
         // Finish Quiz
         const finalXp = score * 10; // 10 XP per correct answer
@@ -92,8 +123,7 @@ const QuestionBank: React.FC = () => {
 
   const resetQuiz = () => {
     setQuizActive(false);
-    setSelectedOption(null);
-    setIsAnswered(false);
+    resetQuestionState();
     setShowResult(false);
   };
 
@@ -146,6 +176,12 @@ const QuestionBank: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar">
                 <div className="glass-card rounded-2xl p-6 md:p-8 mb-6">
+                    {/* Optional Image */}
+                    {question.imageUrl && (
+                        <div className="mb-6 rounded-xl overflow-hidden border border-white/10">
+                            <img src={question.imageUrl} alt="Questão" className="w-full h-auto max-h-[400px] object-contain bg-black/40" />
+                        </div>
+                    )}
                     <p className="text-lg md:text-xl text-white leading-relaxed font-medium">
                         {question.text}
                     </p>
@@ -178,14 +214,58 @@ const QuestionBank: React.FC = () => {
                 </div>
 
                 {isAnswered && (
-                    <div className="mt-8 animate-fade-in">
+                    <div className="mt-8 animate-fade-in space-y-4">
                          {selectedOption !== question.correctAnswer && (
-                             <div className="p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-xl mb-4">
-                                 <p className="text-sm text-indigo-200">
-                                     <span className="font-bold">Explicação:</span> {question.explanation || "Sem explicação disponível."}
-                                 </p>
-                             </div>
+                            <div className="space-y-4">
+                                {/* AI Help Trigger */}
+                                {showExplanationPrompt && !aiExplanation && !isExplaining && (
+                                    <div className="glass-card bg-indigo-600/20 border-indigo-500/30 p-4 rounded-xl flex items-center justify-between animate-pulse-slow">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-500 rounded-full text-white"><Bot size={20}/></div>
+                                            <span className="text-indigo-200 font-bold">Quer saber porque tu errou essa, chefe?</span>
+                                        </div>
+                                        <button 
+                                            onClick={handleRequestExplanation}
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm transition-colors"
+                                        >
+                                            Sim, explica aí
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Loading AI */}
+                                {isExplaining && (
+                                    <div className="flex items-center gap-3 text-indigo-300 p-4">
+                                        <Loader2 className="animate-spin" size={20} />
+                                        <span className="text-sm font-medium">Analisando seu erro com calma...</span>
+                                    </div>
+                                )}
+
+                                {/* AI Explanation Result */}
+                                {aiExplanation && (
+                                    <div className="glass-card bg-purple-900/20 border-purple-500/30 p-6 rounded-xl animate-fade-in relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-12 bg-purple-500/10 blur-3xl rounded-full pointer-events-none" />
+                                        <div className="flex items-start gap-3 relative z-10">
+                                            <Sparkles className="text-purple-400 shrink-0 mt-1" size={20} />
+                                            <div>
+                                                <h4 className="font-bold text-purple-300 mb-2 text-sm uppercase tracking-wide">Explicação do Tutor</h4>
+                                                <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{aiExplanation}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Standard Static Explanation (Fallback) */}
+                                {!aiExplanation && !isExplaining && (
+                                     <div className="p-4 bg-slate-900/50 border border-slate-700/50 rounded-xl">
+                                         <p className="text-sm text-slate-400">
+                                             <span className="font-bold text-slate-300">Gabarito:</span> {question.explanation || "Sem explicação cadastrada."}
+                                         </p>
+                                     </div>
+                                )}
+                            </div>
                          )}
+
                         <button 
                             onClick={handleNext}
                             className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 shadow-lg"
