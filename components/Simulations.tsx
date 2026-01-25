@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { Simulation } from '../types';
-import { Timer, FileText, BarChart3, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
+import { Timer, FileText, ChevronRight, AlertCircle, Loader2, Trophy, Clock, CheckCircle } from 'lucide-react';
 
 const Simulations: React.FC = () => {
   const [simulations, setSimulations] = useState<Simulation[]>([]);
@@ -16,73 +16,66 @@ const Simulations: React.FC = () => {
     fetchSimulations();
   }, []);
 
-  const officialSim = simulations.find(s => s.type === 'official' && s.status === 'open');
-
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-2">Simulados</h2>
-          <p className="text-slate-400">Teste seus conhecimentos em condições reais de prova.</p>
+          <h2 className="text-3xl font-bold text-white mb-2">Simulados e Provas</h2>
+          <p className="text-slate-400">Pratique com simulados reais cadastrados na plataforma.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Highlight Card - Next Exam */}
-        <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-900/40 to-slate-900 border border-indigo-500/30 p-8 group">
-          <div className="absolute top-0 right-0 p-32 bg-indigo-500/20 blur-[80px] rounded-full pointer-events-none group-hover:bg-indigo-500/30 transition-colors duration-500" />
-          
-          {officialSim ? (
-            <div className="relative z-10">
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-4 border border-indigo-500/20">
-                <Timer size={12} /> Oficial
-              </span>
-              <h3 className="text-3xl font-bold text-white mb-2">{officialSim.title}</h3>
-              <p className="text-slate-300 mb-6 max-w-md">{officialSim.description}</p>
-              
-              <div className="flex flex-wrap gap-4">
-                <button className="px-6 py-3 bg-white text-indigo-950 font-bold rounded-lg hover:bg-indigo-50 transition-colors shadow-lg flex items-center gap-2">
-                  Começar Agora <ChevronRight size={18} />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="relative z-10 flex flex-col justify-center h-full">
-              <div className="inline-flex items-center gap-2 text-slate-400 mb-2">
-                <Timer size={20} />
-                <span className="uppercase tracking-widest text-xs font-bold">Sem provas ativas</span>
-              </div>
-              <h3 className="text-2xl font-bold text-white max-w-md">Nenhum simulado oficial aberto no momento.</h3>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <h3 className="text-xl font-bold text-white pt-4">Todos os Simulados</h3>
       {simulations.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {simulations.map((sim) => (
-            <div key={sim.id} className="bg-slate-900/30 border border-white/5 p-4 rounded-xl hover:bg-slate-800/50 transition-all cursor-pointer group">
-                <div className="flex justify-between items-start mb-3">
-                <div className="p-2 bg-slate-800 rounded-lg text-slate-300">
-                    <FileText size={20} />
+            <div key={sim.id} className="glass-card flex flex-col p-6 rounded-2xl hover:bg-slate-800/60 transition-all group border border-white/5 hover:border-indigo-500/30 relative overflow-hidden">
+                {/* Status Badge */}
+                <div className="absolute top-4 right-4">
+                     <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        sim.status === 'open' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
+                        sim.status === 'coming_soon' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                        'bg-slate-700/50 text-slate-400 border border-slate-600'
+                    }`}>
+                        {sim.status === 'open' ? 'Disponível' : sim.status === 'coming_soon' ? 'Em Breve' : 'Encerrado'}
+                    </span>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded capitalize ${
-                    sim.status === 'open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
-                }`}>
-                    {sim.status === 'coming_soon' ? 'Em Breve' : sim.status}
-                </span>
+
+                <div className="mb-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
+                        sim.type === 'official' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 text-slate-300'
+                    }`}>
+                        {sim.type === 'official' ? <Trophy size={24} /> : <FileText size={24} />}
+                    </div>
+                    <h3 className="text-xl font-bold text-white leading-tight mb-2 group-hover:text-indigo-200 transition-colors">{sim.title}</h3>
+                    <p className="text-sm text-slate-400 line-clamp-2">{sim.description}</p>
                 </div>
-                <h4 className="text-white font-medium mb-1">{sim.title}</h4>
-                <p className="text-sm text-slate-500">{sim.questionCount} Questões • {sim.durationMinutes} min</p>
+
+                <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between text-xs text-slate-500 font-medium uppercase tracking-wide">
+                    <span className="flex items-center gap-1"><CheckCircle size={14}/> {sim.questionCount} Questões</span>
+                    <span className="flex items-center gap-1"><Clock size={14}/> {sim.durationMinutes} min</span>
+                </div>
+                
+                <button 
+                    disabled={sim.status !== 'open'}
+                    className="mt-4 w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-white/5 hover:bg-white/10 text-white hover:text-indigo-300"
+                >
+                    {sim.status === 'open' ? 'Iniciar Prova' : 'Indisponível'}
+                    {sim.status === 'open' && <ChevronRight size={16} />}
+                </button>
             </div>
             ))}
         </div>
       ) : (
-          <div className="p-8 text-center bg-slate-900/30 rounded-2xl border border-white/5 border-dashed">
-              <p className="text-slate-500">Nenhum simulado cadastrado na plataforma ainda.</p>
+          <div className="flex flex-col items-center justify-center py-20 bg-slate-900/20 rounded-3xl border border-white/5 border-dashed">
+              <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6">
+                 <FileText size={40} className="text-slate-600 opacity-50" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Nenhum simulado disponível</h3>
+              <p className="text-slate-500 max-w-sm text-center">
+                  No momento não há provas cadastradas no banco de dados. Fique atento às novidades.
+              </p>
           </div>
       )}
     </div>
