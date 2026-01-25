@@ -48,7 +48,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </div>
         <div className="hidden md:block text-right">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-indigo-300 uppercase tracking-wider">
-             {user.isAdmin ? 'Administrador' : user.subscriptionStatus === 'pro' ? 'Assinante Pro' : 'Plano Gratuito'}
+             {user.isAdmin ? 'Administrador' : user.plan !== 'basic' ? 'Assinante Pro' : 'Plano Gratuito'}
           </div>
         </div>
       </div>

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, UserProfile } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
 import { Camera, Save, Loader2, CheckCircle } from 'lucide-react';
 
 interface SettingsProps {
-  user: User;
-  onUpdateUser: (user: User) => void;
+  user: UserProfile;
+  onUpdateUser: (user: UserProfile) => void;
 }
 
 const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
@@ -31,7 +31,10 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
         photoURL
       });
 
-      onUpdateUser(updatedAuthUser);
+      // Merge updated User fields back into UserProfile
+      const updatedProfile: UserProfile = { ...user, ...updatedAuthUser };
+
+      onUpdateUser(updatedProfile);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (e) {
