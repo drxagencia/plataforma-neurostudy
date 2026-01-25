@@ -34,7 +34,7 @@ const AdminPanel: React.FC = () => {
   const [contentForm, setContentForm] = useState({
       subjectId: '',
       topicName: '',
-      subtopicName: '', // Added subtopic
+      subtopicName: '', // Required for new structure
       qText: '',
       qImageUrl: '', 
       qOptions: ['', '', '', ''],
@@ -125,7 +125,7 @@ const AdminPanel: React.FC = () => {
       try {
           if (contentTab === 'question') {
               if (!contentForm.qText || !contentForm.subtopicName) {
-                  alert("Preencha o Enunciado e o Subtópico");
+                  alert("Preencha o Enunciado e o Subtópico para manter a organização.");
                   return;
               }
               const newQuestion: Question = {
@@ -134,11 +134,17 @@ const AdminPanel: React.FC = () => {
                   options: contentForm.qOptions.filter(o => o.trim() !== ''),
                   correctAnswer: contentForm.qCorrect,
                   difficulty: contentForm.qDifficulty as any,
-                  explanation: contentForm.qExplanation
+                  explanation: contentForm.qExplanation,
+                  subjectId: contentForm.subjectId,
+                  topic: contentForm.topicName
               };
-              // Pass subtopic to create hierarchy
+              
               await DatabaseService.createQuestion(contentForm.subjectId, contentForm.topicName, contentForm.subtopicName, newQuestion);
-              alert("Questão criada com sucesso!");
+              
+              // Force refresh to update topics/subtopics lists if they were new
+              await fetchInitialData(); 
+              
+              alert("Questão criada com sucesso e estrutura atualizada!");
           } else {
               if (!contentForm.lTitle) return;
               const newLesson: Lesson = {
@@ -149,8 +155,9 @@ const AdminPanel: React.FC = () => {
               await DatabaseService.createLesson(contentForm.subjectId, contentForm.topicName, newLesson);
               alert("Aula criada com sucesso!");
           }
-          setContentForm(prev => ({...prev, qText: '', qImageUrl: '', lTitle: '', qOptions: ['', '', '', ''], subtopicName: ''}));
+          setContentForm(prev => ({...prev, qText: '', qImageUrl: '', lTitle: '', qOptions: ['', '', '', ''], qExplanation: ''}));
       } catch (e) {
+          console.error(e);
           alert("Erro ao salvar conteúdo.");
       }
   };
@@ -396,14 +403,20 @@ const AdminPanel: React.FC = () => {
                           </div>
                           <div className="space-y-1">
                               <label className="text-xs text-slate-400">Tópico</label>
-                              <input className="w-full glass-input p-3 rounded-lg" placeholder="Ex: Cinemática" value={contentForm.topicName} onChange={(e) => setContentForm({...contentForm, topicName: e.target.value})} list="topics-list" />
+                              <input 
+                                className="w-full glass-input p-3 rounded-lg" 
+                                placeholder="Ex: Cinemática" 
+                                value={contentForm.topicName} 
+                                onChange={(e) => setContentForm({...contentForm, topicName: e.target.value})} 
+                                list="topics-list" 
+                              />
                               <datalist id="topics-list">{contentForm.subjectId && topics[contentForm.subjectId]?.map(t => <option key={t} value={t} />)}</datalist>
                           </div>
                       </div>
 
                       {contentTab === 'question' && (
                           <div className="space-y-4 animate-fade-in">
-                              {/* Subtopic Input */}
+                              {/* Subtopic Input - Critical for new structure */}
                               <div className="space-y-1">
                                   <label className="text-xs text-slate-400">Subtópico</label>
                                   <input 
@@ -414,6 +427,7 @@ const AdminPanel: React.FC = () => {
                                     list="subtopics-list"
                                   />
                                   <datalist id="subtopics-list">{contentForm.topicName && subtopics[contentForm.topicName]?.map(st => <option key={st} value={st} />)}</datalist>
+                                  <p className="text-[10px] text-slate-500">Subtópicos organizam as questões. Se não existir, será criado.</p>
                               </div>
 
                               <textarea className="w-full glass-input p-4 rounded-xl min-h-[100px]" placeholder="Enunciado da questão..." value={contentForm.qText} onChange={e => setContentForm({...contentForm, qText: e.target.value})} />

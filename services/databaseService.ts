@@ -9,7 +9,6 @@ export const DatabaseService = {
       const snapshot = await get(child(ref(database), `users/${uid}`));
       if (snapshot.exists()) {
         const data = snapshot.val();
-        // Ensure defaults for new fields
         return { 
           ...data, 
           uid,
@@ -94,7 +93,6 @@ export const DatabaseService = {
   },
 
   // --- Financial & Credits System ---
-  
   createRechargeRequest: async (uid: string, userDisplayName: string, amount: number): Promise<void> => {
     try {
         const reqRef = push(ref(database, 'recharges'));
@@ -135,14 +133,12 @@ export const DatabaseService = {
         const request = snapshot.val() as RechargeRequest;
         
         if (status === 'approved' && request.status !== 'approved') {
-            // Add Balance to user
             const userRef = ref(database, `users/${request.uid}`);
             const userSnap = await get(userRef);
             const currentBalance = userSnap.val().balance || 0;
             
             await update(userRef, { balance: currentBalance + request.amount });
 
-            // Log Transaction
             const transRef = push(ref(database, `users/${request.uid}/transactions`));
             const transaction: Transaction = {
                 id: transRef.key!,
@@ -244,13 +240,14 @@ export const DatabaseService = {
     return {};
   },
 
-  // --- Questions (Updated Hierarchy) ---
+  // --- Questions (Hierarchical) ---
   getQuestions: async (subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
     try {
-      // Path: questions/math/Algebra/Polinomios/...
+      // Structure: questions/{subjectId}/{topic}/{subtopic}/{questionId}
       let path = `questions/${subjectId}/${topic}`;
       
       if (subtopic) {
+        // Fetch specific subtopic folder
         path += `/${subtopic}`;
       }
       
@@ -259,27 +256,29 @@ export const DatabaseService = {
 
       const data = snapshot.val();
 
-      // If we fetched a specific subtopic, data is an object of questions
       if (subtopic) {
+        // Data is object of questions { q1: {}, q2: {} }
         return Object.keys(data).map(key => ({
             ...data[key],
             id: key
         }));
       } else {
-        // If we fetched a topic, data is an object of subtopics, which contain objects of questions
-        // We need to flatten this structure
+        // Data is object of subtopics { subtopic1: {q1, q2}, subtopic2: {q3, q4} }
+        // We need to flatten to get all questions in the topic
         let allQuestions: Question[] = [];
-        Object.keys(data).forEach(subKey => {
-            const subData = data[subKey]; // This is the subtopic object
-            if (typeof subData === 'object') {
-                Object.keys(subData).forEach(qKey => {
+        
+        Object.keys(data).forEach(subtopicKey => {
+            const questionsInSubtopic = data[subtopicKey];
+            if (typeof questionsInSubtopic === 'object') {
+                Object.keys(questionsInSubtopic).forEach(qKey => {
                     allQuestions.push({
-                        ...subData[qKey],
+                        ...questionsInSubtopic[qKey],
                         id: qKey
                     });
                 });
             }
         });
+        
         return allQuestions;
       }
     } catch (error) {
@@ -290,10 +289,37 @@ export const DatabaseService = {
 
   createQuestion: async (subjectId: string, topic: string, subtopic: string, question: Question): Promise<void> => {
      try {
-       // Hierarchical Path: questions/{subject}/{topic}/{subtopic}/{questionId}
+       // 1. Save Question to Hierarchy
        const questionsRef = ref(database, `questions/${subjectId}/${topic}/${subtopic}`);
        const newQuestionRef = push(questionsRef);
        await set(newQuestionRef, question);
+
+       // 2. Update Metadata: Topics List
+       // Check if topic exists in subjects list, if not add it
+       const topicsRef = ref(database, `topics/${subjectId}`);
+       const topicsSnap = await get(topicsRef);
+       let currentTopics: string[] = [];
+       if (topicsSnap.exists()) {
+           currentTopics = topicsSnap.val();
+       }
+       if (!currentTopics.includes(topic)) {
+           currentTopics.push(topic);
+           await set(topicsRef, currentTopics);
+       }
+
+       // 3. Update Metadata: Subtopics List
+       // Check if subtopic exists in topics list, if not add it
+       const subtopicsRef = ref(database, `subtopics/${topic}`);
+       const subtopicsSnap = await get(subtopicsRef);
+       let currentSubtopics: string[] = [];
+       if (subtopicsSnap.exists()) {
+           currentSubtopics = subtopicsSnap.val();
+       }
+       if (!currentSubtopics.includes(subtopic)) {
+           currentSubtopics.push(subtopic);
+           await set(subtopicsRef, currentSubtopics);
+       }
+
      } catch (error) {
        console.error("Error creating question:", error);
        throw error;
