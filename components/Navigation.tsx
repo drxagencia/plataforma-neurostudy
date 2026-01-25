@@ -9,7 +9,8 @@ import {
   LogOut,
   BookOpen,
   ShieldAlert,
-  Trophy
+  Trophy,
+  Bot
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -24,6 +25,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
   const menuItems: { id: View; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'aulas', label: 'Aulas', icon: <BookOpen size={20} /> },
+    { id: 'tutor', label: 'NeuroTutor', icon: <Bot size={20} /> },
     { id: 'simulados', label: 'Simulados', icon: <GraduationCap size={20} /> },
     { id: 'questoes', label: 'Questões', icon: <FileQuestion size={20} /> },
     { id: 'comunidade', label: 'Comunidade', icon: <Users size={20} /> },

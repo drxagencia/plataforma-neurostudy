@@ -9,9 +9,10 @@ import Simulations from './components/Simulations';
 import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
 import Competitivo from './components/Competitivo';
+import AiTutor from './components/AiTutor'; // New import
 import { User, View } from './types';
 import { AuthService, mapUser } from './services/authService';
-import { DatabaseService } from './services/databaseService'; // Import DB service
+import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -81,6 +82,7 @@ const App: React.FC = () => {
       case 'questoes': return <QuestionBank />;
       case 'comunidade': return <Community />;
       case 'simulados': return <Simulations />;
+      case 'tutor': return <AiTutor />;
       case 'ajustes': return <Settings user={user} onUpdateUser={setUser} />;
       case 'competitivo': return <Competitivo />;
       case 'admin': return user.isAdmin ? <AdminPanel /> : <Dashboard user={user} />;
