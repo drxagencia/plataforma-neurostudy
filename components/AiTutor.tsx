@@ -83,7 +83,7 @@ const AiTutor: React.FC = () => {
 
     if (balance <= 0.05) {
         triggerNotification('error', 'Saldo Insuficiente para realizar esta ação.');
-        setShowRecharge(true);
+        setTimeout(() => setShowRecharge(true), 500);
         return;
     }
 

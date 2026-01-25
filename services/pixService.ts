@@ -28,33 +28,32 @@ export const PixService = {
 
   generatePayload: (amount: number): string => {
     const key = "02976592438"; // CPF Key
-    // Standardize Name and City: No accents, limited length
-    const name = PixService.normalizeText("NeuroStudy User").substring(0, 25);
-    const city = PixService.normalizeText("SAO PAULO").substring(0, 15);
-    const txtId = "***"; // Transaction ID (*** allows dynamic payment in some banks, or use valid ID)
-    
     const amountStr = amount.toFixed(2);
 
-    // Build Payload following strictly EMV QRCPS-MPM
+    // Build Payload following strictly the working example provided:
+    // 00020126330014BR.GOV.BCB.PIX011102976592438520400005303986540520.005802BR5901N6001C62070503***6304
+    
+    // Note: The example provided omits the root Field 01 (Point of Initiation Method), 
+    // and uses "N" and "C" for Name and City. We duplicate this structure for compatibility.
+    
     const payloadStart = 
-      PixService.formatField("00", "01") + // Payload Format Indicator
-      PixService.formatField("01", "11") + // Point of Initiation Method (12 for dynamic, 11/empty for static)
-      PixService.formatField("26", // Merchant Account Information
+      PixService.formatField("00", "01") + 
+      // Field 01 (Point of Initiation) is OMITTED in the working example, so we omit it here too.
+      PixService.formatField("26",
         PixService.formatField("00", "BR.GOV.BCB.PIX") +
         PixService.formatField("01", key)
       ) +
-      PixService.formatField("52", "0000") + // Merchant Category Code (General)
-      PixService.formatField("53", "986") + // Transaction Currency (BRL)
-      PixService.formatField("54", amountStr) + // Transaction Amount
-      PixService.formatField("58", "BR") + // Country Code
-      PixService.formatField("59", name) + // Merchant Name
-      PixService.formatField("60", city) + // Merchant City
-      PixService.formatField("62", // Additional Data Field Template
-        PixService.formatField("05", txtId)
+      PixService.formatField("52", "0000") +
+      PixService.formatField("53", "986") + // BRL
+      PixService.formatField("54", amountStr) +
+      PixService.formatField("58", "BR") +
+      PixService.formatField("59", "N") + // Using "N" to match working example validation
+      PixService.formatField("60", "C") + // Using "C" to match working example validation
+      PixService.formatField("62",
+        PixService.formatField("05", "***")
       ) +
       "6304"; // CRC16 ID + Length
 
-    // Calculate CRC
     const crc = PixService.crc16(payloadStart);
     return payloadStart + crc;
   }
