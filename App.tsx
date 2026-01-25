@@ -32,21 +32,16 @@ const App: React.FC = () => {
 
   // Theme Application Logic
   useEffect(() => {
-      if (user && user.theme) {
-          const root = document.documentElement;
-          const body = document.body;
-          
-          // Reset classes
-          root.classList.remove('light');
-          root.classList.add('dark'); // Default
-          body.classList.remove('theme-midnight');
-
-          if (user.theme === 'light') {
-              root.classList.remove('dark');
-              root.classList.add('light');
-          } else if (user.theme === 'midnight') {
-              body.classList.add('theme-midnight');
-          }
+      const root = document.documentElement;
+      // Clear all potential themes first
+      root.classList.remove('light');
+      root.classList.remove('dark');
+      
+      if (user && user.theme === 'light') {
+          root.classList.add('light');
+      } else {
+          // Default to dark
+          root.classList.add('dark');
       }
   }, [user?.theme]);
 
@@ -65,13 +60,16 @@ const App: React.FC = () => {
                isAdmin: mappedUser.isAdmin
         });
 
+        // Fallback for deprecated 'midnight' theme in DB to 'dark'
+        const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
+
         setUser({
             ...mappedUser,
             ...dbUser, 
             displayName: dbUser?.displayName || mappedUser.displayName,
             photoURL: dbUser?.photoURL || mappedUser.photoURL,
             plan: dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic'), 
-            theme: dbUser?.theme || 'dark'
+            theme: safeTheme
         });
       } else {
         setUser(null);
@@ -132,10 +130,15 @@ const App: React.FC = () => {
         }`}
         style={{ height: '100vh' }}
       >
-        {/* Background Glows (Hide in light mode via CSS) */}
-        <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none theme-glows">
-           <div className="absolute top-[-10%] left-[20%] w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-[120px]" />
-           <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[100px]" />
+        {/* Background Glows */}
+        <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+           {/* Dark Mode Glows */}
+           <div className="absolute top-[-10%] left-[20%] w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-[120px] dark:block hidden" />
+           <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[100px] dark:block hidden" />
+           
+           {/* Light Mode Glows (More subtle, different colors) */}
+           <div className="absolute top-[-10%] left-[20%] w-[600px] h-[600px] bg-indigo-200/40 rounded-full blur-[120px] dark:hidden block" />
+           <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-purple-200/40 rounded-full blur-[100px] dark:hidden block" />
         </div>
 
         <div className="max-w-7xl mx-auto h-full">

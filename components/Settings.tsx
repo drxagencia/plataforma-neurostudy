@@ -12,7 +12,7 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   const [displayName, setDisplayName] = useState(user.displayName);
   const [photoURL, setPhotoURL] = useState(user.photoURL || '');
-  const [selectedTheme, setSelectedTheme] = useState<'dark' | 'light' | 'midnight'>(user.theme || 'dark');
+  const [selectedTheme, setSelectedTheme] = useState<'dark' | 'light'>(user.theme || 'dark');
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -20,27 +20,22 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   useEffect(() => {
     setDisplayName(user.displayName);
     setPhotoURL(user.photoURL || '');
-    setSelectedTheme(user.theme || 'dark');
+    // Fallback if user had midnight stored previously
+    const theme = user.theme === 'light' ? 'light' : 'dark';
+    setSelectedTheme(theme);
   }, [user]);
 
   // Apply theme preview immediately
-  const handleThemeChange = (theme: 'dark' | 'light' | 'midnight') => {
+  const handleThemeChange = (theme: 'dark' | 'light') => {
       setSelectedTheme(theme);
       
       const root = document.documentElement;
-      const body = document.body;
       
       // Reset
       root.classList.remove('light');
-      root.classList.add('dark'); // Default base
-      body.classList.remove('theme-midnight');
-
-      if (theme === 'light') {
-          root.classList.remove('dark');
-          root.classList.add('light');
-      } else if (theme === 'midnight') {
-          body.classList.add('theme-midnight');
-      }
+      root.classList.remove('dark');
+      
+      root.classList.add(theme);
   };
 
   const handleSave = async () => {
@@ -48,20 +43,15 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
     setSuccess(false);
     try {
       // 1. Update Firebase Auth 
-      // CRITICAL FIX: Firebase Auth allows max 2048 chars for photoURL. 
-      // Base64 images are much larger. We ONLY update displayName in Auth.
-      // The PhotoURL will be stored in Realtime Database.
-      
       const authUpdates: { displayName?: string; photoURL?: string } = { displayName };
       
-      // Only send photo to Auth if it's NOT a base64 data string (i.e. it's a short https link)
       if (photoURL && !photoURL.startsWith('data:image')) {
           authUpdates.photoURL = photoURL;
       }
 
       const updatedAuthUser = await AuthService.updateProfile(user, authUpdates);
 
-      // 2. Update Realtime Database (Supports large Base64 strings)
+      // 2. Update Realtime Database
       await DatabaseService.saveUserProfile(user.uid, {
         displayName,
         photoURL,
@@ -72,7 +62,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
       const updatedProfile: UserProfile = { 
           ...user, 
           ...updatedAuthUser, 
-          photoURL, // Ensure local state reflects the base64
+          photoURL, 
           theme: selectedTheme
       };
 
@@ -90,7 +80,6 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
        const file = e.target.files[0];
-       // Limit size to 500KB for Base64 storage performance
        if (file.size > 500000) {
            alert("A imagem deve ter no máximo 500KB.");
            return;
@@ -154,27 +143,24 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
          {/* Theme Section */}
          <div className="space-y-3 pt-4 border-t border-white/5">
             <span className="text-sm font-medium text-slate-300 flex items-center gap-2"><Palette size={16}/> Tema da Interface</span>
-            <div className="grid grid-cols-3 gap-3">
-                <button 
-                    onClick={() => handleThemeChange('midnight')}
-                    className={`p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col items-center gap-2 ${selectedTheme === 'midnight' ? 'bg-[#0f172a] border-indigo-500 text-indigo-400' : 'bg-slate-900 border-transparent text-slate-400'}`}
-                >
-                    <div className="w-4 h-4 rounded-full bg-[#0f172a] border border-white/20"></div>
-                    Azul Escuro
-                </button>
+            <div className="grid grid-cols-2 gap-4">
                 <button 
                     onClick={() => handleThemeChange('dark')}
-                    className={`p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col items-center gap-2 ${selectedTheme === 'dark' ? 'bg-[#020617] border-indigo-500 text-indigo-400' : 'bg-slate-950 border-transparent text-slate-400'}`}
+                    className={`p-4 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-3 ${selectedTheme === 'dark' ? 'bg-slate-950 border-indigo-500 text-indigo-400' : 'bg-slate-900 border-transparent text-slate-400'}`}
                 >
-                    <div className="w-4 h-4 rounded-full bg-[#020617] border border-white/20"></div>
-                    Dark Mode
+                    <div className="w-8 h-8 rounded-full bg-slate-950 border border-white/20 flex items-center justify-center">
+                        <Moon size={16} />
+                    </div>
+                    <span>Dark Mode</span>
                 </button>
                 <button 
                     onClick={() => handleThemeChange('light')}
-                    className={`p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col items-center gap-2 ${selectedTheme === 'light' ? 'bg-white border-indigo-500 text-indigo-600' : 'bg-slate-100 border-transparent text-slate-500'}`}
+                    className={`p-4 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-3 ${selectedTheme === 'light' ? 'bg-white border-indigo-500 text-indigo-600 shadow-md' : 'bg-slate-100 border-transparent text-slate-500'}`}
                 >
-                    <div className="w-4 h-4 rounded-full bg-white border border-slate-300"></div>
-                    Light Mode
+                    <div className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center text-orange-500">
+                        <Sun size={16} />
+                    </div>
+                    <span>White Mode</span>
                 </button>
             </div>
          </div>

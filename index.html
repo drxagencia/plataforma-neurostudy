@@ -46,68 +46,139 @@
       }
     </script>
     <style>
-      body {
-        background-color: #020617; /* slate-950 (Default/Dark) */
+      :root {
+        /* Default Variables (will vary by theme) */
+        --bg-body: #020617;
+        --text-main: #f8fafc;
+        --glass-bg: rgba(15, 23, 42, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --glass-input: rgba(2, 6, 23, 0.5);
+        --glass-input-border: rgba(255, 255, 255, 0.1);
+        --glass-input-text: white;
+        --sidebar-bg: #020617;
+        --sidebar-border: rgba(255, 255, 255, 0.05);
+      }
+
+      /* =========================================
+         THEME: DARK (Default)
+         ========================================= */
+      html.dark body {
+        background-color: #020617; /* slate-950 */
         color: #f8fafc; /* slate-50 */
+      }
+
+      /* =========================================
+         THEME: LIGHT (White Mode)
+         ========================================= */
+      html.light {
+        --bg-body: #f8fafc; /* slate-50 */
+        --text-main: #0f172a; /* slate-900 */
+        --glass-bg: rgba(255, 255, 255, 0.8);
+        --glass-border: rgba(203, 213, 225, 0.6); /* slate-300 */
+        --glass-input: #ffffff;
+        --glass-input-border: #cbd5e1; /* slate-300 */
+        --glass-input-text: #0f172a;
+        --sidebar-bg: #ffffff;
+        --sidebar-border: #e2e8f0;
+      }
+
+      html.light body {
+        background-color: var(--bg-body);
+        color: var(--text-main);
+      }
+
+      /* --- LIGHT MODE COMPATIBILITY OVERRIDES --- */
+      /* These ensure that hardcoded Tailwind classes like 'bg-slate-950' 
+         automatically switch to light counterparts without rewriting React components. */
+      
+      html.light .bg-slate-950 { background-color: #f8fafc !important; } /* Main BG */
+      html.light .bg-slate-900 { background-color: #ffffff !important; } /* Card BG Base */
+      html.light .bg-slate-900\/50, 
+      html.light .bg-slate-900\/40, 
+      html.light .bg-slate-900\/60 { background-color: rgba(255,255,255,0.7) !important; }
+      
+      html.light .bg-slate-800 { background-color: #f1f5f9 !important; } /* Secondary/Hover */
+      html.light .bg-slate-800\/80 { background-color: rgba(241, 245, 249, 0.9) !important; }
+
+      /* Borders */
+      html.light .border-white\/5, 
+      html.light .border-white\/10 { border-color: #e2e8f0 !important; } /* slate-200 */
+      html.light .divide-white\/5 { border-color: #e2e8f0 !important; }
+
+      /* Text Colors */
+      html.light .text-white { color: #0f172a !important; } /* Invert white to dark slate */
+      html.light .text-slate-100 { color: #1e293b !important; }
+      html.light .text-slate-200 { color: #334155 !important; }
+      html.light .text-slate-300 { color: #475569 !important; } /* Medium gray */
+      html.light .text-slate-400 { color: #64748b !important; } /* Muted text */
+      html.light .text-slate-500 { color: #64748b !important; } 
+
+      /* Sidebar Specifics */
+      html.light aside {
+        background-color: #ffffff !important;
+        border-right: 1px solid #e2e8f0 !important;
+      }
+      html.light nav button.text-slate-400:hover {
+        background-color: #f1f5f9 !important; /* slate-100 */
+        color: #0f172a !important;
+      }
+
+      /* Inputs */
+      html.light input::placeholder, 
+      html.light textarea::placeholder {
+        color: #94a3b8 !important; /* slate-400 */
+      }
+
+      /* =========================================
+         GLOBAL COMPONENT STYLES
+         ========================================= */
+
+      /* Glass Card - Adapts to Theme */
+      .glass-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+      
+      /* In light mode, glass cards need a bit more shadow to pop */
+      html.light .glass-card {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+      }
+
+      /* Glass Input - Adapts to Theme */
+      .glass-input {
+        background: var(--glass-input);
+        border: 1px solid var(--glass-input-border);
+        color: var(--glass-input-text);
+      }
+      .glass-input:focus {
+        border-color: #6366f1; /* Indigo 500 */
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        outline: none;
+      }
+      html.light .glass-input:focus {
+        background: #ffffff;
+      }
+
+      /* Global Transitions */
+      * {
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 200ms;
+      }
+
+      body {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         overflow-x: hidden;
       }
-      
-      /* --- MIDNIGHT THEME OVERRIDES --- */
-      body.theme-midnight {
-        background-color: #0f172a; /* Slate 900 base - slightly lighter blueish dark */
-      }
-      body.theme-midnight .glass-card {
-        background: rgba(30, 41, 59, 0.7);
-        border-color: rgba(99, 102, 241, 0.15);
-      }
 
-      /* --- LIGHT MODE OVERRIDES --- */
-      /* Since the app uses hardcoded text-white/bg-slate-950 classes, we must override them for Light Mode */
-      html.light body {
-        background-color: #f1f5f9; /* Slate 100 */
-        color: #0f172a; /* Slate 900 */
-      }
-      
-      html.light .bg-slate-950 { background-color: #f1f5f9 !important; }
-      html.light .text-white { color: #0f172a !important; }
-      html.light .text-slate-100 { color: #1e293b !important; }
-      html.light .text-slate-200 { color: #334155 !important; }
-      html.light .text-slate-300 { color: #475569 !important; }
-      html.light .text-slate-400 { color: #64748b !important; }
-      html.light .text-slate-500 { color: #94a3b8 !important; }
-      
-      html.light .glass-card {
-        background: rgba(255, 255, 255, 0.85);
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
-      }
-      
-      html.light .glass-input {
-        background: white;
-        color: #0f172a;
-        border: 1px solid #cbd5e1;
-      }
-      
-      html.light .glass-input::placeholder {
-        color: #94a3b8;
-      }
-      
-      html.light .theme-glows {
-        opacity: 0; /* Hide background glows in light mode */
-      }
-      
-      /* Sidebar Overrides in Light Mode */
-      html.light aside {
-        background-color: #ffffff;
-        border-right: 1px solid #e2e8f0;
-      }
-      
-      /* High Performance Scrollbar */
+      /* Custom Scrollbar */
       ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
       }
       ::-webkit-scrollbar-track {
         background: transparent; 
@@ -116,34 +187,11 @@
         background: #334155; 
         border-radius: 10px;
       }
+      html.light ::-webkit-scrollbar-thumb {
+        background: #cbd5e1; /* Lighter scrollbar for light mode */
+      }
       ::-webkit-scrollbar-thumb:hover {
         background: #4f46e5; 
-      }
-
-      /* Global Smoothness */
-      * {
-        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-        transition-duration: 200ms;
-      }
-
-      .glass-card {
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-      }
-
-      .glass-input {
-        background: rgba(2, 6, 23, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white;
-      }
-      .glass-input:focus {
-        border-color: #6366f1;
-        background: rgba(2, 6, 23, 0.8);
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
       }
     </style>
   <script type="importmap">
