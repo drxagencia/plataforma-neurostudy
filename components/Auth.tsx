@@ -25,7 +25,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       const user = await AuthService.login(email, password);
       onLogin(user);
     } catch (err: any) {
-      setError("Falha ao entrar. Tente novamente.");
+      setError("Falha ao entrar. Verifique suas credenciais.");
     } finally {
       setIsLoading(false);
     }
@@ -34,43 +34,43 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   return (
     <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-slate-950">
       {/* Background Ambience */}
-      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-600/20 blur-[100px] animate-pulse" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/20 blur-[100px] animate-pulse delay-1000" />
+      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-600/20 blur-[120px] animate-pulse-slow" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/20 blur-[120px] animate-pulse-slow delay-1000" />
 
-      <div className="w-full max-w-md p-8 rounded-3xl bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.5)] z-10 mx-4">
+      <div className="w-full max-w-md p-8 rounded-3xl glass-card z-10 mx-4 animate-slide-up">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4">
-            <img src="/logo_neuro.png" alt="NeuroStudy AI" className="w-full h-full object-contain" />
+          <div className="w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-white/5 rounded-2xl p-2 border border-white/10 shadow-xl shadow-indigo-500/10">
+            <img src="/logo%20neuro.png" alt="NeuroStudy AI" className="w-full h-full object-contain drop-shadow-lg" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">NeuroStudy AI</h1>
-          <p className="text-slate-400 text-sm">Sua jornada rumo à aprovação começa aqui.</p>
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">NeuroStudy AI</h1>
+          <p className="text-slate-400 text-sm">Plataforma de ensino de alta performance.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-300 ml-1">E-mail</label>
+            <label className="text-xs font-semibold text-slate-300 ml-1 uppercase tracking-wide">E-mail</label>
             <div className="relative group">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl py-3.5 pl-12 pr-4 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
-                placeholder="exemplo@email.com"
+                className="w-full glass-input rounded-xl py-3.5 pl-12 pr-4 focus:outline-none transition-all placeholder:text-slate-600"
+                placeholder="seu@email.com"
                 required
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-300 ml-1">Senha</label>
+            <label className="text-xs font-semibold text-slate-300 ml-1 uppercase tracking-wide">Senha</label>
             <div className="relative group">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl py-3.5 pl-12 pr-12 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
+                className="w-full glass-input rounded-xl py-3.5 pl-12 pr-12 focus:outline-none transition-all placeholder:text-slate-600"
                 placeholder="••••••••"
                 required
               />
@@ -85,7 +85,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           </div>
 
           {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center font-medium animate-fade-in">
               {error}
             </div>
           )}
@@ -94,13 +94,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed group"
+              className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed group hover:scale-[1.02] active:scale-[0.98]"
             >
               {isLoading ? (
                 <Loader2 className="animate-spin" size={20} />
               ) : (
                 <>
-                  Entrar na Plataforma
+                  Acessar Plataforma
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -110,7 +110,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
         <div className="mt-8 text-center">
           <p className="text-slate-500 text-sm">
-            Ainda não tem conta? <a href="#" className="text-indigo-400 hover:text-indigo-300 font-medium">Cadastre-se</a>
+            Não tem acesso? <a href="#" className="text-indigo-400 hover:text-indigo-300 font-bold hover:underline">Falar com Suporte</a>
           </p>
         </div>
       </div>

@@ -78,8 +78,12 @@ const QuestionBank: React.FC = () => {
     } else {
         // Finish Quiz
         const finalXp = score * 10; // 10 XP per correct answer
-        if (auth.currentUser && finalXp > 0) {
-            await DatabaseService.addXp(auth.currentUser.uid, finalXp);
+        if (auth.currentUser) {
+            if (finalXp > 0) {
+                await DatabaseService.addXp(auth.currentUser.uid, finalXp);
+            }
+            // Increment Stats
+            await DatabaseService.incrementQuestionsAnswered(auth.currentUser.uid, questions.length);
         }
         setXpEarned(finalXp);
         setShowResult(true);
@@ -100,7 +104,7 @@ const QuestionBank: React.FC = () => {
     if (showResult) {
         return (
             <div className="h-full flex items-center justify-center animate-in zoom-in-95">
-                <div className="text-center bg-slate-900/50 p-10 rounded-3xl border border-indigo-500/20 max-w-md w-full">
+                <div className="text-center glass-card p-10 rounded-3xl max-w-md w-full">
                     <div className="w-24 h-24 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-400">
                         <Trophy size={48} />
                     </div>
@@ -126,22 +130,22 @@ const QuestionBank: React.FC = () => {
 
     const question = questions[currentQuestionIndex];
     return (
-        <div className="max-w-3xl mx-auto h-full flex flex-col pt-4">
+        <div className="max-w-3xl mx-auto h-full flex flex-col pt-4 animate-slide-up">
             <div className="flex justify-between items-center mb-6">
                 <button onClick={resetQuiz} className="text-slate-500 hover:text-white text-sm">Cancelar</button>
-                <div className="text-slate-400 text-sm">Questão {currentQuestionIndex + 1} / {questions.length}</div>
+                <div className="text-slate-400 text-sm font-medium bg-white/5 px-3 py-1 rounded-full">Questão {currentQuestionIndex + 1} / {questions.length}</div>
             </div>
 
             {/* Progress Bar */}
-            <div className="h-1 w-full bg-slate-800 rounded-full mb-8 overflow-hidden">
+            <div className="h-1.5 w-full bg-slate-800 rounded-full mb-8 overflow-hidden">
                 <div 
-                    className="h-full bg-indigo-500 transition-all duration-300" 
+                    className="h-full bg-indigo-500 shadow-[0_0_10px_#6366f1] transition-all duration-300" 
                     style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`}}
                 />
             </div>
 
-            <div className="flex-1 overflow-y-auto pb-20">
-                <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-6 md:p-8 mb-6">
+            <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar">
+                <div className="glass-card rounded-2xl p-6 md:p-8 mb-6">
                     <p className="text-lg md:text-xl text-white leading-relaxed font-medium">
                         {question.text}
                     </p>
@@ -149,7 +153,7 @@ const QuestionBank: React.FC = () => {
 
                 <div className="space-y-3">
                     {question.options.map((option, idx) => {
-                        let stateStyles = "bg-slate-900/40 border-slate-700 hover:bg-slate-800";
+                        let stateStyles = "bg-slate-900/40 border-slate-700 hover:bg-slate-800 hover:border-slate-500";
                         if (isAnswered) {
                             if (idx === question.correctAnswer) stateStyles = "bg-emerald-500/20 border-emerald-500/50 text-emerald-100";
                             else if (idx === selectedOption) stateStyles = "bg-red-500/20 border-red-500/50 text-red-100";
@@ -174,7 +178,7 @@ const QuestionBank: React.FC = () => {
                 </div>
 
                 {isAnswered && (
-                    <div className="mt-8 animate-in slide-in-from-bottom-2 fade-in">
+                    <div className="mt-8 animate-fade-in">
                          {selectedOption !== question.correctAnswer && (
                              <div className="p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-xl mb-4">
                                  <p className="text-sm text-indigo-200">
@@ -200,7 +204,7 @@ const QuestionBank: React.FC = () => {
   const isReady = selectedSubject && selectedTopic && selectedSubTopic;
 
   return (
-    <div className="h-full flex flex-col max-h-[85vh]">
+    <div className="h-full flex flex-col max-h-[85vh] animate-slide-up">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-3xl font-bold text-white mb-2">Banco de Questões</h2>
@@ -214,7 +218,7 @@ const QuestionBank: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Subject Select */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300 ml-1">Disciplina</label>
+          <label className="text-xs font-bold uppercase text-slate-500 ml-1">Disciplina</label>
           <div className="relative">
             <select
               value={selectedSubject || ''}
@@ -223,11 +227,11 @@ const QuestionBank: React.FC = () => {
                   setSelectedTopic(null);
                   setSelectedSubTopic(null);
               }}
-              className="w-full appearance-none bg-slate-900 border border-slate-700 hover:border-slate-500 text-white p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all cursor-pointer"
+              className="w-full appearance-none glass-card p-4 rounded-xl focus:outline-none focus:border-indigo-500 transition-all cursor-pointer text-white"
             >
               <option value="" disabled>Selecione a matéria</option>
               {subjects.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id} className="bg-slate-900">{s.name}</option>
               ))}
             </select>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
@@ -238,7 +242,7 @@ const QuestionBank: React.FC = () => {
 
         {/* Topic Select */}
         <div className={`space-y-2 transition-opacity duration-300 ${!selectedSubject ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-          <label className="text-sm font-medium text-slate-300 ml-1">Assunto</label>
+          <label className="text-xs font-bold uppercase text-slate-500 ml-1">Assunto</label>
           <div className="relative">
             <select
               value={selectedTopic || ''}
@@ -247,11 +251,11 @@ const QuestionBank: React.FC = () => {
                   setSelectedSubTopic(null);
               }}
               disabled={!selectedSubject}
-              className="w-full appearance-none bg-slate-900 border border-slate-700 hover:border-slate-500 text-white p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all cursor-pointer disabled:bg-slate-950 disabled:border-slate-800 disabled:text-slate-600"
+              className="w-full appearance-none glass-card p-4 rounded-xl focus:outline-none focus:border-indigo-500 transition-all cursor-pointer text-white"
             >
               <option value="" disabled>Selecione o assunto</option>
               {topicOptions.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t} className="bg-slate-900">{t}</option>
               ))}
               {!topicOptions.length && selectedSubject && <option disabled>Sem tópicos cadastrados</option>}
             </select>
@@ -263,17 +267,17 @@ const QuestionBank: React.FC = () => {
 
         {/* Subtopic Select */}
         <div className={`space-y-2 transition-opacity duration-300 ${!selectedTopic ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-          <label className="text-sm font-medium text-slate-300 ml-1">Específico</label>
+          <label className="text-xs font-bold uppercase text-slate-500 ml-1">Específico</label>
           <div className="relative">
             <select
               value={selectedSubTopic || ''}
               onChange={(e) => setSelectedSubTopic(e.target.value)}
               disabled={!selectedTopic}
-              className="w-full appearance-none bg-slate-900 border border-slate-700 hover:border-slate-500 text-white p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all cursor-pointer disabled:bg-slate-950 disabled:border-slate-800 disabled:text-slate-600"
+              className="w-full appearance-none glass-card p-4 rounded-xl focus:outline-none focus:border-indigo-500 transition-all cursor-pointer text-white"
             >
               <option value="" disabled>Selecione o subtópico</option>
               {subTopicOptions.map((st) => (
-                <option key={st} value={st}>{st}</option>
+                <option key={st} value={st} className="bg-slate-900">{st}</option>
               ))}
               {!subTopicOptions.length && selectedTopic && <option disabled>Geral</option>}
             </select>
@@ -284,10 +288,10 @@ const QuestionBank: React.FC = () => {
         </div>
       </div>
 
-      <div className={`flex-1 rounded-2xl border border-dashed border-slate-700 flex flex-col items-center justify-center p-12 transition-all duration-500 ${isReady ? 'bg-indigo-900/10 border-indigo-500/30' : 'bg-slate-900/30'}`}>
+      <div className={`flex-1 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center p-12 transition-all duration-500 ${isReady ? 'bg-indigo-900/10 border-indigo-500/30' : 'bg-transparent'}`}>
         {isReady ? (
           <div className="text-center animate-in zoom-in-90">
-            <div className="w-20 h-20 bg-indigo-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(99,102,241,0.4)]">
+            <div className="w-20 h-20 bg-indigo-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(99,102,241,0.5)]">
               <PlayCircle size={40} className="text-white ml-1" />
             </div>
             <h3 className="text-2xl font-bold text-white mb-2">Tudo pronto!</h3>
@@ -302,8 +306,8 @@ const QuestionBank: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="text-center text-slate-500">
-            <Filter size={48} className="mx-auto mb-4 opacity-20" />
+          <div className="text-center text-slate-600">
+            <Filter size={48} className="mx-auto mb-4 opacity-30" />
             <p className="text-lg">Use os filtros acima para gerar seu caderno de questões.</p>
           </div>
         )}

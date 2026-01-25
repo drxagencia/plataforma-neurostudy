@@ -1,6 +1,6 @@
 import { ref, get, child, update, push, set, query, orderByChild } from "firebase/database";
 import { database } from "./firebaseConfig";
-import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question } from "../types";
+import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson } from "../types";
 
 export const DatabaseService = {
   // --- User Profile & XP ---
@@ -14,6 +14,16 @@ export const DatabaseService = {
     } catch (error) {
       console.error("Error fetching user profile:", error);
       return null;
+    }
+  },
+
+  // Used by Admin to pre-create user profiles
+  createUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
+    try {
+      await set(ref(database, `users/${uid}`), data);
+    } catch (error) {
+      console.error("Error creating user profile:", error);
+      throw error;
     }
   },
 
@@ -42,11 +52,22 @@ export const DatabaseService = {
     return 0;
   },
 
+  incrementQuestionsAnswered: async (uid: string, count: number): Promise<void> => {
+    try {
+      const userRef = ref(database, `users/${uid}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        const current = snapshot.val().questionsAnswered || 0;
+        await update(userRef, { questionsAnswered: current + count });
+      }
+    } catch (error) {
+      console.error("Error updating stats:", error);
+    }
+  },
+
   getLeaderboard: async (): Promise<UserProfile[]> => {
     try {
       const usersRef = ref(database, 'users');
-      // Note: Realtime DB sorting is limited on client without complex indexes, 
-      // fetching all for client-side sort is acceptable for smaller scale.
       const snapshot = await get(usersRef);
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -54,8 +75,6 @@ export const DatabaseService = {
           ...data[key],
           uid: key
         })) as UserProfile[];
-        
-        // Sort by XP descending
         return users.sort((a, b) => (b.xp || 0) - (a.xp || 0));
       }
     } catch (error) {
@@ -116,11 +135,8 @@ export const DatabaseService = {
   // --- Questions ---
   getQuestions: async (subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
     try {
-      // Path based on seed structure: questions/subjectId/topic
-      // Note: Subtopic filtering would happen client side if structure is flattened
       const path = `questions/${subjectId}/${topic}`; 
       const snapshot = await get(child(ref(database), path));
-      
       if (snapshot.exists()) {
         const data = snapshot.val();
         return Array.isArray(data) ? data : Object.values(data);
@@ -129,6 +145,42 @@ export const DatabaseService = {
       console.warn("Error fetching questions:", error);
     }
     return [];
+  },
+
+  createQuestion: async (subjectId: string, topic: string, question: Question): Promise<void> => {
+     try {
+       const questionsRef = ref(database, `questions/${subjectId}/${topic}`);
+       // Get existing or create new array
+       const snapshot = await get(questionsRef);
+       let questions = [];
+       if (snapshot.exists()) {
+         questions = snapshot.val();
+         if (!Array.isArray(questions)) questions = Object.values(questions);
+       }
+       questions.push(question);
+       await set(questionsRef, questions);
+     } catch (error) {
+       console.error("Error creating question:", error);
+       throw error;
+     }
+  },
+
+  // --- Lessons ---
+  createLesson: async (subjectId: string, topic: string, lesson: Lesson): Promise<void> => {
+    try {
+      const lessonsRef = ref(database, `lessons/${subjectId}/${topic}`);
+      const snapshot = await get(lessonsRef);
+      let lessons = [];
+      if (snapshot.exists()) {
+        lessons = snapshot.val();
+        if (!Array.isArray(lessons)) lessons = Object.values(lessons);
+      }
+      lessons.push(lesson);
+      await set(lessonsRef, lessons);
+    } catch (error) {
+      console.error("Error creating lesson:", error);
+      throw error;
+    }
   },
 
   // --- Community ---
@@ -151,7 +203,6 @@ export const DatabaseService = {
 
   createPost: async (post: Omit<CommunityPost, 'id'>, uid: string): Promise<void> => {
     try {
-      // Check last posted time
       const userProfile = await DatabaseService.getUserProfile(uid);
       const now = Date.now();
       
@@ -166,9 +217,8 @@ export const DatabaseService = {
       const newPostRef = push(postsRef);
       await set(newPostRef, post);
 
-      // Update user last posted time and give XP
       await update(ref(database, `users/${uid}`), { lastPostedAt: now });
-      await DatabaseService.addXp(uid, 50); // 50 XP for community participation
+      await DatabaseService.addXp(uid, 50); 
     } catch (error) {
       console.error("Error creating post:", error);
       throw error;

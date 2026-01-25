@@ -13,6 +13,8 @@ export interface UserProfile extends User {
   subscriptionExpiry: string; // ISO Date string
   xp: number;
   lastPostedAt?: number; // Timestamp
+  questionsAnswered?: number;
+  hoursStudied?: number;
 }
 
 export interface Announcement {
@@ -31,12 +33,23 @@ export interface Subject {
 }
 
 export interface Question {
-  id: string;
+  id?: string;
   text: string;
   options: string[];
   correctAnswer: number; // Index 0-3
   difficulty: 'easy' | 'medium' | 'hard';
   explanation?: string;
+  subjectId?: string; // For Admin creation
+  topic?: string;     // For Admin creation
+}
+
+export interface Lesson {
+  id?: string;
+  title: string;
+  videoUrl: string;
+  duration: string;
+  subjectId?: string; // For Admin creation
+  topic?: string;     // For Admin creation
 }
 
 export interface CommunityPost {

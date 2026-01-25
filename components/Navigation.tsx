@@ -36,16 +36,18 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
 
   if (isMobile) {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900/90 backdrop-blur-xl border-t border-white/10 flex justify-around items-center z-50 px-2">
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 flex justify-around items-center z-50 px-2 pb-safe">
         {visibleMenuItems.slice(0, 5).map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
-            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all ${
-              currentView === item.id ? 'text-indigo-400 scale-110' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all active:scale-95 ${
+              currentView === item.id ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            {item.icon}
+            <div className={`${currentView === item.id ? 'bg-indigo-500/20 p-1.5 rounded-lg' : ''} transition-all`}>
+              {item.icon}
+            </div>
             <span className="text-[10px] mt-1 font-medium">{item.label}</span>
           </button>
         ))}
@@ -55,39 +57,37 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
 
   // Desktop Sidebar
   return (
-    <aside className="w-64 h-screen bg-slate-950 border-r border-white/10 flex flex-col fixed left-0 top-0 z-50">
+    <aside className="w-64 h-screen bg-[#020617] border-r border-white/5 flex flex-col fixed left-0 top-0 z-50">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
-           <img src="/logo_neuro.png" alt="NeuroStudy AI" className="w-full h-full object-contain" onError={(e) => {
-             // Fallback if image fails
+        <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shadow-lg shadow-indigo-500/10">
+           <img src="/logo%20neuro.png" alt="NeuroStudy AI" className="w-full h-full object-contain p-1" onError={(e) => {
              e.currentTarget.style.display = 'none';
-             e.currentTarget.parentElement!.classList.add('bg-indigo-600');
              e.currentTarget.parentElement!.innerHTML = '<span class="text-white font-bold">N</span>';
            }}/>
         </div>
-        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 leading-tight">
-          NeuroStudy<br/><span className="text-indigo-400 text-sm">AI Platform</span>
+        <h1 className="text-xl font-bold text-white leading-tight tracking-tight">
+          NeuroStudy<br/><span className="text-indigo-400 text-xs font-semibold uppercase tracking-widest">AI Platform</span>
         </h1>
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-2">
+      <nav className="flex-1 px-4 py-4 space-y-1.5">
         {visibleMenuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${
               currentView === item.id 
-                ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]' 
-                : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.1)]' 
+                : 'text-slate-400 hover:bg-white/5 hover:text-slate-100 hover:pl-5'
             }`}
           >
-            <span className={`transition-transform duration-200 ${currentView === item.id ? 'scale-110' : 'group-hover:scale-110'}`}>
+             {/* Hover Glow Effect */}
+            <div className={`absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r-full transition-all duration-300 ${currentView === item.id ? 'opacity-100' : 'opacity-0'}`} />
+
+            <span className={`transition-transform duration-300 ${currentView === item.id ? 'scale-110' : 'group-hover:scale-110'}`}>
               {item.icon}
             </span>
-            <span className="font-medium">{item.label}</span>
-            {currentView === item.id && (
-              <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_currentColor]" />
-            )}
+            <span className="font-medium tracking-wide">{item.label}</span>
           </button>
         ))}
       </nav>
@@ -95,10 +95,10 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
       <div className="p-4 border-t border-white/5">
         <button 
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-400 hover:bg-red-500/5 rounded-xl transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all hover:scale-[1.02]"
         >
           <LogOut size={20} />
-          <span className="font-medium">Sair</span>
+          <span className="font-medium">Sair da Conta</span>
         </button>
       </div>
     </aside>

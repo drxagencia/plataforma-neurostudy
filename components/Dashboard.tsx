@@ -1,35 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { User, Announcement } from '../types';
+import { UserProfile } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Clock, Target, TrendingUp, Trophy, Loader2 } from 'lucide-react';
+import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, Brain, ArrowRight } from 'lucide-react';
 
 interface DashboardProps {
-  user: User;
+  user: UserProfile; // Using UserProfile to get access to XP/Questions
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user }) => {
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [level, setLevel] = useState(1);
+  const [progress, setProgress] = useState(0);
 
-  // Fetch Data
+  // Calculate Level based on XP
   useEffect(() => {
-    const fetchData = async () => {
-      const data = await DatabaseService.getAnnouncements();
-      setAnnouncements(data);
-      setLoading(false);
-    };
-    fetchData();
-  }, []);
-
-  // Carousel Rotation
-  useEffect(() => {
-    if (announcements.length === 0) return;
-    const interval = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % announcements.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [announcements]);
+    const xp = user.xp || 0;
+    // Simple level formula: Level = Math.sqrt(XP / 100)
+    const calcLevel = Math.floor(Math.sqrt(xp / 100)) + 1;
+    const nextLevelXp = Math.pow(calcLevel, 2) * 100;
+    const currentLevelBaseXp = Math.pow(calcLevel - 1, 2) * 100;
+    
+    // Progress to next level
+    const progressPercent = ((xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100;
+    
+    setLevel(calcLevel);
+    setProgress(Math.min(Math.max(progressPercent, 0), 100));
+    setLoading(false);
+  }, [user]);
 
   if (loading) {
     return (
@@ -40,82 +37,148 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <header className="flex justify-between items-end">
+    <div className="space-y-8 animate-slide-up">
+      {/* Header */}
+      <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-1">Olá, {user.displayName.split(' ')[0]} 👋</h2>
-          <p className="text-slate-400">Continue de onde você parou.</p>
+          <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">
+            Olá, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">{user.displayName.split(' ')[0]}</span>
+          </h2>
+          <p className="text-slate-400 font-medium">Vamos elevar seu nível hoje?</p>
         </div>
         <div className="hidden md:block text-right">
-          <p className="text-sm text-slate-500 uppercase tracking-wider font-semibold">
-            {user.isAdmin ? 'Administrador' : 'Plano Pro'}
-          </p>
-          {!user.isAdmin && <p className="text-indigo-400 text-xs">Válido até Dez/2025</p>}
-        </div>
-      </header>
-
-      {/* Announcements Carousel */}
-      {announcements.length > 0 && (
-        <div className="relative w-full h-64 md:h-80 rounded-2xl overflow-hidden shadow-2xl shadow-indigo-500/10 group border border-white/10">
-          {announcements.map((ad, index) => (
-            <div
-              key={ad.id}
-              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-                index === activeSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
-              }`}
-            >
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent z-10" />
-              <img 
-                src={ad.image} 
-                alt={ad.title} 
-                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" 
-              />
-              <div className="absolute bottom-0 left-0 p-8 z-20 max-w-xl">
-                <span className="inline-block px-3 py-1 bg-indigo-600/80 backdrop-blur text-white text-xs font-bold rounded-full mb-3 shadow-[0_0_10px_rgba(79,70,229,0.4)]">
-                  DESTAQUE
-                </span>
-                <h3 className="text-3xl font-bold text-white mb-2">{ad.title}</h3>
-                <p className="text-slate-200 mb-6 text-lg">{ad.description}</p>
-                <button className="px-6 py-3 bg-white text-slate-900 font-bold rounded-lg hover:bg-indigo-50 transition-colors shadow-lg">
-                  {ad.ctaText}
-                </button>
-              </div>
-            </div>
-          ))}
-          
-          {/* Indicators */}
-          <div className="absolute bottom-4 right-4 z-30 flex gap-2">
-            {announcements.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveSlide(idx)}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  activeSlide === idx ? 'w-8 bg-indigo-500' : 'bg-slate-600 hover:bg-slate-400'
-                }`}
-              />
-            ))}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-indigo-300 uppercase tracking-wider">
+             {user.isAdmin ? 'Administrador' : user.subscriptionStatus === 'pro' ? 'Assinante Pro' : 'Plano Gratuito'}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Stats Grid */}
+      {/* Hero Card - Replaces Carousel */}
+      <div className="relative w-full rounded-3xl overflow-hidden glass-card p-8 md:p-10 group transition-all duration-500 hover:shadow-[0_0_50px_rgba(79,70,229,0.15)]">
+        {/* Abstract Background */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 animate-pulse-slow" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[80px] translate-y-1/3 -translate-x-1/4" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+            <div className="max-w-xl">
+                <div className="flex items-center gap-2 mb-4">
+                    <span className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300">
+                        <Sparkles size={18} />
+                    </span>
+                    <span className="text-indigo-300 font-semibold tracking-wide text-sm">FOCO DIÁRIO</span>
+                </div>
+                <h3 className="text-3xl font-bold text-white mb-4 leading-tight">
+                    Continue sua jornada em <br/>
+                    <span className="text-white/90">Física - Termodinâmica</span>
+                </h3>
+                <p className="text-slate-300 mb-8 text-lg leading-relaxed">
+                    Você parou na aula de Introdução. Complete o módulo para ganhar <strong className="text-indigo-400">+150 XP</strong>.
+                </p>
+                <button className="px-8 py-4 bg-white text-slate-950 font-bold rounded-2xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 flex items-center gap-2">
+                    Continuar Estudando
+                    <ArrowRight size={20} />
+                </button>
+            </div>
+
+            {/* Level Circle Progress */}
+            <div className="relative w-40 h-40 flex-shrink-0 mx-auto md:mx-0">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" strokeWidth="8" />
+                    <circle 
+                        cx="50" cy="50" r="45" fill="none" stroke="#6366f1" strokeWidth="8"
+                        strokeDasharray="283"
+                        strokeDashoffset={283 - (283 * progress / 100)}
+                        strokeLinecap="round"
+                        className="transition-all duration-1000 ease-out"
+                    />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Nível</span>
+                    <span className="text-4xl font-black">{level}</span>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      {/* Real Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: <Clock className="text-blue-400" />, label: 'Horas Estudadas', value: '32.5h' },
-          { icon: <Target className="text-emerald-400" />, label: 'Questões Feitas', value: '1,240' },
-          { icon: <TrendingUp className="text-purple-400" />, label: 'Média Geral', value: '78%' },
-          { icon: <Trophy className="text-yellow-400" />, label: 'Ranking', value: '#42' },
+          { 
+              icon: <Clock className="text-blue-400" />, 
+              label: 'Horas Estudadas', 
+              value: `${user.hoursStudied || 0}h`,
+              sub: 'Total acumulado'
+          },
+          { 
+              icon: <Target className="text-emerald-400" />, 
+              label: 'Questões Feitas', 
+              value: user.questionsAnswered || 0,
+              sub: 'Exercícios resolvidos'
+          },
+          { 
+              icon: <TrendingUp className="text-purple-400" />, 
+              label: 'XP Total', 
+              value: user.xp || 0,
+              sub: 'Pontos de experiência'
+          },
+          { 
+              icon: <Trophy className="text-yellow-400" />, 
+              label: 'Sua Classificação', 
+              value: 'Top 10%',
+              sub: 'Ranking mensal'
+          },
         ].map((stat, i) => (
-          <div key={i} className="bg-slate-900/50 backdrop-blur-md border border-white/5 p-6 rounded-xl hover:border-indigo-500/30 transition-colors group">
+          <div key={i} className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 hover:-translate-y-1 group">
             <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-white/5 rounded-lg group-hover:bg-white/10 transition-colors">
+              <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
                 {stat.icon}
               </div>
             </div>
             <p className="text-slate-400 text-sm font-medium">{stat.label}</p>
-            <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+            <p className="text-3xl font-bold text-white mt-1 mb-1">{stat.value}</p>
+            <p className="text-xs text-slate-500 font-medium">{stat.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Mini Modules Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="glass-card rounded-2xl p-6">
+              <h4 className="font-bold text-white mb-4 flex items-center gap-2">
+                  <Brain size={20} className="text-pink-400" />
+                  Sugestões para você
+              </h4>
+              <div className="space-y-3">
+                  {[1,2,3].map((_, i) => (
+                      <div key={i} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
+                          <div className="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-400 font-bold text-xs border border-pink-500/20 group-hover:scale-110 transition-transform">
+                              {i === 0 ? 'MAT' : i === 1 ? 'BIO' : 'HIS'}
+                          </div>
+                          <div>
+                              <p className="text-sm font-bold text-slate-200">Revisão Rápida: {i === 0 ? 'Logaritmos' : i === 1 ? 'Citologia' : 'Guerra Fria'}</p>
+                              <p className="text-xs text-slate-500">15 min • Vídeo + Questões</p>
+                          </div>
+                          <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ArrowRight size={16} className="text-pink-400" />
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+          
+           <div className="glass-card rounded-2xl p-6 relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl" />
+               <h4 className="font-bold text-white mb-2 relative z-10">Desafio Diário</h4>
+               <p className="text-sm text-slate-400 mb-6 relative z-10">Responda 5 perguntas de Atualidades e ganhe 50 XP bônus.</p>
+               
+               <div className="flex items-center justify-between bg-slate-950/50 p-4 rounded-xl border border-white/5 relative z-10">
+                   <div className="flex items-center gap-3">
+                       <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                       <span className="text-sm font-bold text-white">Disponível agora</span>
+                   </div>
+                   <button className="text-xs font-bold text-emerald-400 hover:text-emerald-300">Começar</button>
+               </div>
+           </div>
       </div>
     </div>
   );
