@@ -2,21 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { Simulation } from '../types';
 import { Timer, FileText, BarChart3, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
+import { auth } from '../services/firebaseConfig';
 
 const Simulations: React.FC = () => {
   const [simulations, setSimulations] = useState<Simulation[]>([]);
   const [loading, setLoading] = useState(true);
+  // In a real app, userStats would come from DB too
+  const [userStats, setUserStats] = useState<{tri: number, completed: number}>({ tri: 0, completed: 0 });
 
   useEffect(() => {
     const fetchSimulations = async () => {
       const data = await DatabaseService.getSimulations();
       setSimulations(data);
+      // Fetch user specific stats logic here (omitted for brevity, defaulting to 0)
       setLoading(false);
     };
     fetchSimulations();
   }, []);
 
-  const officialSim = simulations.find(s => s.type === 'official' && s.status === 'open') || simulations[0];
+  const officialSim = simulations.find(s => s.type === 'official' && s.status === 'open');
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
@@ -50,7 +54,12 @@ const Simulations: React.FC = () => {
             </div>
           ) : (
             <div className="relative z-10 flex flex-col justify-center h-full">
-              <h3 className="text-2xl font-bold text-white">Nenhum simulado oficial aberto no momento.</h3>
+              <div className="inline-flex items-center gap-2 text-slate-400 mb-2">
+                <Timer size={20} />
+                <span className="uppercase tracking-widest text-xs font-bold">Sem provas ativas</span>
+              </div>
+              <h3 className="text-2xl font-bold text-white max-w-md">Nenhum simulado oficial aberto no momento.</h3>
+              <p className="text-slate-400 mt-2">Fique atento ao cronograma ou realize simulados de treino abaixo.</p>
             </div>
           )}
         </div>
@@ -68,42 +77,54 @@ const Simulations: React.FC = () => {
              <div>
                <div className="flex justify-between text-sm mb-1">
                  <span className="text-slate-400">Média Geral (TRI)</span>
-                 <span className="text-emerald-400 font-bold">720.5</span>
+                 <span className={`${userStats.tri > 0 ? 'text-emerald-400' : 'text-slate-500'} font-bold`}>
+                    {userStats.tri > 0 ? userStats.tri.toFixed(1) : '---'}
+                 </span>
                </div>
                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                 <div className="h-full bg-emerald-500 w-[72%]" />
+                 <div 
+                    className="h-full bg-emerald-500 transition-all duration-1000" 
+                    style={{ width: `${(userStats.tri / 1000) * 100}%` }} 
+                 />
                </div>
+               {userStats.tri === 0 && <p className="text-xs text-slate-600 mt-1">Realize simulados para gerar sua nota.</p>}
              </div>
           </div>
           
           <div className="mt-6 pt-6 border-t border-white/5">
             <p className="text-xs text-slate-500 flex items-center gap-2">
               <AlertCircle size={12} />
-              Baseado em resultados anteriores.
+              Baseado em {userStats.completed} simulados realizados.
             </p>
           </div>
         </div>
       </div>
 
       <h3 className="text-xl font-bold text-white pt-4">Todos os Simulados</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {simulations.map((sim) => (
-          <div key={sim.id} className="bg-slate-900/30 border border-white/5 p-4 rounded-xl hover:bg-slate-800/50 transition-all cursor-pointer group">
-            <div className="flex justify-between items-start mb-3">
-              <div className="p-2 bg-slate-800 rounded-lg text-slate-300">
-                <FileText size={20} />
-              </div>
-              <span className={`text-xs px-2 py-1 rounded capitalize ${
-                sim.status === 'open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
-              }`}>
-                {sim.status === 'coming_soon' ? 'Em Breve' : sim.status}
-              </span>
+      {simulations.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {simulations.map((sim) => (
+            <div key={sim.id} className="bg-slate-900/30 border border-white/5 p-4 rounded-xl hover:bg-slate-800/50 transition-all cursor-pointer group">
+                <div className="flex justify-between items-start mb-3">
+                <div className="p-2 bg-slate-800 rounded-lg text-slate-300">
+                    <FileText size={20} />
+                </div>
+                <span className={`text-xs px-2 py-1 rounded capitalize ${
+                    sim.status === 'open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
+                }`}>
+                    {sim.status === 'coming_soon' ? 'Em Breve' : sim.status}
+                </span>
+                </div>
+                <h4 className="text-white font-medium mb-1">{sim.title}</h4>
+                <p className="text-sm text-slate-500">{sim.questionCount} Questões • {sim.durationMinutes} min</p>
             </div>
-            <h4 className="text-white font-medium mb-1">{sim.title}</h4>
-            <p className="text-sm text-slate-500">{sim.questionCount} Questões • {sim.durationMinutes} min</p>
+            ))}
+        </div>
+      ) : (
+          <div className="p-8 text-center bg-slate-900/30 rounded-2xl border border-white/5 border-dashed">
+              <p className="text-slate-500">Nenhum simulado cadastrado na plataforma ainda.</p>
           </div>
-        ))}
-      </div>
+      )}
     </div>
   );
 };

@@ -8,8 +8,10 @@ import Community from './components/Community';
 import Simulations from './components/Simulations';
 import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
+import Competitivo from './components/Competitivo';
 import { User, View } from './types';
 import { AuthService, mapUser } from './services/authService';
+import { DatabaseService } from './services/databaseService'; // Import DB service
 import { auth } from './services/firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -28,9 +30,19 @@ const App: React.FC = () => {
 
   // Auth Persistence
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        setUser(mapUser(firebaseUser));
+        // Fetch full profile from DB to get XP, etc.
+        const dbUser = await DatabaseService.getUserProfile(firebaseUser.uid);
+        const mappedUser = mapUser(firebaseUser);
+        
+        // Merge Auth data with DB data (prefer DB for extended fields)
+        setUser({
+            ...mappedUser,
+            ...dbUser, 
+            displayName: dbUser?.displayName || mappedUser.displayName, // Prefer DB name
+            photoURL: dbUser?.photoURL || mappedUser.photoURL
+        });
       } else {
         setUser(null);
       }
@@ -70,15 +82,8 @@ const App: React.FC = () => {
       case 'comunidade': return <Community />;
       case 'simulados': return <Simulations />;
       case 'ajustes': return <Settings user={user} onUpdateUser={setUser} />;
+      case 'competitivo': return <Competitivo />;
       case 'admin': return user.isAdmin ? <AdminPanel /> : <Dashboard user={user} />;
-      case 'provas': return (
-        <div className="flex items-center justify-center h-full text-slate-500">
-           <div className="text-center">
-             <h2 className="text-2xl font-bold text-white mb-2">Repositório de Provas</h2>
-             <p>Em desenvolvimento. Acesse o Banco de Questões por enquanto.</p>
-           </div>
-        </div>
-      );
       default: return <Dashboard user={user} />;
     }
   };

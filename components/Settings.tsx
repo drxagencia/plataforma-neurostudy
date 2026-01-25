@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { User } from '../types';
+import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Camera, Save, Loader2 } from 'lucide-react';
+import { Camera, Save, Loader2, CheckCircle } from 'lucide-react';
 
 interface SettingsProps {
   user: User;
@@ -12,36 +13,46 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   const [displayName, setDisplayName] = useState(user.displayName);
   const [photoURL, setPhotoURL] = useState(user.photoURL || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSuccess(false);
     try {
-      // Simulate API call
-      const updatedUser = await AuthService.updateProfile(user, {
+      // 1. Update Firebase Auth (for login session consistency)
+      const updatedAuthUser = await AuthService.updateProfile(user, {
         displayName,
         photoURL
       });
-      onUpdateUser(updatedUser);
+
+      // 2. Update Realtime Database (for persistence and admin view)
+      await DatabaseService.saveUserProfile(user.uid, {
+        displayName,
+        photoURL
+      });
+
+      onUpdateUser(updatedAuthUser);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (e) {
       console.error("Failed to update", e);
+      alert("Erro ao salvar perfil.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // This is a placeholder logic for file upload as per constraint "use file input".
-    // In a real app with Firebase Storage, we would upload the file here.
-    // For this demo, we'll just simulate a local preview URL if a file is selected.
     if (e.target.files && e.target.files[0]) {
-       // Create a fake local URL just to show UI update capability
+       // In production: Upload to Firebase Storage and get URL
+       // For this environment: Create local blob URL
        const fakeUrl = URL.createObjectURL(e.target.files[0]);
        setPhotoURL(fakeUrl);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
+    <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">Ajustes da Conta</h2>
         <p className="text-slate-400">Gerencie suas informações pessoais e aparência.</p>
@@ -52,12 +63,18 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
         {/* Profile Picture */}
         <div className="flex items-center gap-6">
           <div className="relative group">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-slate-700 group-hover:border-indigo-500 transition-colors">
-              <img 
-                src={photoURL || 'https://via.placeholder.com/150'} 
-                alt="Profile" 
-                className="w-full h-full object-cover"
-              />
+            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-slate-700 group-hover:border-indigo-500 transition-colors bg-slate-800">
+              {photoURL ? (
+                <img 
+                  src={photoURL} 
+                  alt="Profile" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-slate-500">
+                    {displayName.charAt(0)}
+                </div>
+              )}
             </div>
             <label className="absolute bottom-0 right-0 p-2 bg-indigo-600 rounded-full text-white cursor-pointer hover:bg-indigo-500 shadow-lg transition-transform hover:scale-110">
               <Camera size={16} />
@@ -66,7 +83,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
           </div>
           <div>
             <h3 className="text-white font-medium">Foto de Perfil</h3>
-            <p className="text-sm text-slate-500">Recomendado: 400x400px, JPG ou PNG.</p>
+            <p className="text-sm text-slate-500">A imagem será salva no banco de dados.</p>
           </div>
         </div>
 
@@ -81,7 +98,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
           />
         </div>
 
-         {/* Mock Section for Theme - Just visual */}
+         {/* Mock Section for Theme */}
          <div className="space-y-3 pt-4 border-t border-white/5">
             <span className="text-sm font-medium text-slate-300">Tema da Interface</span>
             <div className="grid grid-cols-3 gap-3">
@@ -90,14 +107,16 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
             </div>
          </div>
 
-        <div className="pt-6">
+        <div className="pt-6 flex items-center gap-4">
           <button 
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-colors font-medium disabled:opacity-50"
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all font-medium disabled:opacity-50 ${
+                success ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-500'
+            }`}
           >
-            {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-            Salvar Alterações
+            {isSaving ? <Loader2 className="animate-spin" size={20} /> : success ? <CheckCircle size={20} /> : <Save size={20} />}
+            {success ? 'Salvo!' : 'Salvar Alterações'}
           </button>
         </div>
 

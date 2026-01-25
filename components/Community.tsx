@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { CommunityPost } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { auth } from '../services/firebaseConfig';
-import { MessageCircle, Heart, Share2, Send, Loader2 } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle } from 'lucide-react';
 
 const Community: React.FC = () => {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPosts();
@@ -25,6 +26,7 @@ const Community: React.FC = () => {
     if (!newPost.trim() || !auth.currentUser) return;
 
     setSubmitting(true);
+    setErrorMsg(null);
     try {
       await DatabaseService.createPost({
         authorName: auth.currentUser.displayName || 'Estudante',
@@ -32,12 +34,12 @@ const Community: React.FC = () => {
         content: newPost,
         timestamp: Date.now(),
         likes: 0
-      });
+      }, auth.currentUser.uid);
       
       setNewPost('');
       fetchPosts(); // Refresh list
-    } catch (error) {
-      console.error("Failed to post", error);
+    } catch (error: any) {
+      setErrorMsg(error.message);
     } finally {
       setSubmitting(false);
     }
@@ -49,7 +51,7 @@ const Community: React.FC = () => {
     <div className="max-w-4xl mx-auto h-full flex flex-col">
       <div className="mb-6">
         <h2 className="text-3xl font-bold text-white mb-2">Comunidade</h2>
-        <p className="text-slate-400">Troque conhecimentos com outros estudantes.</p>
+        <p className="text-slate-400">Troque conhecimentos com outros estudantes. Ganhe XP participando!</p>
       </div>
 
       {/* New Post Input */}
@@ -61,8 +63,18 @@ const Community: React.FC = () => {
             placeholder="No que você está pensando? Dúvidas, dicas..."
             className="w-full bg-transparent text-white placeholder-slate-500 resize-none focus:outline-none min-h-[80px]"
           />
+          
+          {errorMsg && (
+             <div className="flex items-center gap-2 text-red-400 text-sm mt-2 p-2 bg-red-900/10 rounded-lg">
+                <AlertCircle size={14} />
+                {errorMsg}
+             </div>
+          )}
+
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
-             <div className="flex gap-2"></div>
+             <div className="flex gap-2 text-xs text-slate-500">
+                1 mensagem a cada 24h
+             </div>
              <button 
                type="submit" 
                disabled={!newPost.trim() || submitting}

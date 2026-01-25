@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
-import { Subject } from '../types';
-import { ChevronRight, Filter, PlayCircle, Loader2 } from 'lucide-react';
+import { Subject, Question } from '../types';
+import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, Trophy } from 'lucide-react';
+import { auth } from '../services/firebaseConfig';
 
 const QuestionBank: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -9,9 +10,20 @@ const QuestionBank: React.FC = () => {
   const [subtopics, setSubtopics] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
 
+  // Selection State
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [selectedSubTopic, setSelectedSubTopic] = useState<string | null>(null);
+
+  // Quiz State
+  const [quizActive, setQuizActive] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [score, setScore] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [xpEarned, setXpEarned] = useState(0);
 
   useEffect(() => {
     const initData = async () => {
@@ -28,24 +40,164 @@ const QuestionBank: React.FC = () => {
     initData();
   }, []);
 
-  // Derived state options
   const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
   const subTopicOptions = selectedTopic ? subtopics[selectedTopic] || [] : [];
 
-  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedSubject(e.target.value);
-    setSelectedTopic(null);
-    setSelectedSubTopic(null);
+  const handleStartQuiz = async () => {
+    if (!selectedSubject || !selectedTopic) return;
+    setLoading(true);
+    const fetchedQuestions = await DatabaseService.getQuestions(selectedSubject, selectedTopic, selectedSubTopic || undefined);
+    setLoading(false);
+
+    if (fetchedQuestions.length > 0) {
+        setQuestions(fetchedQuestions);
+        setQuizActive(true);
+        setCurrentQuestionIndex(0);
+        setScore(0);
+        setShowResult(false);
+        setXpEarned(0);
+    } else {
+        alert("Nenhuma questão encontrada para este filtro no momento.");
+    }
   };
 
-  const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTopic(e.target.value);
-    setSelectedSubTopic(null);
+  const handleAnswer = (index: number) => {
+    if (isAnswered) return;
+    setSelectedOption(index);
+    setIsAnswered(true);
+
+    const isCorrect = index === questions[currentQuestionIndex].correctAnswer;
+    if (isCorrect) setScore(score + 1);
   };
 
-  const isReady = selectedSubject && selectedTopic && selectedSubTopic;
+  const handleNext = async () => {
+    if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setSelectedOption(null);
+        setIsAnswered(false);
+    } else {
+        // Finish Quiz
+        const finalXp = score * 10; // 10 XP per correct answer
+        if (auth.currentUser && finalXp > 0) {
+            await DatabaseService.addXp(auth.currentUser.uid, finalXp);
+        }
+        setXpEarned(finalXp);
+        setShowResult(true);
+    }
+  };
+
+  const resetQuiz = () => {
+    setQuizActive(false);
+    setSelectedOption(null);
+    setIsAnswered(false);
+    setShowResult(false);
+  };
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
+
+  // --- QUIZ ACTIVE VIEW ---
+  if (quizActive) {
+    if (showResult) {
+        return (
+            <div className="h-full flex items-center justify-center animate-in zoom-in-95">
+                <div className="text-center bg-slate-900/50 p-10 rounded-3xl border border-indigo-500/20 max-w-md w-full">
+                    <div className="w-24 h-24 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-400">
+                        <Trophy size={48} />
+                    </div>
+                    <h2 className="text-3xl font-bold text-white mb-2">Quiz Finalizado!</h2>
+                    <p className="text-slate-400 mb-6">Você acertou <strong className="text-white">{score}</strong> de <strong className="text-white">{questions.length}</strong> questões.</p>
+                    
+                    {xpEarned > 0 && (
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-8">
+                            <p className="text-emerald-400 font-bold text-lg">+{xpEarned} XP Ganho!</p>
+                        </div>
+                    )}
+
+                    <button 
+                        onClick={resetQuiz}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors"
+                    >
+                        Voltar ao Banco
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    const question = questions[currentQuestionIndex];
+    return (
+        <div className="max-w-3xl mx-auto h-full flex flex-col pt-4">
+            <div className="flex justify-between items-center mb-6">
+                <button onClick={resetQuiz} className="text-slate-500 hover:text-white text-sm">Cancelar</button>
+                <div className="text-slate-400 text-sm">Questão {currentQuestionIndex + 1} / {questions.length}</div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="h-1 w-full bg-slate-800 rounded-full mb-8 overflow-hidden">
+                <div 
+                    className="h-full bg-indigo-500 transition-all duration-300" 
+                    style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`}}
+                />
+            </div>
+
+            <div className="flex-1 overflow-y-auto pb-20">
+                <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-6 md:p-8 mb-6">
+                    <p className="text-lg md:text-xl text-white leading-relaxed font-medium">
+                        {question.text}
+                    </p>
+                </div>
+
+                <div className="space-y-3">
+                    {question.options.map((option, idx) => {
+                        let stateStyles = "bg-slate-900/40 border-slate-700 hover:bg-slate-800";
+                        if (isAnswered) {
+                            if (idx === question.correctAnswer) stateStyles = "bg-emerald-500/20 border-emerald-500/50 text-emerald-100";
+                            else if (idx === selectedOption) stateStyles = "bg-red-500/20 border-red-500/50 text-red-100";
+                            else stateStyles = "bg-slate-900/40 border-slate-800 opacity-50";
+                        } else if (selectedOption === idx) {
+                            stateStyles = "bg-indigo-500/20 border-indigo-500";
+                        }
+
+                        return (
+                            <button
+                                key={idx}
+                                onClick={() => handleAnswer(idx)}
+                                disabled={isAnswered}
+                                className={`w-full p-4 rounded-xl border text-left transition-all flex items-center justify-between group ${stateStyles}`}
+                            >
+                                <span className="flex-1">{option}</span>
+                                {isAnswered && idx === question.correctAnswer && <CheckCircle size={20} className="text-emerald-400" />}
+                                {isAnswered && idx === selectedOption && idx !== question.correctAnswer && <XCircle size={20} className="text-red-400" />}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {isAnswered && (
+                    <div className="mt-8 animate-in slide-in-from-bottom-2 fade-in">
+                         {selectedOption !== question.correctAnswer && (
+                             <div className="p-4 bg-indigo-900/20 border border-indigo-500/20 rounded-xl mb-4">
+                                 <p className="text-sm text-indigo-200">
+                                     <span className="font-bold">Explicação:</span> {question.explanation || "Sem explicação disponível."}
+                                 </p>
+                             </div>
+                         )}
+                        <button 
+                            onClick={handleNext}
+                            className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 shadow-lg"
+                        >
+                            {currentQuestionIndex === questions.length - 1 ? 'Finalizar' : 'Próxima Questão'}
+                            <ArrowRight size={20} />
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+  }
+
+  // --- FILTERS VIEW ---
+  const isReady = selectedSubject && selectedTopic && selectedSubTopic;
 
   return (
     <div className="h-full flex flex-col max-h-[85vh]">
@@ -66,7 +218,11 @@ const QuestionBank: React.FC = () => {
           <div className="relative">
             <select
               value={selectedSubject || ''}
-              onChange={handleSubjectChange}
+              onChange={(e) => {
+                  setSelectedSubject(e.target.value);
+                  setSelectedTopic(null);
+                  setSelectedSubTopic(null);
+              }}
               className="w-full appearance-none bg-slate-900 border border-slate-700 hover:border-slate-500 text-white p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all cursor-pointer"
             >
               <option value="" disabled>Selecione a matéria</option>
@@ -86,7 +242,10 @@ const QuestionBank: React.FC = () => {
           <div className="relative">
             <select
               value={selectedTopic || ''}
-              onChange={handleTopicChange}
+              onChange={(e) => {
+                  setSelectedTopic(e.target.value);
+                  setSelectedSubTopic(null);
+              }}
               disabled={!selectedSubject}
               className="w-full appearance-none bg-slate-900 border border-slate-700 hover:border-slate-500 text-white p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all cursor-pointer disabled:bg-slate-950 disabled:border-slate-800 disabled:text-slate-600"
             >
@@ -135,7 +294,10 @@ const QuestionBank: React.FC = () => {
             <p className="text-slate-300 mb-8 max-w-md mx-auto">
               Gerando bateria de questões sobre <strong>{selectedSubTopic}</strong> em {selectedTopic}.
             </p>
-            <button className="px-8 py-4 bg-white text-slate-900 font-bold rounded-xl hover:bg-indigo-50 hover:scale-105 transition-all shadow-xl">
+            <button 
+                onClick={handleStartQuiz}
+                className="px-8 py-4 bg-white text-slate-900 font-bold rounded-xl hover:bg-indigo-50 hover:scale-105 transition-all shadow-xl"
+            >
               Iniciar Exercícios
             </button>
           </div>

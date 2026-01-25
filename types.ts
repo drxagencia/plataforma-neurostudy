@@ -1,4 +1,4 @@
-export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'provas' | 'ajustes' | 'admin';
+export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'ajustes' | 'admin';
 
 export interface User {
   uid: string;
@@ -11,6 +11,8 @@ export interface User {
 export interface UserProfile extends User {
   subscriptionStatus: 'free' | 'pro';
   subscriptionExpiry: string; // ISO Date string
+  xp: number;
+  lastPostedAt?: number; // Timestamp
 }
 
 export interface Announcement {
@@ -28,10 +30,13 @@ export interface Subject {
   color: string;
 }
 
-export interface QuestionFilter {
-  subjectId: string | null;
-  topicId: string | null;
-  subTopicId: string | null;
+export interface Question {
+  id: string;
+  text: string;
+  options: string[];
+  correctAnswer: number; // Index 0-3
+  difficulty: 'easy' | 'medium' | 'hard';
+  explanation?: string;
 }
 
 export interface CommunityPost {

@@ -5,11 +5,11 @@ import {
   GraduationCap, 
   FileQuestion, 
   Users, 
-  FileText, 
   Settings, 
   LogOut,
   BookOpen,
-  ShieldAlert
+  ShieldAlert,
+  Trophy
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -27,7 +27,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
     { id: 'simulados', label: 'Simulados', icon: <GraduationCap size={20} /> },
     { id: 'questoes', label: 'Questões', icon: <FileQuestion size={20} /> },
     { id: 'comunidade', label: 'Comunidade', icon: <Users size={20} /> },
-    { id: 'provas', label: 'Provas', icon: <FileText size={20} /> },
+    { id: 'competitivo', label: 'Competitivo', icon: <Trophy size={20} /> },
     { id: 'admin', label: 'Admin', icon: <ShieldAlert size={20} />, adminOnly: true },
     { id: 'ajustes', label: 'Ajustes', icon: <Settings size={20} /> },
   ];
