@@ -1,3 +1,5 @@
+import { auth } from "./firebaseConfig";
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'ai';
@@ -14,15 +16,18 @@ export const AiService = {
         },
         body: JSON.stringify({ 
           message,
-          history: history.map(h => ({ role: h.role, content: h.content }))
+          history: history.map(h => ({ role: h.role, content: h.content })),
+          uid: auth.currentUser?.uid, // Send UID for balance verification
+          mode: 'chat'
         }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error(`Erro na comunicação: ${response.statusText}`);
+        throw new Error(`${response.status}: ${data.error || response.statusText}`);
       }
 
-      const data = await response.json();
       return data.text;
     } catch (error) {
       console.error("AI Service Error:", error);
@@ -43,17 +48,22 @@ export const AiService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: promptContext,
-          mode: 'explanation' 
+          mode: 'explanation',
+          uid: auth.currentUser?.uid
         }),
       });
 
-      if (!response.ok) throw new Error("Erro ao gerar explicação");
-      
       const data = await response.json();
+      
+      if (!response.ok) {
+         throw new Error(`${response.status}: ${data.error || response.statusText}`);
+      }
+      
       return data.text;
     } catch (error) {
       console.error("AI Explanation Error:", error);
-      return "Ops, não consegui analisar seu erro agora. Tente novamente mais tarde.";
+      // If error is related to plan permissions/balance, rethrow to be handled by UI
+      throw error;
     }
   }
 };

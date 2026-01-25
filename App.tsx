@@ -9,15 +9,16 @@ import Simulations from './components/Simulations';
 import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
 import Competitivo from './components/Competitivo';
-import AiTutor from './components/AiTutor'; // New import
-import { User, View } from './types';
+import AiTutor from './components/AiTutor';
+import AccessDenied from './components/AccessDenied'; // New Component
+import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null); // Use UserProfile type
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -33,16 +34,16 @@ const App: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Fetch full profile from DB to get XP, etc.
+        // Fetch full profile from DB
         const dbUser = await DatabaseService.getUserProfile(firebaseUser.uid);
         const mappedUser = mapUser(firebaseUser);
         
-        // Merge Auth data with DB data (prefer DB for extended fields)
         setUser({
             ...mappedUser,
             ...dbUser, 
-            displayName: dbUser?.displayName || mappedUser.displayName, // Prefer DB name
-            photoURL: dbUser?.photoURL || mappedUser.photoURL
+            displayName: dbUser?.displayName || mappedUser.displayName,
+            photoURL: dbUser?.photoURL || mappedUser.photoURL,
+            plan: dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic') // Default plan
         });
       } else {
         setUser(null);
@@ -54,12 +55,28 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (loggedInUser: User) => {
-    setUser(loggedInUser);
+    // Optimistic set, real data comes from auth listener
+    setLoadingAuth(true); 
   };
 
   const handleLogout = async () => {
     await AuthService.logout();
     setCurrentView('dashboard');
+  };
+
+  const checkAccess = (view: View): boolean => {
+    if (!user) return false;
+    if (user.isAdmin || user.plan === 'admin' || user.plan === 'advanced') return true;
+
+    // Plan Limits
+    if (user.plan === 'basic') {
+        if (['comunidade', 'competitivo', 'simulados', 'tutor'].includes(view)) return false;
+    }
+    
+    // Intermediate has access to everything in UI, but features within (AI) are limited by config/API
+    if (user.plan === 'intermediate') return true; 
+
+    return true;
   };
 
   if (loadingAuth) {
@@ -76,6 +93,12 @@ const App: React.FC = () => {
 
   // View Container to handle rendering content
   const renderView = () => {
+    if (!checkAccess(currentView)) {
+        // Determine required plan message
+        const required = user.plan === 'basic' ? 'intermediate' : 'advanced';
+        return <AccessDenied currentPlan={user.plan} requiredPlan={required} />;
+    }
+
     switch (currentView) {
       case 'dashboard': return <Dashboard user={user} />;
       case 'aulas': return <Classes />;

@@ -89,7 +89,8 @@
       "displayName": "Admin Master",
       "email": "master@admin.com",
       "photoURL": "",
-      "subscriptionStatus": "pro",
+      "plan": "admin",
+      "balance": 100.00,
       "subscriptionExpiry": "2030-01-01",
       "isAdmin": true
     },
@@ -97,7 +98,8 @@
       "displayName": "Estudante Demo",
       "email": "aluno@email.com",
       "photoURL": "",
-      "subscriptionStatus": "free",
+      "plan": "basic",
+      "balance": 0,
       "subscriptionExpiry": "2024-12-31"
     }
   },
@@ -113,17 +115,57 @@
       ]
     }
   },
+  "config": {
+    "ai": {
+      "intermediateLimits": {
+        "canUseChat": false,
+        "canUseExplanation": true,
+        "dailyMessageLimit": 10
+      }
+    }
+  },
   "questions": {
     "physics": {
-      "cinematica": [
-         {
-           "id": "q1",
-           "text": "Um carro percorre...",
-           "options": ["10m/s", "20m/s", "30m/s", "40m/s"],
-           "correctAnswer": 1,
-           "difficulty": "medium"
+      "Cinemática": {
+         "Movimento Uniforme": {
+            "-KeyQ1": {
+               "text": "Um carro percorre uma estrada reta com velocidade constante de 72 km/h. Qual a distância percorrida em 10 segundos?",
+               "options": ["100 m", "200 m", "300 m", "400 m"],
+               "correctAnswer": 1,
+               "difficulty": "easy",
+               "explanation": "Primeiro converta 72 km/h para m/s dividindo por 3,6 = 20 m/s. Distância = Velocidade x Tempo. D = 20 * 10 = 200m."
+            },
+            "-KeyQ2": {
+               "text": "Dois móveis A e B partem simultaneamente de um mesmo ponto, com velocidades constantes de 10m/s e 15m/s, mesma direção e sentido. Após 20s, qual a distância entre eles?",
+               "options": ["50 m", "100 m", "200 m", "150 m"],
+               "correctAnswer": 1,
+               "difficulty": "medium",
+               "explanation": "Velocidade relativa = 15 - 10 = 5m/s. Distância = 5m/s * 20s = 100m."
+            }
+         },
+         "Vetores": {
+             "-KeyQ3": {
+                 "text": "Dois vetores de módulos 3u e 4u formam um ângulo de 90º entre si. Qual o módulo do vetor resultante?",
+                 "options": ["5u", "7u", "1u", "12u"],
+                 "correctAnswer": 0,
+                 "difficulty": "easy",
+                 "explanation": "Teorema de Pitágoras: R² = 3² + 4² = 9 + 16 = 25. R = 5."
+             }
          }
-      ]
+      }
+    },
+    "math": {
+        "Álgebra": {
+            "Funções": {
+                "-KeyQ4": {
+                    "text": "Dada a função f(x) = 2x - 3, qual o valor de f(5)?",
+                    "options": ["5", "7", "8", "10"],
+                    "correctAnswer": 1,
+                    "difficulty": "easy",
+                    "explanation": "f(5) = 2(5) - 3 = 10 - 3 = 7."
+                }
+            }
+        }
     }
   }
 }

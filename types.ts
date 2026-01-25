@@ -1,4 +1,33 @@
-export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'tutor' | 'ajustes' | 'admin';
+export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'tutor' | 'ajustes' | 'admin' | 'financeiro';
+
+export type UserPlan = 'basic' | 'intermediate' | 'advanced' | 'admin';
+
+export interface Transaction {
+  id: string;
+  type: 'debit' | 'credit';
+  amount: number; // Valor em R$
+  description: string;
+  timestamp: number;
+  tokensUsed?: number;
+}
+
+export interface RechargeRequest {
+  id: string;
+  uid: string;
+  userDisplayName: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected';
+  timestamp: number;
+  proofUrl?: string; // Opcional, URL do comprovante
+}
+
+export interface AiConfig {
+  intermediateLimits: {
+    canUseExplanation: boolean; // "Quer saber pq errou?"
+    canUseChat: boolean;        // Chat livre
+    dailyMessageLimit: number;
+  }
+}
 
 export interface User {
   uid: string;
@@ -9,10 +38,11 @@ export interface User {
 }
 
 export interface UserProfile extends User {
-  subscriptionStatus: 'free' | 'pro';
+  plan: UserPlan;
   subscriptionExpiry: string; // ISO Date string
+  balance: number; // Saldo em R$
   xp: number;
-  lastPostedAt?: number; // Timestamp
+  lastPostedAt?: number;
   questionsAnswered?: number;
   hoursStudied?: number;
 }
@@ -28,20 +58,20 @@ export interface Announcement {
 export interface Subject {
   id: string;
   name: string;
-  iconName: string; // Mapping to Lucide icon name
+  iconName: string; 
   color: string;
 }
 
 export interface Question {
   id?: string;
   text: string;
-  imageUrl?: string; // New field for question image
+  imageUrl?: string; 
   options: string[];
-  correctAnswer: number; // Index 0-3
+  correctAnswer: number; 
   difficulty: 'easy' | 'medium' | 'hard';
   explanation?: string;
-  subjectId?: string; // For Admin creation
-  topic?: string;     // For Admin creation
+  subjectId?: string; 
+  topic?: string;    
 }
 
 export interface Lesson {
@@ -49,8 +79,8 @@ export interface Lesson {
   title: string;
   videoUrl: string;
   duration: string;
-  subjectId?: string; // For Admin creation
-  topic?: string;     // For Admin creation
+  subjectId?: string; 
+  topic?: string;     
 }
 
 export interface CommunityPost {
@@ -70,5 +100,5 @@ export interface Simulation {
   durationMinutes: number;
   type: 'official' | 'training';
   status: 'open' | 'closed' | 'coming_soon';
-  subjects: string[]; // Subject IDs
+  subjects: string[]; 
 }

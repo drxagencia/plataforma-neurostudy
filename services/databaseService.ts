@@ -1,6 +1,6 @@
-import { ref, get, child, update, push, set, query, orderByChild } from "firebase/database";
+import { ref, get, child, update, push, set, query, orderByChild, equalTo } from "firebase/database";
 import { database } from "./firebaseConfig";
-import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson } from "../types";
+import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan } from "../types";
 
 export const DatabaseService = {
   // --- User Profile & XP ---
@@ -8,7 +8,14 @@ export const DatabaseService = {
     try {
       const snapshot = await get(child(ref(database), `users/${uid}`));
       if (snapshot.exists()) {
-        return { ...snapshot.val(), uid };
+        const data = snapshot.val();
+        // Ensure defaults for new fields
+        return { 
+          ...data, 
+          uid,
+          plan: data.plan || (data.isAdmin ? 'admin' : 'basic'),
+          balance: data.balance || 0
+        };
       }
       return null;
     } catch (error) {
@@ -17,10 +24,13 @@ export const DatabaseService = {
     }
   },
 
-  // Used by Admin to pre-create user profiles
   createUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
     try {
-      await set(ref(database, `users/${uid}`), data);
+      await set(ref(database, `users/${uid}`), {
+        ...data,
+        balance: 0,
+        plan: data.isAdmin ? 'admin' : 'basic'
+      });
     } catch (error) {
       console.error("Error creating user profile:", error);
       throw error;
@@ -83,6 +93,108 @@ export const DatabaseService = {
     return [];
   },
 
+  // --- Financial & Credits System ---
+  
+  createRechargeRequest: async (uid: string, userDisplayName: string, amount: number): Promise<void> => {
+    try {
+        const reqRef = push(ref(database, 'recharges'));
+        const request: RechargeRequest = {
+            id: reqRef.key!,
+            uid,
+            userDisplayName,
+            amount,
+            status: 'pending',
+            timestamp: Date.now()
+        };
+        await set(reqRef, request);
+    } catch (error) {
+        console.error("Error creating recharge:", error);
+        throw error;
+    }
+  },
+
+  getRechargeRequests: async (): Promise<RechargeRequest[]> => {
+    try {
+        const snapshot = await get(ref(database, 'recharges'));
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            return (Object.values(data) as RechargeRequest[]).sort((a, b) => b.timestamp - a.timestamp);
+        }
+        return [];
+    } catch (error) {
+        return [];
+    }
+  },
+
+  processRecharge: async (requestId: string, status: 'approved' | 'rejected'): Promise<void> => {
+    try {
+        const reqRef = ref(database, `recharges/${requestId}`);
+        const snapshot = await get(reqRef);
+        if (!snapshot.exists()) throw new Error("Request not found");
+        
+        const request = snapshot.val() as RechargeRequest;
+        
+        if (status === 'approved' && request.status !== 'approved') {
+            // Add Balance to user
+            const userRef = ref(database, `users/${request.uid}`);
+            const userSnap = await get(userRef);
+            const currentBalance = userSnap.val().balance || 0;
+            
+            await update(userRef, { balance: currentBalance + request.amount });
+
+            // Log Transaction
+            const transRef = push(ref(database, `users/${request.uid}/transactions`));
+            const transaction: Transaction = {
+                id: transRef.key!,
+                type: 'credit',
+                amount: request.amount,
+                description: 'Recarga aprovada via PIX',
+                timestamp: Date.now()
+            };
+            await set(transRef, transaction);
+        }
+
+        await update(reqRef, { status });
+    } catch (error) {
+        console.error("Error processing recharge:", error);
+        throw error;
+    }
+  },
+
+  getUserTransactions: async (uid: string): Promise<Transaction[]> => {
+      try {
+          const snapshot = await get(ref(database, `users/${uid}/transactions`));
+          if (snapshot.exists()) {
+              const data = snapshot.val();
+              return (Object.values(data) as Transaction[]).sort((a, b) => b.timestamp - a.timestamp);
+          }
+          return [];
+      } catch (error) {
+          return [];
+      }
+  },
+
+  // --- AI Config ---
+  getAiConfig: async (): Promise<AiConfig> => {
+      try {
+          const snapshot = await get(ref(database, 'config/ai'));
+          if (snapshot.exists()) return snapshot.val();
+          return {
+              intermediateLimits: {
+                  canUseChat: false,
+                  canUseExplanation: true,
+                  dailyMessageLimit: 10
+              }
+          };
+      } catch (error) {
+          return { intermediateLimits: { canUseChat: false, canUseExplanation: true, dailyMessageLimit: 10 } };
+      }
+  },
+
+  updateAiConfig: async (config: AiConfig): Promise<void> => {
+      await set(ref(database, 'config/ai'), config);
+  },
+
   // --- Announcements ---
   getAnnouncements: async (): Promise<Announcement[]> => {
     try {
@@ -132,14 +244,43 @@ export const DatabaseService = {
     return {};
   },
 
-  // --- Questions ---
+  // --- Questions (Updated Hierarchy) ---
   getQuestions: async (subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
     try {
-      const path = `questions/${subjectId}/${topic}`; 
+      // Path: questions/math/Algebra/Polinomios/...
+      let path = `questions/${subjectId}/${topic}`;
+      
+      if (subtopic) {
+        path += `/${subtopic}`;
+      }
+      
       const snapshot = await get(child(ref(database), path));
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        return Array.isArray(data) ? data : Object.values(data);
+      if (!snapshot.exists()) return [];
+
+      const data = snapshot.val();
+
+      // If we fetched a specific subtopic, data is an object of questions
+      if (subtopic) {
+        return Object.keys(data).map(key => ({
+            ...data[key],
+            id: key
+        }));
+      } else {
+        // If we fetched a topic, data is an object of subtopics, which contain objects of questions
+        // We need to flatten this structure
+        let allQuestions: Question[] = [];
+        Object.keys(data).forEach(subKey => {
+            const subData = data[subKey]; // This is the subtopic object
+            if (typeof subData === 'object') {
+                Object.keys(subData).forEach(qKey => {
+                    allQuestions.push({
+                        ...subData[qKey],
+                        id: qKey
+                    });
+                });
+            }
+        });
+        return allQuestions;
       }
     } catch (error) {
       console.warn("Error fetching questions:", error);
@@ -147,18 +288,12 @@ export const DatabaseService = {
     return [];
   },
 
-  createQuestion: async (subjectId: string, topic: string, question: Question): Promise<void> => {
+  createQuestion: async (subjectId: string, topic: string, subtopic: string, question: Question): Promise<void> => {
      try {
-       const questionsRef = ref(database, `questions/${subjectId}/${topic}`);
-       // Get existing or create new array
-       const snapshot = await get(questionsRef);
-       let questions = [];
-       if (snapshot.exists()) {
-         questions = snapshot.val();
-         if (!Array.isArray(questions)) questions = Object.values(questions);
-       }
-       questions.push(question);
-       await set(questionsRef, questions);
+       // Hierarchical Path: questions/{subject}/{topic}/{subtopic}/{questionId}
+       const questionsRef = ref(database, `questions/${subjectId}/${topic}/${subtopic}`);
+       const newQuestionRef = push(questionsRef);
+       await set(newQuestionRef, question);
      } catch (error) {
        console.error("Error creating question:", error);
        throw error;
@@ -256,11 +391,11 @@ export const DatabaseService = {
     return [];
   },
 
-  updateUserPlan: async (uid: string, status: 'free' | 'pro', expiry: string): Promise<void> => {
+  updateUserPlan: async (uid: string, plan: UserPlan, expiry: string): Promise<void> => {
     try {
       const userRef = child(ref(database), `users/${uid}`);
       await update(userRef, {
-        subscriptionStatus: status,
+        plan: plan,
         subscriptionExpiry: expiry
       });
     } catch (error) {
