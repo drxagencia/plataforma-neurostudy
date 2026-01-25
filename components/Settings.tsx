@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserProfile } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
@@ -12,20 +12,35 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   const [displayName, setDisplayName] = useState(user.displayName);
   const [photoURL, setPhotoURL] = useState(user.photoURL || '');
+  const [selectedTheme, setSelectedTheme] = useState<'dark' | 'light' | 'midnight'>(user.theme || 'dark');
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Theme Logic
+  // Sync local state when user prop updates
+  useEffect(() => {
+    setDisplayName(user.displayName);
+    setPhotoURL(user.photoURL || '');
+    setSelectedTheme(user.theme || 'dark');
+  }, [user]);
+
+  // Apply theme preview immediately
   const handleThemeChange = (theme: 'dark' | 'light' | 'midnight') => {
+      setSelectedTheme(theme);
+      
       const root = document.documentElement;
-      root.classList.remove('theme-dark', 'theme-light', 'theme-midnight');
-      root.classList.add(`theme-${theme}`);
+      const body = document.body;
       
-      // For simple tailwind dark mode toggle
-      if (theme === 'light') root.classList.remove('dark');
-      else root.classList.add('dark');
-      
-      // In a real app, save this to localStorage
+      // Reset
+      root.classList.remove('light');
+      root.classList.add('dark'); // Default base
+      body.classList.remove('theme-midnight');
+
+      if (theme === 'light') {
+          root.classList.remove('dark');
+          root.classList.add('light');
+      } else if (theme === 'midnight') {
+          body.classList.add('theme-midnight');
+      }
   };
 
   const handleSave = async () => {
@@ -33,26 +48,40 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
     setSuccess(false);
     try {
       // 1. Update Firebase Auth 
-      const updatedAuthUser = await AuthService.updateProfile(user, {
-        displayName,
-        photoURL
-      });
+      // CRITICAL FIX: Firebase Auth allows max 2048 chars for photoURL. 
+      // Base64 images are much larger. We ONLY update displayName in Auth.
+      // The PhotoURL will be stored in Realtime Database.
+      
+      const authUpdates: { displayName?: string; photoURL?: string } = { displayName };
+      
+      // Only send photo to Auth if it's NOT a base64 data string (i.e. it's a short https link)
+      if (photoURL && !photoURL.startsWith('data:image')) {
+          authUpdates.photoURL = photoURL;
+      }
 
-      // 2. Update Realtime Database
+      const updatedAuthUser = await AuthService.updateProfile(user, authUpdates);
+
+      // 2. Update Realtime Database (Supports large Base64 strings)
       await DatabaseService.saveUserProfile(user.uid, {
         displayName,
-        photoURL
+        photoURL,
+        theme: selectedTheme
       });
 
       // Merge updated User fields back into UserProfile
-      const updatedProfile: UserProfile = { ...user, ...updatedAuthUser };
+      const updatedProfile: UserProfile = { 
+          ...user, 
+          ...updatedAuthUser, 
+          photoURL, // Ensure local state reflects the base64
+          theme: selectedTheme
+      };
 
       onUpdateUser(updatedProfile);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (e) {
       console.error("Failed to update", e);
-      alert("Erro ao salvar perfil.");
+      alert("Erro ao salvar perfil. Tente uma imagem menor.");
     } finally {
       setIsSaving(false);
     }
@@ -128,20 +157,23 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
             <div className="grid grid-cols-3 gap-3">
                 <button 
                     onClick={() => handleThemeChange('midnight')}
-                    className="p-3 rounded-xl bg-[#020617] border-2 border-indigo-500 text-indigo-400 text-xs font-bold"
+                    className={`p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col items-center gap-2 ${selectedTheme === 'midnight' ? 'bg-[#0f172a] border-indigo-500 text-indigo-400' : 'bg-slate-900 border-transparent text-slate-400'}`}
                 >
+                    <div className="w-4 h-4 rounded-full bg-[#0f172a] border border-white/20"></div>
                     Azul Escuro
                 </button>
                 <button 
                     onClick={() => handleThemeChange('dark')}
-                    className="p-3 rounded-xl bg-[#18181b] border border-slate-700 text-slate-400 text-xs font-bold hover:text-white"
+                    className={`p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col items-center gap-2 ${selectedTheme === 'dark' ? 'bg-[#020617] border-indigo-500 text-indigo-400' : 'bg-slate-950 border-transparent text-slate-400'}`}
                 >
+                    <div className="w-4 h-4 rounded-full bg-[#020617] border border-white/20"></div>
                     Dark Mode
                 </button>
                 <button 
                     onClick={() => handleThemeChange('light')}
-                    className="p-3 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold hover:bg-slate-50"
+                    className={`p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col items-center gap-2 ${selectedTheme === 'light' ? 'bg-white border-indigo-500 text-indigo-600' : 'bg-slate-100 border-transparent text-slate-500'}`}
                 >
+                    <div className="w-4 h-4 rounded-full bg-white border border-slate-300"></div>
                     Light Mode
                 </button>
             </div>

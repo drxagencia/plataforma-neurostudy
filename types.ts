@@ -46,6 +46,7 @@ export interface UserProfile extends User {
   lastPostedAt?: number;
   questionsAnswered?: number;
   hoursStudied?: number;
+  theme?: 'dark' | 'light' | 'midnight'; // Added Theme
 }
 
 export interface Announcement {

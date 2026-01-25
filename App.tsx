@@ -10,7 +10,7 @@ import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
 import Competitivo from './components/Competitivo';
 import AiTutor from './components/AiTutor';
-import AccessDenied from './components/AccessDenied'; // New Component
+import AccessDenied from './components/AccessDenied'; 
 import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
@@ -18,7 +18,7 @@ import { auth } from './services/firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<UserProfile | null>(null); // Use UserProfile type
+  const [user, setUser] = useState<UserProfile | null>(null); 
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -30,6 +30,26 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Theme Application Logic
+  useEffect(() => {
+      if (user && user.theme) {
+          const root = document.documentElement;
+          const body = document.body;
+          
+          // Reset classes
+          root.classList.remove('light');
+          root.classList.add('dark'); // Default
+          body.classList.remove('theme-midnight');
+
+          if (user.theme === 'light') {
+              root.classList.remove('dark');
+              root.classList.add('light');
+          } else if (user.theme === 'midnight') {
+              body.classList.add('theme-midnight');
+          }
+      }
+  }, [user?.theme]);
+
   // Auth Persistence & DB Structure Enforcement
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -37,7 +57,6 @@ const App: React.FC = () => {
         const mappedUser = mapUser(firebaseUser);
         
         // Ensure user exists in Realtime Database under users/[uid]
-        // This prevents the 404 User Not Found error in API calls
         const dbUser = await DatabaseService.ensureUserProfile(firebaseUser.uid, {
                displayName: mappedUser.displayName,
                email: mappedUser.email,
@@ -51,7 +70,8 @@ const App: React.FC = () => {
             ...dbUser, 
             displayName: dbUser?.displayName || mappedUser.displayName,
             photoURL: dbUser?.photoURL || mappedUser.photoURL,
-            plan: dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic') // Default plan
+            plan: dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic'), 
+            theme: dbUser?.theme || 'dark'
         });
       } else {
         setUser(null);
@@ -63,7 +83,6 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (loggedInUser: User) => {
-    // Optimistic set, real data comes from auth listener
     setLoadingAuth(true); 
   };
 
@@ -76,12 +95,10 @@ const App: React.FC = () => {
     if (!user) return false;
     if (user.isAdmin || user.plan === 'admin' || user.plan === 'advanced') return true;
 
-    // Plan Limits
     if (user.plan === 'basic') {
         if (['comunidade', 'competitivo', 'simulados', 'tutor'].includes(view)) return false;
     }
     
-    // Intermediate has access to everything in UI, but features within (AI) are limited by config/API
     if (user.plan === 'intermediate') return true; 
 
     return true;
@@ -99,28 +116,6 @@ const App: React.FC = () => {
     return <Auth onLogin={handleLogin} />;
   }
 
-  // View Container to handle rendering content
-  const renderView = () => {
-    if (!checkAccess(currentView)) {
-        // Determine required plan message
-        const required = user.plan === 'basic' ? 'intermediate' : 'advanced';
-        return <AccessDenied currentPlan={user.plan} requiredPlan={required} />;
-    }
-
-    switch (currentView) {
-      case 'dashboard': return <Dashboard user={user} onNavigate={setCurrentView} />;
-      case 'aulas': return <Classes />;
-      case 'questoes': return <QuestionBank />;
-      case 'comunidade': return <Community />;
-      case 'simulados': return <Simulations />;
-      case 'tutor': return <AiTutor />;
-      case 'ajustes': return <Settings user={user} onUpdateUser={setUser} />;
-      case 'competitivo': return <Competitivo />;
-      case 'admin': return user.isAdmin ? <AdminPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />;
-      default: return <Dashboard user={user} onNavigate={setCurrentView} />;
-    }
-  };
-
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       <Navigation 
@@ -137,14 +132,30 @@ const App: React.FC = () => {
         }`}
         style={{ height: '100vh' }}
       >
-        {/* Background Glows */}
-        <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        {/* Background Glows (Hide in light mode via CSS) */}
+        <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none theme-glows">
            <div className="absolute top-[-10%] left-[20%] w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-[120px]" />
            <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[100px]" />
         </div>
 
         <div className="max-w-7xl mx-auto h-full">
-            {renderView()}
+            {/* View Rendering Logic */}
+            {!checkAccess(currentView) 
+                ? <AccessDenied currentPlan={user.plan} requiredPlan={user.plan === 'basic' ? 'intermediate' : 'advanced'} />
+                : (
+                    <>
+                    {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} />}
+                    {currentView === 'aulas' && <Classes />}
+                    {currentView === 'questoes' && <QuestionBank />}
+                    {currentView === 'comunidade' && <Community />}
+                    {currentView === 'simulados' && <Simulations />}
+                    {currentView === 'tutor' && <AiTutor />}
+                    {currentView === 'ajustes' && <Settings user={user} onUpdateUser={setUser} />}
+                    {currentView === 'competitivo' && <Competitivo />}
+                    {currentView === 'admin' && (user.isAdmin ? <AdminPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />)}
+                    </>
+                )
+            }
         </div>
       </main>
     </div>
