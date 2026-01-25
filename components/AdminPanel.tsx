@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan } from '../types';
+import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'content' | 'finance' | 'config'>('users');
@@ -31,6 +31,9 @@ const AdminPanel: React.FC = () => {
   });
 
   // Content Form
+  const [materials, setMaterials] = useState<LessonMaterial[]>([]);
+  const [currentMaterial, setCurrentMaterial] = useState({ title: '', url: '' });
+
   const [contentForm, setContentForm] = useState({
       subjectId: '',
       topicName: '',
@@ -128,6 +131,17 @@ const AdminPanel: React.FC = () => {
   };
 
   // --- CONTENT LOGIC ---
+  const addMaterial = () => {
+      if (currentMaterial.title && currentMaterial.url) {
+          setMaterials([...materials, { ...currentMaterial }]);
+          setCurrentMaterial({ title: '', url: '' });
+      }
+  };
+
+  const removeMaterial = (index: number) => {
+      setMaterials(materials.filter((_, i) => i !== index));
+  };
+
   const handleSaveContent = async () => {
       if (contentTab === 'subject') {
           if(!contentForm.sName) return alert("Nome obrigatório");
@@ -174,10 +188,12 @@ const AdminPanel: React.FC = () => {
               const newLesson: Lesson = {
                   title: contentForm.lTitle,
                   videoUrl: contentForm.lUrl,
-                  duration: contentForm.lDuration
+                  duration: contentForm.lDuration,
+                  materials: materials // Add materials
               };
               await DatabaseService.createLesson(contentForm.subjectId, contentForm.topicName, newLesson);
               alert("Aula criada com sucesso!");
+              setMaterials([]); // Reset materials
           }
           setContentForm(prev => ({...prev, qText: '', qImageUrl: '', lTitle: '', qOptions: ['', '', '', ''], qExplanation: ''}));
       } catch (e) {
@@ -352,7 +368,7 @@ const AdminPanel: React.FC = () => {
                               </div>
 
                               <textarea className="w-full glass-input p-3 rounded-lg" placeholder="Explicação da resposta" value={contentForm.qExplanation} onChange={e => setContentForm({...contentForm, qExplanation: e.target.value})} />
-                              <button onClick={handleSaveContent} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-500 transition-all">Salvar Questão</button>
+                              <button onClick={handleSaveContent} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-50 transition-all">Salvar Questão</button>
                           </div>
                       )}
 
@@ -360,8 +376,44 @@ const AdminPanel: React.FC = () => {
                           <div className="space-y-4 animate-fade-in">
                               <input className="w-full glass-input p-3 rounded-lg" placeholder="Título da Aula" value={contentForm.lTitle} onChange={e => setContentForm({...contentForm, lTitle: e.target.value})} />
                               <input className="w-full glass-input p-3 rounded-lg" placeholder="URL do Vídeo (YouTube)" value={contentForm.lUrl} onChange={e => setContentForm({...contentForm, lUrl: e.target.value})} />
-                              <input className="w-full glass-input p-3 rounded-lg" placeholder="Duração" value={contentForm.lDuration} onChange={e => setContentForm({...contentForm, lDuration: e.target.value})} />
-                               <button onClick={handleSaveContent} className="w-full py-3 bg-pink-600 text-white font-bold rounded-xl hover:bg-pink-500 transition-all">Adicionar Aula</button>
+                              <input className="w-full glass-input p-3 rounded-lg" placeholder="Duração (ex: 15:00)" value={contentForm.lDuration} onChange={e => setContentForm({...contentForm, lDuration: e.target.value})} />
+                              
+                              {/* Materials Section */}
+                              <div className="p-4 bg-slate-900/50 rounded-xl border border-white/5 space-y-3">
+                                  <label className="text-xs text-slate-400 font-bold uppercase flex items-center gap-2"><FileText size={14}/> Materiais de Apoio (Opcional)</label>
+                                  
+                                  {materials.map((mat, idx) => (
+                                      <div key={idx} className="flex items-center gap-2 text-sm bg-slate-800 p-2 rounded-lg">
+                                          <Link size={14} className="text-indigo-400"/>
+                                          <span className="flex-1 truncate text-slate-300">{mat.title}</span>
+                                          <button onClick={() => removeMaterial(idx)} className="text-red-400 hover:text-red-300 p-1"><Trash2 size={14}/></button>
+                                      </div>
+                                  ))}
+
+                                  <div className="flex gap-2">
+                                      <input 
+                                          className="flex-1 glass-input p-2 rounded-lg text-sm" 
+                                          placeholder="Título do Material (ex: PDF de Resumo)" 
+                                          value={currentMaterial.title}
+                                          onChange={e => setCurrentMaterial({...currentMaterial, title: e.target.value})}
+                                      />
+                                      <input 
+                                          className="flex-1 glass-input p-2 rounded-lg text-sm" 
+                                          placeholder="URL (Drive, Dropbox...)" 
+                                          value={currentMaterial.url}
+                                          onChange={e => setCurrentMaterial({...currentMaterial, url: e.target.value})}
+                                      />
+                                      <button 
+                                          onClick={addMaterial}
+                                          disabled={!currentMaterial.title || !currentMaterial.url}
+                                          className="p-2 bg-indigo-600 rounded-lg text-white disabled:opacity-50 hover:bg-indigo-500"
+                                      >
+                                          <Plus size={18}/>
+                                      </button>
+                                  </div>
+                              </div>
+
+                              <button onClick={handleSaveContent} className="w-full py-3 bg-pink-600 text-white font-bold rounded-xl hover:bg-pink-500 transition-all">Adicionar Aula</button>
                           </div>
                       )}
                   </div>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { Subject, Lesson } from '../types';
 import * as Icons from 'lucide-react';
-import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play } from 'lucide-react';
+import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, ExternalLink, Download } from 'lucide-react';
 
 const Classes: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -80,7 +80,8 @@ const Classes: React.FC = () => {
               </button>
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2 space-y-4">
+                  <div className="lg:col-span-2 space-y-6">
+                      {/* Video Player Container */}
                       <div className="aspect-video w-full bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                           {videoId ? (
                               <iframe 
@@ -97,26 +98,64 @@ const Classes: React.FC = () => {
                               </div>
                           )}
                       </div>
-                      <h2 className="text-2xl font-bold text-white">{selectedLesson.title}</h2>
-                      <p className="text-slate-400">
-                         {selectedSubject.name} • {selectedTopic}
-                      </p>
+                      
+                      <div>
+                        <h2 className="text-2xl font-bold text-white mb-1">{selectedLesson.title}</h2>
+                        <p className="text-slate-400 flex items-center gap-2 text-sm">
+                           {selectedSubject.name} <ChevronRight size={14}/> {selectedTopic}
+                        </p>
+                      </div>
+
+                      {/* Materials Section */}
+                      <div className="glass-card p-6 rounded-2xl border border-white/5 bg-slate-900/40">
+                          <h3 className="font-bold text-slate-200 mb-4 flex items-center gap-2">
+                              <FileText size={20} className="text-indigo-400" /> 
+                              Materiais de Apoio
+                          </h3>
+                          
+                          {selectedLesson.materials && selectedLesson.materials.length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {selectedLesson.materials.map((material, idx) => (
+                                      <a 
+                                        key={idx}
+                                        href={material.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-white/5 hover:border-indigo-500/30 transition-all group"
+                                      >
+                                          <div className="flex items-center gap-3 overflow-hidden">
+                                              <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                                                  <FileText size={18} />
+                                              </div>
+                                              <span className="text-sm font-medium text-slate-300 truncate">{material.title}</span>
+                                          </div>
+                                          <ExternalLink size={16} className="text-slate-500 group-hover:text-white transition-colors" />
+                                      </a>
+                                  ))}
+                              </div>
+                          ) : (
+                              <div className="text-center py-6 border border-dashed border-white/10 rounded-xl">
+                                  <p className="text-slate-500 text-sm">Nenhum material anexado a esta aula.</p>
+                              </div>
+                          )}
+                      </div>
                   </div>
 
+                  {/* Playlist Sidebar */}
                   <div className="space-y-4">
                       <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Neste módulo</h3>
-                      <div className="space-y-2">
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar pr-1">
                           {topicLessons.map((l, idx) => (
                               <button 
                                 key={idx}
                                 onClick={() => setSelectedLesson(l)}
                                 className={`w-full p-3 rounded-xl flex items-center gap-3 text-left transition-all ${
                                     selectedLesson.title === l.title 
-                                    ? 'bg-indigo-600 text-white' 
+                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
                                     : 'bg-slate-900/50 hover:bg-slate-800 text-slate-400'
                                 }`}
                               >
-                                  <div className={`p-2 rounded-lg ${selectedLesson.title === l.title ? 'bg-white/20' : 'bg-slate-800'}`}>
+                                  <div className={`p-2 rounded-lg flex-shrink-0 ${selectedLesson.title === l.title ? 'bg-white/20' : 'bg-slate-800'}`}>
                                       <Play size={14} fill={selectedLesson.title === l.title ? "currentColor" : "none"} />
                                   </div>
                                   <div className="flex-1 min-w-0">

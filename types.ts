@@ -1,3 +1,4 @@
+
 export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'tutor' | 'ajustes' | 'admin' | 'financeiro';
 
 export type UserPlan = 'basic' | 'intermediate' | 'advanced' | 'admin';
@@ -74,13 +75,20 @@ export interface Question {
   topic?: string;    
 }
 
+export interface LessonMaterial {
+  title: string;
+  url: string;
+  type?: 'pdf' | 'link' | 'image';
+}
+
 export interface Lesson {
   id?: string;
   title: string;
   videoUrl: string;
   duration: string;
   subjectId?: string; 
-  topic?: string;     
+  topic?: string;
+  materials?: LessonMaterial[];
 }
 
 export interface CommunityPost {
