@@ -1,54 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CommunityPost } from '../types';
-import { MessageCircle, Heart, Share2, Send } from 'lucide-react';
-
-const MOCK_POSTS: CommunityPost[] = [
-  {
-    id: '1',
-    authorName: 'Ana Silva',
-    authorAvatar: 'https://picsum.photos/seed/u1/100',
-    content: 'Alguém tem resumo de Eletroquímica pra compartilhar? Tô travada na parte de pilhas 🔋',
-    timestamp: Date.now() - 3600000,
-    likes: 12
-  },
-  {
-    id: '2',
-    authorName: 'Carlos Mendes',
-    authorAvatar: 'https://picsum.photos/seed/u2/100',
-    content: 'Acabei de fazer o simulado de Humanas. A questão sobre Revolução Industrial tava bem difícil, o que acharam?',
-    timestamp: Date.now() - 7200000,
-    likes: 24
-  },
-  {
-    id: '3',
-    authorName: 'Beatriz Costa',
-    authorAvatar: 'https://picsum.photos/seed/u3/100',
-    content: 'Dica do dia: Usem o Anki para memorizar fórmulas de Física! Salvou minha vida na prova de ontem.',
-    timestamp: Date.now() - 10200000,
-    likes: 56
-  }
-];
+import { DatabaseService } from '../services/databaseService';
+import { auth } from '../services/firebaseConfig';
+import { MessageCircle, Heart, Share2, Send, Loader2 } from 'lucide-react';
 
 const Community: React.FC = () => {
-  const [posts, setPosts] = useState<CommunityPost[]>(MOCK_POSTS);
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [newPost, setNewPost] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handlePost = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPost.trim()) return;
+  useEffect(() => {
+    fetchPosts();
+  }, []);
 
-    const post: CommunityPost = {
-      id: Date.now().toString(),
-      authorName: 'Você', // In real app, use auth user
-      authorAvatar: 'https://picsum.photos/seed/me/100',
-      content: newPost,
-      timestamp: Date.now(),
-      likes: 0
-    };
-
-    setPosts([post, ...posts]);
-    setNewPost('');
+  const fetchPosts = async () => {
+    const data = await DatabaseService.getPosts();
+    setPosts(data);
+    setLoading(false);
   };
+
+  const handlePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPost.trim() || !auth.currentUser) return;
+
+    setSubmitting(true);
+    try {
+      await DatabaseService.createPost({
+        authorName: auth.currentUser.displayName || 'Estudante',
+        authorAvatar: auth.currentUser.photoURL || `https://ui-avatars.com/api/?name=${auth.currentUser.displayName}`,
+        content: newPost,
+        timestamp: Date.now(),
+        likes: 0
+      });
+      
+      setNewPost('');
+      fetchPosts(); // Refresh list
+    } catch (error) {
+      console.error("Failed to post", error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto h-full flex flex-col">
@@ -67,15 +62,13 @@ const Community: React.FC = () => {
             className="w-full bg-transparent text-white placeholder-slate-500 resize-none focus:outline-none min-h-[80px]"
           />
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
-             <div className="flex gap-2">
-                {/* Formatting tools placeholders could go here */}
-             </div>
+             <div className="flex gap-2"></div>
              <button 
                type="submit" 
-               disabled={!newPost.trim()}
+               disabled={!newPost.trim() || submitting}
                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
              >
-               <Send size={16} />
+               {submitting ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
                Publicar
              </button>
           </div>
@@ -83,17 +76,17 @@ const Community: React.FC = () => {
       </form>
 
       {/* Feed */}
-      <div className="space-y-4 flex-1 overflow-y-auto pr-2 pb-20">
+      <div className="space-y-4 flex-1 overflow-y-auto pr-2 pb-20 custom-scrollbar">
         {posts.map((post) => (
-          <div key={post.id} className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 hover:bg-slate-900/60 transition-colors">
+          <div key={post.id} className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 hover:bg-slate-900/60 transition-colors animate-in slide-in-from-bottom-2">
              <div className="flex items-start gap-4">
-               <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full border border-white/10" />
+               <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full border border-white/10 object-cover" />
                <div className="flex-1">
                  <div className="flex justify-between items-start">
                    <div>
                      <h4 className="font-bold text-slate-200">{post.authorName}</h4>
                      <span className="text-xs text-slate-500">
-                       {new Date(post.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                       {new Date(post.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(post.timestamp).toLocaleDateString()}
                      </span>
                    </div>
                  </div>
@@ -108,14 +101,14 @@ const Community: React.FC = () => {
                      <MessageCircle size={18} />
                      <span className="text-xs font-medium">Responder</span>
                    </button>
-                   <button className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors ml-auto">
-                     <Share2 size={16} />
-                   </button>
                  </div>
                </div>
              </div>
           </div>
         ))}
+        {posts.length === 0 && (
+          <p className="text-center text-slate-500 mt-10">Nenhuma postagem ainda. Seja o primeiro!</p>
+        )}
       </div>
     </div>
   );

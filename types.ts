@@ -42,3 +42,14 @@ export interface CommunityPost {
   timestamp: number;
   likes: number;
 }
+
+export interface Simulation {
+  id: string;
+  title: string;
+  description: string;
+  questionCount: number;
+  durationMinutes: number;
+  type: 'official' | 'training';
+  status: 'open' | 'closed' | 'coming_soon';
+  subjects: string[]; // Subject IDs
+}

@@ -1,8 +1,30 @@
-import React from 'react';
-import { SUBJECTS } from '../constants';
+import React, { useEffect, useState } from 'react';
+import { DatabaseService } from '../services/databaseService';
+import { Subject } from '../types';
 import * as Icons from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const Classes: React.FC = () => {
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      const data = await DatabaseService.getSubjects();
+      setSubjects(data);
+      setLoading(false);
+    };
+    fetchSubjects();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-indigo-500" size={32} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in zoom-in-95 duration-300">
       <header>
@@ -11,7 +33,7 @@ const Classes: React.FC = () => {
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {SUBJECTS.map((subject) => {
+        {subjects.map((subject) => {
           // Dynamic icon rendering
           const IconComponent = (Icons as any)[subject.iconName] || Icons.Book;
 

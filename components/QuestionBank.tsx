@@ -1,15 +1,36 @@
-import React, { useState } from 'react';
-import { SUBJECTS, MOCK_TOPICS, MOCK_SUBTOPICS } from '../constants';
-import { ChevronRight, Filter, PlayCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { DatabaseService } from '../services/databaseService';
+import { Subject } from '../types';
+import { ChevronRight, Filter, PlayCircle, Loader2 } from 'lucide-react';
 
 const QuestionBank: React.FC = () => {
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [topics, setTopics] = useState<Record<string, string[]>>({});
+  const [subtopics, setSubtopics] = useState<Record<string, string[]>>({});
+  const [loading, setLoading] = useState(true);
+
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [selectedSubTopic, setSelectedSubTopic] = useState<string | null>(null);
 
+  useEffect(() => {
+    const initData = async () => {
+      const [subs, tops, subtops] = await Promise.all([
+        DatabaseService.getSubjects(),
+        DatabaseService.getTopics(),
+        DatabaseService.getSubTopics()
+      ]);
+      setSubjects(subs);
+      setTopics(tops);
+      setSubtopics(subtops);
+      setLoading(false);
+    };
+    initData();
+  }, []);
+
   // Derived state options
-  const topicOptions = selectedSubject ? MOCK_TOPICS[selectedSubject] || [] : [];
-  const subTopicOptions = selectedTopic ? MOCK_SUBTOPICS[selectedTopic] || [] : [];
+  const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
+  const subTopicOptions = selectedTopic ? subtopics[selectedTopic] || [] : [];
 
   const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedSubject(e.target.value);
@@ -23,6 +44,8 @@ const QuestionBank: React.FC = () => {
   };
 
   const isReady = selectedSubject && selectedTopic && selectedSubTopic;
+
+  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
   return (
     <div className="h-full flex flex-col max-h-[85vh]">
@@ -47,7 +70,7 @@ const QuestionBank: React.FC = () => {
               className="w-full appearance-none bg-slate-900 border border-slate-700 hover:border-slate-500 text-white p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all cursor-pointer"
             >
               <option value="" disabled>Selecione a matéria</option>
-              {SUBJECTS.map((s) => (
+              {subjects.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
@@ -71,7 +94,7 @@ const QuestionBank: React.FC = () => {
               {topicOptions.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
-              {!topicOptions.length && selectedSubject && <option disabled>Sem tópicos disponíveis (Demo)</option>}
+              {!topicOptions.length && selectedSubject && <option disabled>Sem tópicos cadastrados</option>}
             </select>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
               <ChevronRight className="rotate-90" size={16} />
@@ -110,10 +133,10 @@ const QuestionBank: React.FC = () => {
             </div>
             <h3 className="text-2xl font-bold text-white mb-2">Tudo pronto!</h3>
             <p className="text-slate-300 mb-8 max-w-md mx-auto">
-              Encontramos <strong>42 questões</strong> sobre {selectedSubTopic} em {selectedTopic}.
+              Gerando bateria de questões sobre <strong>{selectedSubTopic}</strong> em {selectedTopic}.
             </p>
             <button className="px-8 py-4 bg-white text-slate-900 font-bold rounded-xl hover:bg-indigo-50 hover:scale-105 transition-all shadow-xl">
-              Iniciar Bateria de Questões
+              Iniciar Exercícios
             </button>
           </div>
         ) : (

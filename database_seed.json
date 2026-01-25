@@ -39,18 +39,66 @@
     "Dinâmica": ["Leis de Newton", "Força de Atrito", "Trabalho e Energia", "Impulso"],
     "Álgebra": ["Funções", "Logaritmos", "Matrizes", "Polinômios"]
   },
-  "users": {
-    "user_id_1": {
-      "displayName": "Estudante Exemplo",
-      "email": "aluno@email.com",
-      "subscriptionStatus": "free",
-      "subscriptionExpiry": "2024-12-31"
+  "posts": {
+    "-Nt123abc": {
+      "authorName": "Ana Silva",
+      "authorAvatar": "https://picsum.photos/seed/u1/100",
+      "content": "Alguém tem resumo de Eletroquímica pra compartilhar? Tô travada na parte de pilhas 🔋",
+      "timestamp": 1709800000000,
+      "likes": 12
     },
-    "user_id_admin": {
+    "-Nt123def": {
+      "authorName": "Carlos Mendes",
+      "authorAvatar": "https://picsum.photos/seed/u2/100",
+      "content": "Acabei de fazer o simulado de Humanas. A questão sobre Revolução Industrial tava bem difícil, o que acharam?",
+      "timestamp": 1709790000000,
+      "likes": 24
+    }
+  },
+  "simulations": {
+    "sim_001": {
+      "title": "Simulado Nacional ENEM 2025",
+      "description": "Prova completa com 90 questões e redação. Teste oficial.",
+      "questionCount": 90,
+      "durationMinutes": 300,
+      "type": "official",
+      "status": "open",
+      "subjects": ["math", "human", "nature", "linguages"]
+    },
+    "sim_002": {
+      "title": "Mini-Simulado de Exatas",
+      "description": "Foco em Matemática e Física.",
+      "questionCount": 45,
+      "durationMinutes": 120,
+      "type": "training",
+      "status": "closed",
+      "subjects": ["math", "physics"]
+    },
+    "sim_003": {
+      "title": "Simulado FUVEST 1ª Fase",
+      "description": "Modelo específico da USP.",
+      "questionCount": 90,
+      "durationMinutes": 300,
+      "type": "training",
+      "status": "coming_soon",
+      "subjects": ["general"]
+    }
+  },
+  "users": {
+    "admin_uid_placeholder": {
       "displayName": "Admin Master",
       "email": "master@admin.com",
+      "photoURL": "",
       "subscriptionStatus": "pro",
-      "subscriptionExpiry": "2099-12-31"
+      "subscriptionExpiry": "2030-01-01",
+      "isAdmin": true
+    },
+    "student_uid_placeholder": {
+      "displayName": "Estudante Demo",
+      "email": "aluno@email.com",
+      "photoURL": "",
+      "subscriptionStatus": "free",
+      "subscriptionExpiry": "2024-12-31"
     }
   },
   "lessons": {
@@ -77,23 +125,5 @@
          }
       ]
     }
-  },
-  "posts": [
-    {
-      "id": "1",
-      "authorName": "Ana Silva",
-      "authorAvatar": "https://picsum.photos/seed/u1/100",
-      "content": "Alguém tem resumo de Eletroquímica pra compartilhar? Tô travada na parte de pilhas 🔋",
-      "timestamp": 1709800000000,
-      "likes": 12
-    },
-    {
-      "id": "2",
-      "authorName": "Carlos Mendes",
-      "authorAvatar": "https://picsum.photos/seed/u2/100",
-      "content": "Acabei de fazer o simulado de Humanas. A questão sobre Revolução Industrial tava bem difícil, o que acharam?",
-      "timestamp": 1709790000000,
-      "likes": 24
-    }
-  ]
+  }
 }

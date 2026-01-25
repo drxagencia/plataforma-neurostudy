@@ -1,47 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
-import { DatabaseService } from '../services/databaseService'; // Assumes we add a getAllUsers method or simulated
-import { Search, Save, Trash2, CheckCircle, XCircle } from 'lucide-react';
-
-// Mock data for display since we can't easily list all users with client SDK
-const MOCK_USERS: UserProfile[] = [
-  { uid: '1', displayName: 'João Silva', email: 'joao@student.com', subscriptionStatus: 'free', subscriptionExpiry: '2024-12-31' },
-  { uid: '2', displayName: 'Maria Oliveira', email: 'maria@student.com', subscriptionStatus: 'pro', subscriptionExpiry: '2025-06-30' },
-  { uid: '3', displayName: 'Pedro Santos', email: 'pedro@student.com', subscriptionStatus: 'pro', subscriptionExpiry: '2025-12-31' },
-  { uid: '4', displayName: 'Admin User', email: 'master@admin.com', subscriptionStatus: 'pro', subscriptionExpiry: '2030-01-01', isAdmin: true },
-];
+import { DatabaseService } from '../services/databaseService';
+import { Search, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
-  const [users, setUsers] = useState<UserProfile[]>(MOCK_USERS);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  // Simulated save function
-  const handleSave = (id: string) => {
-    // In real app: call DatabaseService.updateUser(id, { ...data })
-    setEditingId(null);
-    alert("Dados do usuário atualizados com sucesso!");
+  // Temporary state for editing
+  const [editForm, setEditForm] = useState<{status: 'free' | 'pro', expiry: string}>({
+    status: 'free',
+    expiry: ''
+  });
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const data = await DatabaseService.getAllUsers();
+    setUsers(data);
+    setLoading(false);
   };
 
-  const handleStatusChange = (id: string, newStatus: 'free' | 'pro') => {
-    setUsers(users.map(u => u.uid === id ? { ...u, subscriptionStatus: newStatus } : u));
+  const startEditing = (user: UserProfile) => {
+    setEditingId(user.uid);
+    setEditForm({
+      status: user.subscriptionStatus || 'free',
+      expiry: user.subscriptionExpiry || new Date().toISOString().split('T')[0]
+    });
   };
 
-  const handleDateChange = (id: string, newDate: string) => {
-    setUsers(users.map(u => u.uid === id ? { ...u, subscriptionExpiry: newDate } : u));
+  const handleSave = async (uid: string) => {
+    try {
+      await DatabaseService.updateUserPlan(uid, editForm.status, editForm.expiry);
+      // Update local state
+      setUsers(users.map(u => u.uid === uid ? { ...u, subscriptionStatus: editForm.status, subscriptionExpiry: editForm.expiry } : u));
+      setEditingId(null);
+      alert("Usuário atualizado com sucesso!");
+    } catch (e) {
+      alert("Erro ao atualizar usuário");
+    }
   };
 
   const filteredUsers = users.filter(user => 
-    user.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <header className="flex justify-between items-end">
         <div>
           <h2 className="text-3xl font-bold text-white mb-1">Painel Administrativo</h2>
-          <p className="text-slate-400">Gerenciamento de usuários e assinaturas.</p>
+          <p className="text-slate-400">Gerenciamento de usuários via Database.</p>
         </div>
       </header>
 
@@ -77,8 +94,8 @@ const AdminPanel: React.FC = () => {
                 <tr key={user.uid} className="hover:bg-white/5 transition-colors">
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">
-                        {user.displayName.charAt(0)}
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold overflow-hidden">
+                        {user.photoURL ? <img src={user.photoURL} className="w-full h-full object-cover"/> : user.displayName?.charAt(0)}
                       </div>
                       <span className="text-white font-medium">{user.displayName}</span>
                       {user.isAdmin && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded ml-2">ADMIN</span>}
@@ -88,8 +105,8 @@ const AdminPanel: React.FC = () => {
                   <td className="p-4">
                     {editingId === user.uid ? (
                       <select 
-                        value={user.subscriptionStatus}
-                        onChange={(e) => handleStatusChange(user.uid, e.target.value as 'free' | 'pro')}
+                        value={editForm.status}
+                        onChange={(e) => setEditForm({...editForm, status: e.target.value as 'free' | 'pro'})}
                         className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-sm"
                       >
                         <option value="free">Gratuito</option>
@@ -101,7 +118,7 @@ const AdminPanel: React.FC = () => {
                           ? 'bg-emerald-500/20 text-emerald-400' 
                           : 'bg-slate-700/50 text-slate-400'
                       }`}>
-                        {user.subscriptionStatus.toUpperCase()}
+                        {(user.subscriptionStatus || 'FREE').toUpperCase()}
                       </span>
                     )}
                   </td>
@@ -109,12 +126,12 @@ const AdminPanel: React.FC = () => {
                     {editingId === user.uid ? (
                       <input 
                         type="date" 
-                        value={user.subscriptionExpiry}
-                        onChange={(e) => handleDateChange(user.uid, e.target.value)}
+                        value={editForm.expiry}
+                        onChange={(e) => setEditForm({...editForm, expiry: e.target.value})}
                         className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-sm"
                       />
                     ) : (
-                      <span>{new Date(user.subscriptionExpiry).toLocaleDateString()}</span>
+                      <span>{user.subscriptionExpiry ? new Date(user.subscriptionExpiry).toLocaleDateString() : '-'}</span>
                     )}
                   </td>
                   <td className="p-4 text-right">
@@ -137,7 +154,7 @@ const AdminPanel: React.FC = () => {
                       </div>
                     ) : (
                       <button 
-                        onClick={() => setEditingId(user.uid)}
+                        onClick={() => startEditing(user)}
                         className="p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors"
                       >
                         Editar
@@ -149,20 +166,6 @@ const AdminPanel: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {filteredUsers.length === 0 && (
-          <div className="p-8 text-center text-slate-500">
-            Nenhum usuário encontrado.
-          </div>
-        )}
-      </div>
-      
-      <div className="mt-8 bg-indigo-900/10 border border-indigo-500/20 rounded-xl p-4">
-        <h3 className="text-indigo-400 font-bold mb-2">Instruções do Sistema</h3>
-        <p className="text-slate-300 text-sm">
-          Como administrador, você pode alterar manualmente o status de qualquer conta. 
-          As alterações são salvas automaticamente no banco de dados. 
-          Para adicionar aulas e questões, edite diretamente o arquivo JSON do Database.
-        </p>
       </div>
     </div>
   );

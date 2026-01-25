@@ -1,9 +1,27 @@
-import React from 'react';
-import { Timer, FileText, BarChart3, ChevronRight, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { DatabaseService } from '../services/databaseService';
+import { Simulation } from '../types';
+import { Timer, FileText, BarChart3, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 
 const Simulations: React.FC = () => {
+  const [simulations, setSimulations] = useState<Simulation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSimulations = async () => {
+      const data = await DatabaseService.getSimulations();
+      setSimulations(data);
+      setLoading(false);
+    };
+    fetchSimulations();
+  }, []);
+
+  const officialSim = simulations.find(s => s.type === 'official' && s.status === 'open') || simulations[0];
+
+  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold text-white mb-2">Simulados</h2>
@@ -16,22 +34,25 @@ const Simulations: React.FC = () => {
         <div className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-900/40 to-slate-900 border border-indigo-500/30 p-8 group">
           <div className="absolute top-0 right-0 p-32 bg-indigo-500/20 blur-[80px] rounded-full pointer-events-none group-hover:bg-indigo-500/30 transition-colors duration-500" />
           
-          <div className="relative z-10">
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-4 border border-indigo-500/20">
-              <Timer size={12} /> Próximo Evento Oficial
-            </span>
-            <h3 className="text-3xl font-bold text-white mb-2">Simulado Nacional ENEM 2025</h3>
-            <p className="text-slate-300 mb-6 max-w-md">90 questões + Redação. Cronômetro oficial e TRI simulada. Disponível neste fim de semana.</p>
-            
-            <div className="flex flex-wrap gap-4">
-              <button className="px-6 py-3 bg-white text-indigo-950 font-bold rounded-lg hover:bg-indigo-50 transition-colors shadow-lg flex items-center gap-2">
-                Inscrever-se Grátis <ChevronRight size={18} />
-              </button>
-              <button className="px-6 py-3 bg-white/5 text-white font-medium rounded-lg hover:bg-white/10 transition-colors border border-white/10">
-                Ver Edital
-              </button>
+          {officialSim ? (
+            <div className="relative z-10">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-4 border border-indigo-500/20">
+                <Timer size={12} /> {officialSim.type === 'official' ? 'Oficial' : 'Treino'}
+              </span>
+              <h3 className="text-3xl font-bold text-white mb-2">{officialSim.title}</h3>
+              <p className="text-slate-300 mb-6 max-w-md">{officialSim.description}</p>
+              
+              <div className="flex flex-wrap gap-4">
+                <button className="px-6 py-3 bg-white text-indigo-950 font-bold rounded-lg hover:bg-indigo-50 transition-colors shadow-lg flex items-center gap-2">
+                  Começar Agora <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative z-10 flex flex-col justify-center h-full">
+              <h3 className="text-2xl font-bold text-white">Nenhum simulado oficial aberto no momento.</h3>
+            </div>
+          )}
         </div>
 
         {/* Stats Summary */}
@@ -53,38 +74,33 @@ const Simulations: React.FC = () => {
                  <div className="h-full bg-emerald-500 w-[72%]" />
                </div>
              </div>
-             <div>
-               <div className="flex justify-between text-sm mb-1">
-                 <span className="text-slate-400">Simulados Feitos</span>
-                 <span className="text-white font-bold">4/10</span>
-               </div>
-               <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                 <div className="h-full bg-indigo-500 w-[40%]" />
-               </div>
-             </div>
           </div>
           
           <div className="mt-6 pt-6 border-t border-white/5">
             <p className="text-xs text-slate-500 flex items-center gap-2">
               <AlertCircle size={12} />
-              Você precisa melhorar em Natureza.
+              Baseado em resultados anteriores.
             </p>
           </div>
         </div>
       </div>
 
-      <h3 className="text-xl font-bold text-white pt-4">Histórico e Anteriores</h3>
+      <h3 className="text-xl font-bold text-white pt-4">Todos os Simulados</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="bg-slate-900/30 border border-white/5 p-4 rounded-xl hover:bg-slate-800/50 transition-all cursor-pointer group">
+        {simulations.map((sim) => (
+          <div key={sim.id} className="bg-slate-900/30 border border-white/5 p-4 rounded-xl hover:bg-slate-800/50 transition-all cursor-pointer group">
             <div className="flex justify-between items-start mb-3">
               <div className="p-2 bg-slate-800 rounded-lg text-slate-300">
                 <FileText size={20} />
               </div>
-              {i <= 2 && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">Feito</span>}
+              <span className={`text-xs px-2 py-1 rounded capitalize ${
+                sim.status === 'open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
+              }`}>
+                {sim.status === 'coming_soon' ? 'Em Breve' : sim.status}
+              </span>
             </div>
-            <h4 className="text-white font-medium mb-1">Simulado Modelo {2023 + (i % 2)} - #{i}</h4>
-            <p className="text-sm text-slate-500">90 Questões • 5h de duração</p>
+            <h4 className="text-white font-medium mb-1">{sim.title}</h4>
+            <p className="text-sm text-slate-500">{sim.questionCount} Questões • {sim.durationMinutes} min</p>
           </div>
         ))}
       </div>
