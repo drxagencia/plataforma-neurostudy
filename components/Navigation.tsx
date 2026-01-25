@@ -10,7 +10,8 @@ import {
   BookOpen,
   ShieldAlert,
   Trophy,
-  Bot
+  Bot,
+  BrainCircuit
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -61,11 +62,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
   return (
     <aside className="w-64 h-screen bg-[#020617] border-r border-white/5 flex flex-col fixed left-0 top-0 z-50">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shadow-lg shadow-indigo-500/10">
-           <img src="/logo%20neuro.png" alt="NeuroStudy AI" className="w-full h-full object-contain p-1" onError={(e) => {
-             e.currentTarget.style.display = 'none';
-             e.currentTarget.parentElement!.innerHTML = '<span class="text-white font-bold">N</span>';
-           }}/>
+        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center overflow-hidden shadow-lg shadow-indigo-500/10">
+           <BrainCircuit className="w-6 h-6 text-indigo-500" />
         </div>
         <h1 className="text-xl font-bold text-white leading-tight tracking-tight">
           NeuroStudy<br/><span className="text-indigo-400 text-xs font-semibold uppercase tracking-widest">AI Platform</span>

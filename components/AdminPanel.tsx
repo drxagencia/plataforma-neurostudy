@@ -130,7 +130,7 @@ const AdminPanel: React.FC = () => {
               }
               const newQuestion: Question = {
                   text: contentForm.qText,
-                  imageUrl: contentForm.qImageUrl || undefined,
+                  imageUrl: contentForm.qImageUrl || "", // Firebase does not accept undefined
                   options: contentForm.qOptions.filter(o => o.trim() !== ''),
                   correctAnswer: contentForm.qCorrect,
                   difficulty: contentForm.qDifficulty as any,

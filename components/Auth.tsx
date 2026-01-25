@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, BrainCircuit } from 'lucide-react';
 import { AuthService } from '../services/authService';
 import { User } from '../types';
 
@@ -39,8 +39,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
       <div className="w-full max-w-md p-8 rounded-3xl glass-card z-10 mx-4 animate-slide-up">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-white/5 rounded-2xl p-2 border border-white/10 shadow-xl shadow-indigo-500/10">
-            <img src="/logo%20neuro.png" alt="NeuroStudy AI" className="w-full h-full object-contain drop-shadow-lg" />
+          <div className="w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-indigo-500/10 rounded-2xl p-2 border border-indigo-500/20 shadow-xl shadow-indigo-500/10">
+            <BrainCircuit className="w-12 h-12 text-indigo-500 drop-shadow-lg" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">NeuroStudy AI</h1>
           <p className="text-slate-400 text-sm">Plataforma de ensino de alta performance.</p>
