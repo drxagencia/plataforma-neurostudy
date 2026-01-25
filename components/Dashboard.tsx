@@ -1,30 +1,49 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile } from '../types';
-import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, Brain, ArrowRight } from 'lucide-react';
+import { UserProfile, View } from '../types';
+import { DatabaseService } from '../services/databaseService';
+import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight } from 'lucide-react';
 
 interface DashboardProps {
   user: UserProfile; 
+  onNavigate: (view: View) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [level, setLevel] = useState(1);
   const [progress, setProgress] = useState(0);
+  const [rank, setRank] = useState<number | null>(null);
 
-  // Calculate Level based on XP
   useEffect(() => {
-    const xp = user.xp || 0;
-    // Simple level formula: Level = Math.sqrt(XP / 100)
-    const calcLevel = Math.floor(Math.sqrt(xp / 100)) + 1;
-    const nextLevelXp = Math.pow(calcLevel, 2) * 100;
-    const currentLevelBaseXp = Math.pow(calcLevel - 1, 2) * 100;
-    
-    // Progress to next level
-    const progressPercent = ((xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100;
-    
-    setLevel(calcLevel);
-    setProgress(Math.min(Math.max(progressPercent, 0), 100));
-    setLoading(false);
+    const fetchData = async () => {
+        // 1. Calculate Level
+        const xp = user.xp || 0;
+        const calcLevel = Math.floor(Math.sqrt(xp / 100)) + 1;
+        const nextLevelXp = Math.pow(calcLevel, 2) * 100;
+        const currentLevelBaseXp = Math.pow(calcLevel - 1, 2) * 100;
+        
+        // Progress to next level
+        const progressPercent = ((xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100;
+        
+        setLevel(calcLevel);
+        setProgress(Math.min(Math.max(progressPercent, 0), 100));
+
+        // 2. Calculate Real Rank
+        try {
+            const allUsers = await DatabaseService.getAllUsers();
+            // Sort descending by XP
+            const sortedUsers = allUsers.sort((a, b) => (b.xp || 0) - (a.xp || 0));
+            // Find current user index (0-based, so add 1)
+            const myRank = sortedUsers.findIndex(u => u.uid === user.uid) + 1;
+            setRank(myRank > 0 ? myRank : null);
+        } catch (error) {
+            console.error("Error calculating rank:", error);
+        }
+
+        setLoading(false);
+    };
+
+    fetchData();
   }, [user]);
 
   if (loading) {
@@ -67,7 +86,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                     <span className="text-indigo-300 font-semibold tracking-wide text-sm">FOCO DIÁRIO</span>
                 </div>
                 
-                {/* Logic: Show generic welcome if no history, otherwise show last activity (To be implemented in future with history tracking) */}
                 <h3 className="text-3xl font-bold text-white mb-4 leading-tight">
                     Pronto para começar?
                 </h3>
@@ -76,7 +94,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 </p>
                 
                 <div className="flex gap-4">
-                    <button className="px-8 py-4 bg-white text-slate-950 font-bold rounded-2xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 flex items-center gap-2">
+                    <button 
+                        onClick={() => onNavigate('questoes')}
+                        className="px-8 py-4 bg-white text-slate-950 font-bold rounded-2xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer"
+                    >
                         Explorar Conteúdos
                         <ArrowRight size={20} />
                     </button>
@@ -127,8 +148,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           { 
               icon: <Trophy className="text-yellow-400" />, 
               label: 'Sua Classificação', 
-              value: '---', // Needs leaderboard context
-              sub: 'Ranking mensal'
+              value: rank ? `#${rank}` : '---',
+              sub: 'Ranking Geral'
           },
         ].map((stat, i) => (
           <div key={i} className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 hover:-translate-y-1 group">

@@ -108,7 +108,7 @@ const App: React.FC = () => {
     }
 
     switch (currentView) {
-      case 'dashboard': return <Dashboard user={user} />;
+      case 'dashboard': return <Dashboard user={user} onNavigate={setCurrentView} />;
       case 'aulas': return <Classes />;
       case 'questoes': return <QuestionBank />;
       case 'comunidade': return <Community />;
@@ -116,8 +116,8 @@ const App: React.FC = () => {
       case 'tutor': return <AiTutor />;
       case 'ajustes': return <Settings user={user} onUpdateUser={setUser} />;
       case 'competitivo': return <Competitivo />;
-      case 'admin': return user.isAdmin ? <AdminPanel /> : <Dashboard user={user} />;
-      default: return <Dashboard user={user} />;
+      case 'admin': return user.isAdmin ? <AdminPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />;
+      default: return <Dashboard user={user} onNavigate={setCurrentView} />;
     }
   };
 
