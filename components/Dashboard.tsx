@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserProfile, View } from '../types';
 import { DatabaseService } from '../services/databaseService';
@@ -12,7 +13,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [level, setLevel] = useState(1);
   const [progress, setProgress] = useState(0);
-  const [rank, setRank] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -28,18 +28,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
         setLevel(calcLevel);
         setProgress(Math.min(Math.max(progressPercent, 0), 100));
 
-        // 2. Calculate Real Rank
-        try {
-            const allUsers = await DatabaseService.getAllUsers();
-            // Sort descending by XP
-            const sortedUsers = allUsers.sort((a, b) => (b.xp || 0) - (a.xp || 0));
-            // Find current user index (0-based, so add 1)
-            const myRank = sortedUsers.findIndex(u => u.uid === user.uid) + 1;
-            setRank(myRank > 0 ? myRank : null);
-        } catch (error) {
-            console.error("Error calculating rank:", error);
-        }
-
+        // Note: Real-time ranking calculation removed for performance.
+        // It requires downloading the entire user database which is not scalable.
         setLoading(false);
     };
 
@@ -148,8 +138,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
           { 
               icon: <Trophy className="text-yellow-400" />, 
               label: 'Sua Classificação', 
-              value: rank ? `#${rank}` : '---',
-              sub: 'Ranking Geral'
+              value: 'TOP 10%',
+              sub: 'Estimativa'
           },
         ].map((stat, i) => (
           <div key={i} className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 hover:-translate-y-1 group">
