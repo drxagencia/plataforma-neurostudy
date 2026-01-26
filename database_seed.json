@@ -17,25 +17,25 @@
     }
   },
   "subjects": {
-    "math": { "id": "math", "name": "Matemática", "iconName": "Calculator", "color": "text-blue-400", "category": "regular" },
-    "physics": { "id": "physics", "name": "Física", "iconName": "Zap", "color": "text-yellow-400", "category": "regular" },
-    "chem": { "id": "chem", "name": "Química", "iconName": "Beaker", "color": "text-purple-400", "category": "regular" },
-    "bio": { "id": "bio", "name": "Biologia", "iconName": "Microscope", "color": "text-green-400", "category": "regular" },
-    "lit": { "id": "lit", "name": "Literatura", "iconName": "BookOpen", "color": "text-pink-400", "category": "regular" },
-    "gram": { "id": "gram", "name": "Gramática", "iconName": "PenTool", "color": "text-red-400", "category": "regular" },
-    "hist": { "id": "hist", "name": "História", "iconName": "ScrollText", "color": "text-orange-400", "category": "regular" },
-    "geo": { "id": "geo", "name": "Geografia", "iconName": "Map", "color": "text-emerald-400", "category": "regular" },
-    "phil": { "id": "phil", "name": "Filosofia/Soc.", "iconName": "Scale", "color": "text-indigo-400", "category": "regular" },
-    "eng": { "id": "eng", "name": "Inglês", "iconName": "Languages", "color": "text-cyan-400", "category": "regular" },
-    "spa": { "id": "spa", "name": "Espanhol", "iconName": "MessageCircle", "color": "text-rose-400", "category": "regular" },
-    "text": { "id": "text", "name": "Interpretação", "iconName": "BrainCircuit", "color": "text-teal-400", "category": "regular" },
+    "matematica": { "id": "matematica", "name": "Matemática", "iconName": "Calculator", "color": "text-blue-400", "category": "regular" },
+    "fisica": { "id": "fisica", "name": "Física", "iconName": "Zap", "color": "text-yellow-400", "category": "regular" },
+    "quimica": { "id": "quimica", "name": "Química", "iconName": "Beaker", "color": "text-purple-400", "category": "regular" },
+    "biologia": { "id": "biologia", "name": "Biologia", "iconName": "Microscope", "color": "text-green-400", "category": "regular" },
+    "literatura": { "id": "literatura", "name": "Literatura", "iconName": "BookOpen", "color": "text-pink-400", "category": "regular" },
+    "gramatica": { "id": "gramatica", "name": "Gramática", "iconName": "PenTool", "color": "text-red-400", "category": "regular" },
+    "historia": { "id": "historia", "name": "História", "iconName": "ScrollText", "color": "text-orange-400", "category": "regular" },
+    "geografia": { "id": "geografia", "name": "Geografia", "iconName": "Map", "color": "text-emerald-400", "category": "regular" },
+    "filosofia": { "id": "filosofia", "name": "Filosofia/Soc.", "iconName": "Scale", "color": "text-indigo-400", "category": "regular" },
+    "ingles": { "id": "ingles", "name": "Inglês", "iconName": "Languages", "color": "text-cyan-400", "category": "regular" },
+    "espanhol": { "id": "espanhol", "name": "Espanhol", "iconName": "MessageCircle", "color": "text-rose-400", "category": "regular" },
+    "interpretacao": { "id": "interpretacao", "name": "Interpretação", "iconName": "BrainCircuit", "color": "text-teal-400", "category": "regular" },
     "esa": { "id": "esa", "name": "ESA", "iconName": "Target", "color": "text-emerald-600", "category": "military" },
     "espcex": { "id": "espcex", "name": "ESPCEX", "iconName": "Sword", "color": "text-emerald-800", "category": "military" }
   },
   "topics": {
-    "physics": ["Cinemática", "Dinâmica", "Eletrodinâmica", "Termodinâmica", "Óptica"],
-    "math": ["Álgebra", "Geometria Plana", "Geometria Espacial", "Trigonometria", "Estatística"],
-    "chem": ["Química Geral", "Físico-Química", "Química Orgânica", "Atomística"],
+    "fisica": ["Cinemática", "Dinâmica", "Eletrodinâmica", "Termodinâmica", "Óptica"],
+    "matematica": ["Álgebra", "Geometria Plana", "Geometria Espacial", "Trigonometria", "Estatística"],
+    "quimica": ["Química Geral", "Físico-Química", "Química Orgânica", "Atomística"],
     "esa": ["Matemática Militar", "História do Brasil", "Geografia do Brasil"]
   },
   "subtopics": {
@@ -74,7 +74,7 @@
       "type": "official",
       "status": "open",
       "questionIds": ["-KeyQ1", "-KeyQ2", "-KeyQ3", "-KeyQ4"],
-      "subjects": ["math", "human", "nature", "linguages"]
+      "subjects": ["matematica", "humanas", "natureza", "linguagens"]
     },
     "sim_002": {
       "id": "sim_002",
@@ -85,7 +85,7 @@
       "type": "training",
       "status": "closed",
       "questionIds": ["-KeyQ1", "-KeyQ4"],
-      "subjects": ["math", "physics"]
+      "subjects": ["matematica", "fisica"]
     },
     "sim_003": {
       "id": "sim_003",
@@ -95,7 +95,7 @@
       "durationMinutes": 300,
       "type": "training",
       "status": "coming_soon",
-      "subjects": ["general"]
+      "subjects": ["geral"]
     }
   },
   "users": {
@@ -138,7 +138,7 @@
     }
   },
   "lessons": {
-    "physics": {
+    "fisica": {
       "Cinemática": {
         "l1": {
           "id": "l1",
@@ -152,7 +152,7 @@
   },
   "questions": {
     "regular": {
-        "physics": {
+        "fisica": {
           "Cinemática": {
             "Movimento Uniforme": {
                 "-KeyQ1": {
@@ -181,7 +181,7 @@
             }
           }
         },
-        "math": {
+        "matematica": {
             "Álgebra": {
                 "Funções": {
                     "-KeyQ4": {

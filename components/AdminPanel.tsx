@@ -172,6 +172,10 @@ const AdminPanel: React.FC = () => {
 
   // --- ACTIONS ---
 
+  const normalizeId = (str: string) => {
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  };
+
   const handleImportQuestions = async () => {
       if (!importText.trim()) return alert("Cole o texto para importar.");
       setIsImporting(true);
@@ -192,7 +196,7 @@ const AdminPanel: React.FC = () => {
 
               // Reconstruct if description has colons
               // We assume strict field order.
-              const subjectId = parts[0].trim().toLowerCase(); // Normalize subject ID
+              const subjectId = normalizeId(parts[0]); // Normalize: 'Física' -> 'fisica'
               const topic = parts[1].trim(); // "SUBMATERIA" mapped to Topic
               const subtopic = parts[2].trim(); // "TOPICO" mapped to Subtopic
               
@@ -350,7 +354,7 @@ const AdminPanel: React.FC = () => {
       // 2. CREATE MODE (Existing Logic)
       if (contentTab === 'subject') {
           if(!contentForm.sName) return alert("Nome obrigatório");
-          const id = contentForm.sName.toLowerCase().replace(/\s+/g, '-');
+          const id = normalizeId(contentForm.sName);
           await DatabaseService.createSubject({
               id,
               name: contentForm.sName,
