@@ -175,6 +175,7 @@ const QuestionBank: React.FC = () => {
   const [answeredMap, setAnsweredMap] = useState<Record<string, {correct: boolean}>>({});
 
   // Filters
+  const [selectedCategory, setSelectedCategory] = useState<string>('regular');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [selectedSubTopic, setSelectedSubTopic] = useState<string>('');
@@ -211,7 +212,7 @@ const QuestionBank: React.FC = () => {
       setQuestions([]); // Clear prev
       
       try {
-        const fetched = await DatabaseService.getQuestions(selectedSubject, selectedTopic, selectedSubTopic || undefined);
+        const fetched = await DatabaseService.getQuestions(selectedCategory, selectedSubject, selectedTopic, selectedSubTopic || undefined);
         setQuestions(fetched);
       } catch (e) {
           console.error(e);
@@ -220,14 +221,14 @@ const QuestionBank: React.FC = () => {
       }
   };
 
-  // Trigger fetch when filters change (Debounced slightly naturally by React batching or explicit effect)
+  // Trigger fetch when filters change
   useEffect(() => {
       if (selectedSubject && selectedTopic) {
           handleFetchQuestions();
       } else {
           setQuestions([]);
       }
-  }, [selectedSubject, selectedTopic, selectedSubTopic]);
+  }, [selectedSubject, selectedTopic, selectedSubTopic, selectedCategory]);
 
   const handleAnswerSubmit = async (qId: string, isCorrect: boolean) => {
       if (!auth.currentUser) return;
@@ -243,7 +244,6 @@ const QuestionBank: React.FC = () => {
   };
 
   // Filter the displayed list based on "Hide Answered" toggle
-  // FIX 3: Logic to hide answered questions
   const displayedQuestions = questions.filter(q => {
       if (hideAnswered && q.id && answeredMap[q.id]) return false;
       return true;
@@ -262,7 +262,6 @@ const QuestionBank: React.FC = () => {
           <p className="text-slate-400">Pratique questões isoladas focando em suas dificuldades.</p>
         </div>
         
-        {/* FIX 3: Toggle Hide Answered */}
         <button 
             onClick={() => setHideAnswered(!hideAnswered)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-bold ${
@@ -277,7 +276,23 @@ const QuestionBank: React.FC = () => {
       </div>
 
       {/* FILTER BAR - Always Visible */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 flex-shrink-0 bg-slate-900/50 p-4 rounded-2xl border border-white/5">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 flex-shrink-0 bg-slate-900/50 p-4 rounded-2xl border border-white/5">
+        {/* Category Select */}
+        <div className="relative">
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  // Optional: clear other selections if category changes logic substantially
+              }}
+              className="w-full appearance-none glass-input p-3 rounded-xl focus:outline-none focus:border-indigo-500 text-white text-sm font-bold"
+            >
+              <option value="regular">ENEM / Vestibular</option>
+              <option value="military">Militar (ESA/Espcex)</option>
+            </select>
+            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 rotate-90 pointer-events-none" size={14} />
+        </div>
+
         {/* Subject Select */}
         <div className="relative">
             <select
@@ -334,7 +349,7 @@ const QuestionBank: React.FC = () => {
         </div>
       </div>
 
-      {/* QUESTION FEED - FIX 2 */}
+      {/* QUESTION FEED */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-20">
           {listLoading ? (
              <div className="flex flex-col items-center justify-center py-20 opacity-50">

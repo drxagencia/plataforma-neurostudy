@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'content' | 'finance' | 'config'>('users');
-  const [contentTab, setContentTab] = useState<'question' | 'lesson' | 'subject' | 'simulation'>('question');
+  const [contentTab, setContentTab] = useState<'question' | 'lesson' | 'subject' | 'simulation' | 'import'>('question');
   
   // View Mode: Create New vs Manage Existing
   const [viewMode, setViewMode] = useState<'create' | 'manage'>('create');
@@ -24,7 +24,6 @@ const AdminPanel: React.FC = () => {
   const [simulations, setSimulations] = useState<Simulation[]>([]);
   
   // Management Lists
-  // NOTE: filteredQuestions now only loads when needed to prevent bandwidth explosion
   const [filteredQuestions, setFilteredQuestions] = useState<(Question & { path: string, subtopic: string })[]>([]);
   
   // Lesson Management
@@ -35,6 +34,11 @@ const AdminPanel: React.FC = () => {
   // States
   const [loading, setLoading] = useState(true);
   
+  // Import State
+  const [importText, setImportText] = useState('');
+  const [importCategory, setImportCategory] = useState('regular');
+  const [isImporting, setIsImporting] = useState(false);
+
   // Simulation Form
   const [simForm, setSimForm] = useState({
       title: '',
@@ -50,6 +54,7 @@ const AdminPanel: React.FC = () => {
   // Manage Questions Filter
   const [manageQSubject, setManageQSubject] = useState('');
   const [manageQTopic, setManageQTopic] = useState('');
+  const [manageQCategory, setManageQCategory] = useState('regular');
 
   // Edit User
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -67,6 +72,7 @@ const AdminPanel: React.FC = () => {
   const [currentMaterial, setCurrentMaterial] = useState({ title: '', url: '' });
 
   const [contentForm, setContentForm] = useState({
+      category: 'regular',
       subjectId: '',
       topicName: '',
       subtopicName: '', 
@@ -140,18 +146,19 @@ const AdminPanel: React.FC = () => {
       
       const loadQ = async () => {
           if (contentTab === 'simulation' && simFilter.subject && simFilter.topic) {
-              const q = await DatabaseService.getQuestionsByPath(simFilter.subject, simFilter.topic);
+              // Sim search defaults to regular for now or needs to support cat
+              const q = await DatabaseService.getQuestionsByPath('regular', simFilter.subject, simFilter.topic);
               setFilteredQuestions(q);
           }
           else if (contentTab === 'question' && viewMode === 'manage' && manageQSubject && manageQTopic) {
-              const q = await DatabaseService.getQuestionsByPath(manageQSubject, manageQTopic);
+              const q = await DatabaseService.getQuestionsByPath(manageQCategory, manageQSubject, manageQTopic);
               setFilteredQuestions(q);
           } else {
               setFilteredQuestions([]);
           }
       };
       loadQ();
-  }, [activeTab, contentTab, viewMode, simFilter, manageQSubject, manageQTopic]);
+  }, [activeTab, contentTab, viewMode, simFilter, manageQSubject, manageQTopic, manageQCategory]);
 
 
   // Fetch Lessons for Manager
@@ -165,6 +172,67 @@ const AdminPanel: React.FC = () => {
 
   // --- ACTIONS ---
 
+  const handleImportQuestions = async () => {
+      if (!importText.trim()) return alert("Cole o texto para importar.");
+      setIsImporting(true);
+
+      const lines = importText.split('\n').filter(l => l.trim().length > 0);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const line of lines) {
+          try {
+              // FORMAT: MATERIA:SUBMATERIA:TOPICO:ENUNCIADO:IMAGEM:ALT1:ALT2:ALT3:ALT4:EXPLAIN:CORRECTANSWER(0,1,2,3)
+              const parts = line.split(':');
+              if (parts.length < 11) {
+                  console.error("Invalid line format:", line);
+                  errorCount++;
+                  continue;
+              }
+
+              // Reconstruct if description has colons
+              // We assume strict field order.
+              const subjectId = parts[0].trim().toLowerCase(); // Normalize subject ID
+              const topic = parts[1].trim(); // "SUBMATERIA" mapped to Topic
+              const subtopic = parts[2].trim(); // "TOPICO" mapped to Subtopic
+              
+              // Extract fixed fields from end
+              const correctAnswerRaw = parts[parts.length - 1].trim();
+              const explanation = parts[parts.length - 2].trim();
+              const alt4 = parts[parts.length - 3].trim();
+              const alt3 = parts[parts.length - 4].trim();
+              const alt2 = parts[parts.length - 5].trim();
+              const alt1 = parts[parts.length - 6].trim();
+              const imageUrl = parts[parts.length - 7].trim();
+              
+              // The Text might contain colons, so join everything between index 3 and length-7
+              const textParts = parts.slice(3, parts.length - 7);
+              const text = textParts.join(':').trim();
+
+              const q: Question = {
+                  text,
+                  imageUrl: imageUrl === 'NULL' || imageUrl === '' ? undefined : imageUrl,
+                  options: [alt1, alt2, alt3, alt4],
+                  correctAnswer: parseInt(correctAnswerRaw) || 0,
+                  difficulty: 'medium', // Default
+                  explanation: explanation === 'NULL' ? '' : explanation,
+                  subjectId,
+                  topic
+              };
+
+              await DatabaseService.createQuestion(importCategory, subjectId, topic, subtopic, q);
+              successCount++;
+          } catch (e) {
+              console.error(e);
+              errorCount++;
+          }
+      }
+
+      alert(`Importação concluída!\nSucesso: ${successCount}\nErros: ${errorCount}`);
+      setImportText('');
+      setIsImporting(false);
+  };
+
   const handleEditItem = (item: any, type: 'question' | 'lesson' | 'simulation' | 'subject') => {
       setIsEditing(true);
       setEditingId(item.id);
@@ -173,6 +241,7 @@ const AdminPanel: React.FC = () => {
       if (type === 'question') {
           setContentForm({
               ...contentForm,
+              category: manageQCategory, // Inherit from filter
               subjectId: item.subjectId,
               topicName: item.topic,
               subtopicName: item.subtopic,
@@ -216,7 +285,7 @@ const AdminPanel: React.FC = () => {
           await DatabaseService.deletePath(path);
           alert("Item deletado.");
           if (contentTab === 'question') {
-               const q = await DatabaseService.getQuestionsByPath(manageQSubject, manageQTopic);
+               const q = await DatabaseService.getQuestionsByPath(manageQCategory, manageQSubject, manageQTopic);
                setFilteredQuestions(q);
           } else if (contentTab === 'simulation') {
              const s = await DatabaseService.getSimulations();
@@ -335,7 +404,7 @@ const AdminPanel: React.FC = () => {
                   topic: contentForm.topicName
               };
               
-              await DatabaseService.createQuestion(contentForm.subjectId, contentForm.topicName, contentForm.subtopicName, newQuestion);
+              await DatabaseService.createQuestion(contentForm.category, contentForm.subjectId, contentForm.topicName, contentForm.subtopicName, newQuestion);
               alert("Questão criada com sucesso e estrutura atualizada!");
           } else {
               if (!contentForm.lTitle) return;
@@ -441,10 +510,11 @@ const AdminPanel: React.FC = () => {
                   <button onClick={() => {setContentTab('lesson'); setViewMode('create'); setIsEditing(false);}} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'lesson' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><Layers size={18} /> Aulas</button>
                   <button onClick={() => {setContentTab('subject'); setViewMode('create'); setIsEditing(false);}} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'subject' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><PenTool size={18} /> Matérias</button>
                   <button onClick={() => {setContentTab('simulation'); setViewMode('create'); setIsEditing(false);}} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'simulation' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><LayoutList size={18} /> Simulados</button>
+                  <button onClick={() => {setContentTab('import'); setViewMode('create'); setIsEditing(false);}} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'import' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><Upload size={18} /> Importar</button>
               </div>
 
               {/* Toggle Create vs Manage */}
-              {contentTab !== 'subject' && (
+              {contentTab !== 'subject' && contentTab !== 'import' && (
                   <div className="flex justify-center mb-6">
                       <div className="bg-slate-900 border border-white/10 p-1 rounded-lg flex">
                           <button onClick={() => {setViewMode('create'); resetForms(); setIsEditing(false);}} className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${viewMode === 'create' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>
@@ -457,8 +527,47 @@ const AdminPanel: React.FC = () => {
                   </div>
               )}
 
+              {/* --- IMPORT TAB --- */}
+              {contentTab === 'import' && (
+                  <div className="glass-card p-6 rounded-2xl animate-fade-in">
+                      <h3 className="text-xl font-bold text-white mb-4">Importação em Massa</h3>
+                      <div className="space-y-4">
+                          <div>
+                              <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Categoria de Destino</label>
+                              <select 
+                                  className="w-full glass-input p-3 rounded-xl"
+                                  value={importCategory}
+                                  onChange={e => setImportCategory(e.target.value)}
+                              >
+                                  <option value="regular">Regular / ENEM</option>
+                                  <option value="military">Militar</option>
+                              </select>
+                          </div>
+                          
+                          <div>
+                              <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Cole as questões abaixo</label>
+                              <p className="text-[10px] text-slate-500 mb-2">Formato: MATERIA:SUBMATERIA:TOPICO:ENUNCIADO:IMAGEM:ALT1:ALT2:ALT3:ALT4:EXPLAIN:CORRECTANSWER(0-3)</p>
+                              <textarea 
+                                  className="w-full glass-input p-4 rounded-xl min-h-[300px] font-mono text-xs"
+                                  placeholder="COLE AQUI..."
+                                  value={importText}
+                                  onChange={e => setImportText(e.target.value)}
+                              />
+                          </div>
+
+                          <button 
+                              onClick={handleImportQuestions}
+                              disabled={isImporting || !importText.trim()}
+                              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl"
+                          >
+                              {isImporting ? <Loader2 className="animate-spin mx-auto"/> : 'Processar Importação'}
+                          </button>
+                      </div>
+                  </div>
+              )}
+
               {/* --- VIEW MODE: CREATE / EDIT --- */}
-              {viewMode === 'create' && (
+              {viewMode === 'create' && contentTab !== 'import' && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
                       <div className="lg:col-span-2 space-y-6">
                           <div className={`glass-card p-6 rounded-2xl ${isEditing ? 'border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.1)]' : ''}`}>
@@ -540,6 +649,14 @@ const AdminPanel: React.FC = () => {
 
                                      {contentTab === 'question' && (
                                         <div className="space-y-4">
+                                            <div className="mb-4">
+                                                <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Categoria</label>
+                                                <select className="w-full glass-input p-3 rounded-lg" value={contentForm.category} onChange={e => setContentForm({...contentForm, category: e.target.value})}>
+                                                    <option value="regular">Regular / ENEM</option>
+                                                    <option value="military">Militar</option>
+                                                </select>
+                                            </div>
+
                                             <div className="grid grid-cols-2 gap-4">
                                                 <select className="w-full glass-input p-3 rounded-lg" value={contentForm.subjectId} onChange={(e) => setContentForm({...contentForm, subjectId: e.target.value})}>
                                                     <option value="">Matéria</option>
@@ -591,10 +708,37 @@ const AdminPanel: React.FC = () => {
               {viewMode === 'manage' && (
                    // ... existing manage code ...
                    <div className="space-y-6 animate-fade-in">
-                        {/* Simply re-render manage views from previous code if needed or assume standard structure */}
-                        {/* We are mostly changing create logic, manage logic is generic list rendering */}
                          <div className="glass-card p-6 rounded-2xl">
-                             <p className="text-slate-400">Selecione filtros acima para gerenciar itens existentes.</p>
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                 {contentTab === 'question' && (
+                                     <select className="glass-input p-2 rounded-lg" value={manageQCategory} onChange={e => setManageQCategory(e.target.value)}>
+                                        <option value="regular">Regular</option>
+                                        <option value="military">Militar</option>
+                                     </select>
+                                 )}
+                                 <select className="glass-input p-2 rounded-lg" value={manageQSubject} onChange={e => setManageQSubject(e.target.value)}>
+                                     <option value="">Matéria</option>
+                                     {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                 </select>
+                                 <select className="glass-input p-2 rounded-lg" value={manageQTopic} onChange={e => setManageQTopic(e.target.value)}>
+                                     <option value="">Tópico</option>
+                                     {manageQSubject && topics[manageQSubject]?.map(t => <option key={t} value={t}>{t}</option>)}
+                                 </select>
+                             </div>
+
+                             {contentTab === 'question' && (
+                                <div className="space-y-2">
+                                    {filteredQuestions.map(q => (
+                                        <div key={q.id} className="p-3 bg-slate-900 rounded-lg flex justify-between items-center group">
+                                            <span className="truncate flex-1 pr-4">{q.text}</span>
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => handleEditItem(q, 'question')} className="p-1 hover:bg-white/10 rounded"><Pencil size={16}/></button>
+                                                <button onClick={() => handleDeleteItem(q.path)} className="p-1 hover:bg-red-900/50 text-red-400 rounded"><Trash2 size={16}/></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                             )}
                          </div>
                    </div>
               )}

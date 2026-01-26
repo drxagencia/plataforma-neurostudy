@@ -183,7 +183,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           const currentCredits = typeof user.essayCredits === 'number' ? user.essayCredits : 0;
           onUpdateUser({
               ...user,
-              essayCredits: Math.max(0, currentCredits - 1)
+              essayCredits: Math.max(0, Number(currentCredits) - 1)
           });
 
           setCurrentResult(result);
@@ -603,4 +603,3 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 };
 
 export default Redacao;
-    

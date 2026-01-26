@@ -455,10 +455,14 @@ export const DatabaseService = {
   },
 
   // --- Questions (Hierarchical) ---
-  // OPTIMIZED: Added limit to prevent massive downloads
-  getQuestions: async (subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
+  // Updated to support Category (regular vs military)
+  getQuestions: async (category: string, subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
     try {
-      let path = `questions/${subjectId}/${topic}`;
+      // Path format: questions/{category}/{subject}/{topic}/{subtopic}
+      // If category is not provided, we might default to 'regular' in the path or old path logic
+      const root = category ? `questions/${category}` : `questions/regular`;
+      
+      let path = `${root}/${subjectId}/${topic}`;
       if (subtopic) {
         path += `/${subtopic}`;
       }
@@ -499,10 +503,11 @@ export const DatabaseService = {
     return [];
   },
 
-  getQuestionsByPath: async (subjectId: string, topic: string): Promise<(Question & { path: string, subtopic: string })[]> => {
+  getQuestionsByPath: async (category: string, subjectId: string, topic: string): Promise<(Question & { path: string, subtopic: string })[]> => {
      try {
+         const root = category ? `questions/${category}` : `questions/regular`;
          // Limit this admin query as well
-         const snapshot = await get(query(ref(database, `questions/${subjectId}/${topic}`), limitToFirst(50)));
+         const snapshot = await get(query(ref(database, `${root}/${subjectId}/${topic}`), limitToFirst(50)));
          if(!snapshot.exists()) return [];
          
          const data = snapshot.val();
@@ -517,7 +522,7 @@ export const DatabaseService = {
                      subjectId: subjectId,
                      topic: topic,
                      subtopic: subtopic,
-                     path: `questions/${subjectId}/${topic}/${subtopic}/${qId}`
+                     path: `${root}/${subjectId}/${topic}/${subtopic}/${qId}`
                  });
              });
          });
@@ -543,9 +548,10 @@ export const DatabaseService = {
       }).filter(q => q !== null) as Question[];
   },
 
-  createQuestion: async (subjectId: string, topic: string, subtopic: string, question: Question): Promise<void> => {
+  createQuestion: async (category: string, subjectId: string, topic: string, subtopic: string, question: Question): Promise<void> => {
      try {
-       const questionsRef = ref(database, `questions/${subjectId}/${topic}/${subtopic}`);
+       const root = category ? `questions/${category}` : `questions/regular`;
+       const questionsRef = ref(database, `${root}/${subjectId}/${topic}/${subtopic}`);
        const newQuestionRef = push(questionsRef);
        await set(newQuestionRef, question);
 
