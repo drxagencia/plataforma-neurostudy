@@ -1,15 +1,16 @@
 
-export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'tutor' | 'ajustes' | 'admin' | 'financeiro';
+export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'tutor' | 'ajustes' | 'admin' | 'financeiro' | 'redacao' | 'militares';
 
 export type UserPlan = 'basic' | 'intermediate' | 'advanced' | 'admin';
 
 export interface Transaction {
   id: string;
   type: 'debit' | 'credit';
-  amount: number; // Valor em R$
+  amount: number; // Valor em R$ ou Créditos
   description: string;
   timestamp: number;
   tokensUsed?: number;
+  currencyType?: 'BRL' | 'CREDIT';
 }
 
 export interface RechargeRequest {
@@ -19,7 +20,8 @@ export interface RechargeRequest {
   amount: number;
   status: 'pending' | 'approved' | 'rejected';
   timestamp: number;
-  proofUrl?: string; // Opcional, URL do comprovante
+  type: 'BRL' | 'CREDIT'; // Distinguish between wallet balance and essay credits
+  quantityCredits?: number; // Only if type is CREDIT
 }
 
 export interface AiConfig {
@@ -41,7 +43,8 @@ export interface User {
 export interface UserProfile extends User {
   plan: UserPlan;
   subscriptionExpiry: string; // ISO Date string
-  balance: number; // Saldo em R$
+  balance: number; // Saldo em R$ (IA Chat)
+  essayCredits: number; // Créditos de Redação
   xp: number;
   lastPostedAt?: number;
   questionsAnswered?: number;
@@ -62,6 +65,7 @@ export interface Subject {
   name: string;
   iconName: string; 
   color: string;
+  category?: 'regular' | 'military'; // Distinction
 }
 
 export interface Question {
@@ -92,6 +96,13 @@ export interface Lesson {
   materials?: LessonMaterial[];
 }
 
+export interface Reply {
+  id?: string;
+  author: string;
+  content: string;
+  timestamp: number;
+}
+
 export interface CommunityPost {
   id: string;
   authorName: string;
@@ -99,6 +110,7 @@ export interface CommunityPost {
   content: string;
   timestamp: number;
   likes: number;
+  replies?: Reply[];
 }
 
 export interface Simulation {
@@ -122,4 +134,21 @@ export interface SimulationResult {
   answers: Record<string, boolean>; // QuestionID -> Correct(true/false)
   timestamp: number;
   topicPerformance?: Record<string, { correct: number; total: number }>; // Analysis data
+}
+
+export interface EssayCorrection {
+  id?: string;
+  theme: string;
+  imageUrl: string; // Currently base64 for simplicity in MVP, ideally Storage URL
+  date: number;
+  scoreTotal: number;
+  competencies: {
+    c1: number;
+    c2: number;
+    c3: number;
+    c4: number;
+    c5: number;
+  };
+  feedback: string;
+  errors: string[];
 }

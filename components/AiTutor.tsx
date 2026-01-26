@@ -1,12 +1,18 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle } from 'lucide-react';
 import { AiService, ChatMessage } from '../services/aiService';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
-import { Transaction } from '../types';
+import { Transaction, UserProfile } from '../types';
 import { auth } from '../services/firebaseConfig';
 
-const AiTutor: React.FC = () => {
+interface AiTutorProps {
+    user: UserProfile;
+    onUpdateUser: (u: UserProfile) => void;
+}
+
+const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -16,7 +22,7 @@ const AiTutor: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [balance, setBalance] = useState(0);
+  // Use user prop for balance, only fetch history
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showRecharge, setShowRecharge] = useState(false);
@@ -42,7 +48,7 @@ const AiTutor: React.FC = () => {
 
   useEffect(() => {
     if (auth.currentUser) {
-        fetchFinancialData();
+        fetchHistory();
     }
   }, []);
 
@@ -54,12 +60,26 @@ const AiTutor: React.FC = () => {
       }
   }, [notification]);
 
-  const fetchFinancialData = async () => {
+  const fetchHistory = async () => {
       if (!auth.currentUser) return;
-      const profile = await DatabaseService.getUserProfile(auth.currentUser.uid);
-      if (profile) setBalance(profile.balance);
       const trans = await DatabaseService.getUserTransactions(auth.currentUser.uid);
       setTransactions(trans);
+  };
+
+  const updateBalanceLocally = async () => {
+      // Small optimization: re-fetch only the balance/user specific data if we really need strong consistency,
+      // but usually for chat cost we can rely on what the API returns or just fetch user.
+      // In this case, to keep it simple and consistent with bandwidth saving:
+      // We know the API chat handler subtracts balance. We should fetch the updated user to sync state.
+      // But we will use the lightweight `getUserProfile` (which now we know downloads everything), 
+      // so actually, we rely on the backend response to tell us the new balance if possible, or we re-fetch.
+      
+      // Since we modified chat API to return remaining balance, let's use that if we can.
+      // But `AiService` abstracts it.
+      // Let's fallback to refetching user profile but assume it's acceptable for "Chat" interactions which are lower frequency than navigation.
+      if (!auth.currentUser) return;
+      const updatedUser = await DatabaseService.getUserProfile(auth.currentUser.uid);
+      if (updatedUser) onUpdateUser(updatedUser);
   };
 
   const triggerNotification = (type: 'success' | 'error', message: string) => {
@@ -81,7 +101,7 @@ const AiTutor: React.FC = () => {
     e?.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    if (balance <= 0.05) {
+    if (user.balance <= 0.05) {
         triggerNotification('error', 'Saldo Insuficiente para realizar esta ação.');
         setTimeout(() => setShowRecharge(true), 500);
         return;
@@ -109,7 +129,7 @@ const AiTutor: React.FC = () => {
       };
       
       setMessages(prev => [...prev, aiMsg]);
-      fetchFinancialData(); 
+      updateBalanceLocally();
     } catch (error: any) {
       if (error.message.includes('402')) {
           triggerNotification('error', 'Seu saldo acabou durante a requisição.');
@@ -148,8 +168,6 @@ const AiTutor: React.FC = () => {
           const payload = PixService.generatePayload(val);
           setPixPayload(payload);
           setCopied(false);
-          // Optional: Force re-render of QR Code image if needed by clearing first
-          // setPixPayload(null); setTimeout(() => setPixPayload(payload), 10);
       } catch (e) {
           console.error(e);
           triggerNotification('error', 'Erro ao gerar QR Code.');
@@ -219,8 +237,8 @@ const AiTutor: React.FC = () => {
             <div className="flex items-center gap-3 bg-slate-900 border border-white/10 px-4 py-2 rounded-xl">
                 <div className="flex flex-col items-end">
                     <span className="text-[10px] text-slate-400 uppercase font-bold">Seu Saldo</span>
-                    <span className={`font-mono font-bold ${balance > 5 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        R$ {balance.toFixed(4)}
+                    <span className={`font-mono font-bold ${user.balance > 5 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        R$ {user.balance.toFixed(4)}
                     </span>
                 </div>
                 <div className="h-8 w-[1px] bg-white/10 mx-1"></div>

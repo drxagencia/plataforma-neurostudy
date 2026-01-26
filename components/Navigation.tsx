@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { View } from '../types';
 import { 
@@ -11,7 +12,9 @@ import {
   ShieldAlert,
   Trophy,
   Bot,
-  BrainCircuit
+  BrainCircuit,
+  PenTool,
+  Sword
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -26,6 +29,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
   const menuItems: { id: View; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'aulas', label: 'Aulas', icon: <BookOpen size={20} /> },
+    { id: 'militares', label: 'Militares', icon: <Sword size={20} /> },
+    { id: 'redacao', label: 'Redação', icon: <PenTool size={20} /> },
     { id: 'tutor', label: 'NeuroTutor', icon: <Bot size={20} /> },
     { id: 'simulados', label: 'Simulados', icon: <GraduationCap size={20} /> },
     { id: 'questoes', label: 'Questões', icon: <FileQuestion size={20} /> },
@@ -40,7 +45,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
   if (isMobile) {
     return (
       <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 flex justify-around items-center z-50 px-2 pb-safe">
-        {visibleMenuItems.slice(0, 5).map((item) => (
+        {visibleMenuItems.slice(0, 6).map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
@@ -51,7 +56,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
             <div className={`${currentView === item.id ? 'bg-indigo-500/20 p-1.5 rounded-lg' : ''} transition-all`}>
               {item.icon}
             </div>
-            <span className="text-[10px] mt-1 font-medium">{item.label}</span>
+            <span className="text-[9px] mt-1 font-medium">{item.label}</span>
           </button>
         ))}
       </nav>
@@ -70,7 +75,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
         </h1>
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1.5">
+      <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto custom-scrollbar">
         {visibleMenuItems.map((item) => (
           <button
             key={item.id}

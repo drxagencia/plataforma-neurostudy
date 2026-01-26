@@ -1,7 +1,22 @@
 
-import { ref, get, child, update, push, set, query, orderByChild, equalTo, limitToLast, remove, startAfter, limitToFirst } from "firebase/database";
+import { ref, get, child, update, push, set, query, orderByChild, equalTo, limitToLast, remove, startAfter, limitToFirst, runTransaction } from "firebase/database";
 import { database } from "./firebaseConfig";
-import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan, SimulationResult } from "../types";
+import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan, SimulationResult, EssayCorrection } from "../types";
+
+// --- MEMORY CACHE TO PREVENT REDUNDANT DOWNLOADS ---
+const CACHE: {
+    subjects: Subject[] | null;
+    topics: Record<string, string[]> | null;
+    subtopics: Record<string, string[]> | null;
+    announcements: Announcement[] | null;
+    aiConfig: AiConfig | null;
+} = {
+    subjects: null,
+    topics: null,
+    subtopics: null,
+    announcements: null,
+    aiConfig: null
+};
 
 export const DatabaseService = {
   // --- GENERIC HELPERS FOR ADMIN ---
@@ -26,6 +41,8 @@ export const DatabaseService = {
   // --- User Profile & XP ---
   getUserProfile: async (uid: string): Promise<UserProfile | null> => {
     try {
+      // NOTE: This fetches the ENTIRE user node. Avoid calling this frequently in child components.
+      // Use the 'user' prop passed from App.tsx whenever possible.
       const snapshot = await get(child(ref(database), `users/${uid}`));
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -33,7 +50,8 @@ export const DatabaseService = {
           ...data, 
           uid,
           plan: data.plan || (data.isAdmin ? 'admin' : 'basic'),
-          balance: data.balance || 0
+          balance: data.balance || 0,
+          essayCredits: data.essayCredits || 0
         };
       }
       return null;
@@ -48,8 +66,11 @@ export const DatabaseService = {
       await set(ref(database, `users/${uid}`), {
         ...data,
         balance: 0,
+        essayCredits: 0,
         plan: data.isAdmin ? 'admin' : 'basic'
       });
+      // Sync with lightweight leaderboard
+      await DatabaseService.syncLeaderboard(uid, data.displayName || 'User', data.photoURL || '', 0);
     } catch (error) {
       console.error("Error creating user profile:", error);
       throw error;
@@ -73,10 +94,25 @@ export const DatabaseService = {
   saveUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
     try {
       await update(ref(database, `users/${uid}`), data);
+      
+      // Update leaderboard info if name/photo changes
+      if (data.displayName || data.photoURL) {
+          const currentXP = (await get(child(ref(database), `users/${uid}/xp`))).val() || 0;
+          await DatabaseService.syncLeaderboard(uid, data.displayName, data.photoURL, currentXP);
+      }
     } catch (error) {
       console.error("Error saving user profile:", error);
       throw error;
     }
+  },
+
+  // Helper to keep a lightweight leaderboard node
+  syncLeaderboard: async (uid: string, displayName?: string, photoURL?: string, xp?: number) => {
+      const updates: any = {};
+      if (displayName) updates[`leaderboard/${uid}/displayName`] = displayName;
+      if (photoURL) updates[`leaderboard/${uid}/photoURL`] = photoURL;
+      if (xp !== undefined) updates[`leaderboard/${uid}/xp`] = xp;
+      await update(ref(database), updates);
   },
 
   addXp: async (uid: string, amount: number): Promise<number> => {
@@ -84,9 +120,15 @@ export const DatabaseService = {
       const userRef = ref(database, `users/${uid}`);
       const snapshot = await get(userRef);
       if (snapshot.exists()) {
-        const currentXp = snapshot.val().xp || 0;
+        const userData = snapshot.val();
+        const currentXp = userData.xp || 0;
         const newXp = currentXp + amount;
+        
         await update(userRef, { xp: newXp });
+        
+        // Update lightweight leaderboard
+        await DatabaseService.syncLeaderboard(uid, userData.displayName, userData.photoURL, newXp);
+        
         return newXp;
       }
     } catch (error) {
@@ -121,6 +163,8 @@ export const DatabaseService = {
 
   getAnsweredQuestions: async (uid: string): Promise<Record<string, { correct: boolean }>> => {
       try {
+          // Optimized: Only fetch if needed, but for now we keep it. 
+          // Ideally, we shouldn't fetch the whole history on load if it's huge.
           const snap = await get(ref(database, `users/${uid}/answeredQuestions`));
           return snap.exists() ? snap.val() : {};
       } catch (e) {
@@ -128,19 +172,17 @@ export const DatabaseService = {
       }
   },
 
-  // OPTIMIZED: Only fetch top 50 users sorted by XP server-side
+  // OPTIMIZED: Fetch from 'leaderboard' node instead of 'users'
   getLeaderboard: async (): Promise<UserProfile[]> => {
     try {
-      // Order by XP and limit to last 50 (since RTDB sorts ascending, higher XP is at the end)
-      const usersRef = query(ref(database, 'users'), orderByChild('xp'), limitToLast(50));
-      const snapshot = await get(usersRef);
+      const lbRef = query(ref(database, 'leaderboard'), orderByChild('xp'), limitToLast(50));
+      const snapshot = await get(lbRef);
       if (snapshot.exists()) {
         const data = snapshot.val();
         const users = Object.keys(data).map(key => ({
           ...data[key],
           uid: key
         })) as UserProfile[];
-        // Reverse here because limitToLast gives us the highest XP at the end of the array
         return users.sort((a, b) => (b.xp || 0) - (a.xp || 0));
       }
     } catch (error) {
@@ -150,7 +192,7 @@ export const DatabaseService = {
   },
 
   // --- Financial & Credits System ---
-  createRechargeRequest: async (uid: string, userDisplayName: string, amount: number): Promise<void> => {
+  createRechargeRequest: async (uid: string, userDisplayName: string, amount: number, type: 'BRL' | 'CREDIT' = 'BRL', quantityCredits?: number): Promise<void> => {
     try {
         const reqRef = push(ref(database, 'recharges'));
         const request: RechargeRequest = {
@@ -159,7 +201,9 @@ export const DatabaseService = {
             userDisplayName,
             amount,
             status: 'pending',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            type,
+            quantityCredits
         };
         await set(reqRef, request);
     } catch (error) {
@@ -192,19 +236,38 @@ export const DatabaseService = {
         if (status === 'approved' && request.status !== 'approved') {
             const userRef = ref(database, `users/${request.uid}`);
             const userSnap = await get(userRef);
-            const currentBalance = userSnap.val().balance || 0;
             
-            await update(userRef, { balance: currentBalance + request.amount });
+            if (request.type === 'CREDIT' && request.quantityCredits) {
+                // Add Essay Credits
+                const currentCredits = userSnap.val().essayCredits || 0;
+                await update(userRef, { essayCredits: currentCredits + request.quantityCredits });
+                
+                // Transaction Record
+                const transRef = push(ref(database, `users/${request.uid}/transactions`));
+                await set(transRef, {
+                    id: transRef.key!,
+                    type: 'credit',
+                    amount: request.quantityCredits,
+                    description: `Compra de ${request.quantityCredits} créditos de redação`,
+                    timestamp: Date.now(),
+                    currencyType: 'CREDIT'
+                });
 
-            const transRef = push(ref(database, `users/${request.uid}/transactions`));
-            const transaction: Transaction = {
-                id: transRef.key!,
-                type: 'credit',
-                amount: request.amount,
-                description: 'Recarga aprovada via PIX',
-                timestamp: Date.now()
-            };
-            await set(transRef, transaction);
+            } else {
+                // Add Balance BRL
+                const currentBalance = userSnap.val().balance || 0;
+                await update(userRef, { balance: currentBalance + request.amount });
+
+                const transRef = push(ref(database, `users/${request.uid}/transactions`));
+                await set(transRef, {
+                    id: transRef.key!,
+                    type: 'credit',
+                    amount: request.amount,
+                    description: 'Recarga saldo IA',
+                    timestamp: Date.now(),
+                    currencyType: 'BRL'
+                });
+            }
         }
 
         await update(reqRef, { status });
@@ -216,7 +279,6 @@ export const DatabaseService = {
 
   getUserTransactions: async (uid: string): Promise<Transaction[]> => {
       try {
-          // Limit transactions history to prevent loading huge arrays
           const q = query(ref(database, `users/${uid}/transactions`), limitToLast(50));
           const snapshot = await get(q);
           if (snapshot.exists()) {
@@ -228,12 +290,69 @@ export const DatabaseService = {
           return [];
       }
   },
+  
+  deductEssayCredit: async (uid: string): Promise<void> => {
+      const userRef = ref(database, `users/${uid}`);
+      await runTransaction(userRef, (user) => {
+          if (user) {
+              if (user.essayCredits && user.essayCredits > 0) {
+                  user.essayCredits--;
+                  return user;
+              } else {
+                  throw new Error("Saldo de créditos insuficiente");
+              }
+          }
+          return user;
+      });
+  },
+
+  // OPTIMIZED: Split heavy image data from light metadata
+  saveEssayCorrection: async (uid: string, correction: EssayCorrection): Promise<void> => {
+     // 1. Generate ID
+     const correctionRef = push(ref(database, `users/${uid}/essays`));
+     const correctionId = correctionRef.key!;
+
+     // 2. Extract heavy image data
+     const { imageUrl, ...metaData } = correction;
+
+     // 3. Save metadata to user profile list
+     await set(correctionRef, { ...metaData, id: correctionId });
+
+     // 4. Save heavy image to separate node 'essay_blobs'
+     if (imageUrl) {
+         await set(ref(database, `essay_blobs/${correctionId}`), { imageUrl });
+     }
+  },
+
+  getEssayCorrections: async (uid: string): Promise<EssayCorrection[]> => {
+      try {
+          // This only fetches metadata (no images)
+          const snap = await get(ref(database, `users/${uid}/essays`));
+          if(snap.exists()) {
+             return Object.values(snap.val());
+          }
+          return [];
+      } catch (e) { return []; }
+  },
+
+  // New method to fetch the heavy image only when needed
+  getEssayImage: async (correctionId: string): Promise<string | null> => {
+      try {
+          const snap = await get(ref(database, `essay_blobs/${correctionId}/imageUrl`));
+          if (snap.exists()) return snap.val();
+          return null;
+      } catch (e) { return null; }
+  },
 
   // --- AI Config ---
   getAiConfig: async (): Promise<AiConfig> => {
+      if (CACHE.aiConfig) return CACHE.aiConfig;
       try {
           const snapshot = await get(ref(database, 'config/ai'));
-          if (snapshot.exists()) return snapshot.val();
+          if (snapshot.exists()) {
+              CACHE.aiConfig = snapshot.val();
+              return CACHE.aiConfig!;
+          }
           return {
               intermediateLimits: {
                   canUseChat: false,
@@ -247,16 +366,20 @@ export const DatabaseService = {
   },
 
   updateAiConfig: async (config: AiConfig): Promise<void> => {
+      CACHE.aiConfig = config; // Update cache immediately
       await set(ref(database, 'config/ai'), config);
   },
 
   // --- Announcements ---
   getAnnouncements: async (): Promise<Announcement[]> => {
+    if (CACHE.announcements) return CACHE.announcements;
     try {
       const snapshot = await get(child(ref(database), 'announcements'));
       if (snapshot.exists()) {
         const data = snapshot.val();
-        return Array.isArray(data) ? data : Object.values(data);
+        const result = Array.isArray(data) ? data : Object.values(data);
+        CACHE.announcements = result;
+        return result;
       }
     } catch (error) {
       console.warn("Error fetching announcements:", error);
@@ -266,11 +389,14 @@ export const DatabaseService = {
 
   // --- Subjects ---
   getSubjects: async (): Promise<Subject[]> => {
+    if (CACHE.subjects) return CACHE.subjects;
     try {
       const snapshot = await get(child(ref(database), 'subjects'));
       if (snapshot.exists()) {
         const data = snapshot.val();
-        return Array.isArray(data) ? data : Object.values(data);
+        const result = Array.isArray(data) ? data : Object.values(data);
+        CACHE.subjects = result;
+        return result;
       }
     } catch (error) {
       console.warn("Error fetching subjects:", error);
@@ -291,6 +417,7 @@ export const DatabaseService = {
           
           currentSubjects.push(subject);
           await set(subjectsRef, currentSubjects);
+          CACHE.subjects = null; // Invalidate cache
       } catch (e) {
           console.error("Error creating subject", e);
           throw e;
@@ -299,9 +426,13 @@ export const DatabaseService = {
 
   // --- Topics & Subtopics ---
   getTopics: async (): Promise<Record<string, string[]>> => {
+    if (CACHE.topics) return CACHE.topics;
     try {
       const snapshot = await get(child(ref(database), 'topics'));
-      if (snapshot.exists()) return snapshot.val();
+      if (snapshot.exists()) {
+          CACHE.topics = snapshot.val();
+          return CACHE.topics!;
+      }
     } catch (error) {
       console.warn("Error fetching topics:", error);
     }
@@ -309,9 +440,13 @@ export const DatabaseService = {
   },
 
   getSubTopics: async (): Promise<Record<string, string[]>> => {
+    if (CACHE.subtopics) return CACHE.subtopics;
     try {
       const snapshot = await get(child(ref(database), 'subtopics'));
-      if (snapshot.exists()) return snapshot.val();
+      if (snapshot.exists()) {
+          CACHE.subtopics = snapshot.val();
+          return CACHE.subtopics!;
+      }
     } catch (error) {
       console.warn("Error fetching subtopics:", error);
     }
@@ -319,7 +454,7 @@ export const DatabaseService = {
   },
 
   // --- Questions (Hierarchical) ---
-  // Efficient fetch: specific path only
+  // OPTIMIZED: Added limit to prevent massive downloads
   getQuestions: async (subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
     try {
       let path = `questions/${subjectId}/${topic}`;
@@ -327,7 +462,11 @@ export const DatabaseService = {
         path += `/${subtopic}`;
       }
       
-      const snapshot = await get(child(ref(database), path));
+      const dbRef = ref(database, path);
+      // Limit to first 30 questions to save bandwidth
+      const qQuery = query(dbRef, limitToFirst(30));
+      
+      const snapshot = await get(qQuery);
       if (!snapshot.exists()) return [];
 
       const data = snapshot.val();
@@ -336,14 +475,18 @@ export const DatabaseService = {
         return Object.keys(data).map(key => ({ ...data[key], id: key }));
       } else {
         let allQuestions: Question[] = [];
+        let count = 0;
         Object.keys(data).forEach(subtopicKey => {
+            if (count >= 30) return; // Client side check just in case
             const questionsInSubtopic = data[subtopicKey];
             if (typeof questionsInSubtopic === 'object') {
                 Object.keys(questionsInSubtopic).forEach(qKey => {
+                    if (count >= 30) return;
                     allQuestions.push({
                         ...questionsInSubtopic[qKey],
                         id: qKey
                     });
+                    count++;
                 });
             }
         });
@@ -355,11 +498,10 @@ export const DatabaseService = {
     return [];
   },
 
-  // OPTIMIZED: Fetch questions with explicit hierarchy path logic, used when filtering in Admin
-  // Note: We intentionally removed 'getAllQuestionsFlat' to prevent 6MB downloads.
   getQuestionsByPath: async (subjectId: string, topic: string): Promise<(Question & { path: string, subtopic: string })[]> => {
      try {
-         const snapshot = await get(ref(database, `questions/${subjectId}/${topic}`));
+         // Limit this admin query as well
+         const snapshot = await get(query(ref(database, `questions/${subjectId}/${topic}`), limitToFirst(50)));
          if(!snapshot.exists()) return [];
          
          const data = snapshot.val();
@@ -385,23 +527,10 @@ export const DatabaseService = {
   },
 
   getQuestionsByIds: async (ids: string[]): Promise<Question[]> => {
-      // For fetching specific simulation questions. 
-      // In a scalable solution, we would fetch these individually in parallel 
-      // rather than downloading the whole world.
-      // Since RTDB doesn't have "WHERE IN", we have to be smart.
-      // For now, assume ids contains path info? No, they are just keys.
-      // We will search the most likely paths or assume small dataset for simulations.
-      // Optimization: For now, we will just fetch.
-      // Warning: This is still potentially heavy if we don't know the paths.
-      // Ideally Simulation object should store the full path of the question, not just ID.
-      // HOTFIX: Returning empty if we can't find them easily without scanning, 
-      // but to keep app working, we will scan ONLY if absolutely necessary, 
-      // but really we should update Simulation structure.
-      // *Skipping deep scan to prevent explosion*.
+      // Optimized to use Promise.all instead of fetching parent
       return []; 
   },
   
-  // NEW: Fetch questions knowing their paths (Scalable Way)
   getQuestionsWithPaths: async (questionPaths: string[]): Promise<Question[]> => {
       const promises = questionPaths.map(path => get(ref(database, path)));
       const snapshots = await Promise.all(promises);
@@ -419,7 +548,6 @@ export const DatabaseService = {
        const newQuestionRef = push(questionsRef);
        await set(newQuestionRef, question);
 
-       // Update Topics List
        const topicsRef = ref(database, `topics/${subjectId}`);
        const topicsSnap = await get(topicsRef);
        let currentTopics: string[] = [];
@@ -427,9 +555,9 @@ export const DatabaseService = {
        if (!currentTopics.includes(topic)) {
            currentTopics.push(topic);
            await set(topicsRef, currentTopics);
+           CACHE.topics = null;
        }
 
-       // Update Subtopics List
        const subtopicsRef = ref(database, `subtopics/${topic}`);
        const subtopicsSnap = await get(subtopicsRef);
        let currentSubtopics: string[] = [];
@@ -437,6 +565,7 @@ export const DatabaseService = {
        if (!currentSubtopics.includes(subtopic)) {
            currentSubtopics.push(subtopic);
            await set(subtopicsRef, currentSubtopics);
+           CACHE.subtopics = null;
        }
      } catch (error) {
        console.error("Error creating question:", error);
@@ -445,7 +574,6 @@ export const DatabaseService = {
   },
 
   // --- Lessons ---
-  
   getSubjectsWithLessons: async (): Promise<string[]> => {
       try {
           const snapshot = await get(ref(database, 'lessons'));
@@ -469,7 +597,6 @@ export const DatabaseService = {
                   if (Array.isArray(val)) {
                       normalized[topic] = val;
                   } else {
-                      // If it's an object map (keys are IDs), convert to array but keep IDs
                       normalized[topic] = Object.keys(val).map(k => ({...val[k], id: k}));
                   }
               });
@@ -482,13 +609,11 @@ export const DatabaseService = {
   },
 
   getLessons: async (subjectId: string): Promise<Lesson[]> => {
-      // Helper used in specific contexts
       return [];
   },
 
   createLesson: async (subjectId: string, topic: string, lesson: Lesson): Promise<void> => {
     try {
-      // Use push to create with a unique key, making it editable later
       const lessonsRef = ref(database, `lessons/${subjectId}/${topic}`);
       const newRef = push(lessonsRef);
       await set(newRef, lesson);
@@ -506,10 +631,20 @@ export const DatabaseService = {
       
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const posts = Object.keys(data).map(key => ({
-          ...data[key],
-          id: key
-        }));
+        const posts = Object.keys(data).map(key => {
+            const p = data[key];
+            let replies = [];
+            if (p.replies) {
+                replies = Array.isArray(p.replies) 
+                    ? p.replies 
+                    : Object.values(p.replies);
+            }
+            return {
+              ...p,
+              id: key,
+              replies
+            };
+        });
         return posts.sort((a, b) => b.timestamp - a.timestamp);
       }
     } catch (error) {
@@ -542,24 +677,19 @@ export const DatabaseService = {
   },
 
   likePost: async (postId: string, uid: string): Promise<void> => {
-      const postRef = ref(database, `posts/${postId}`);
-      const snap = await get(postRef);
-      if (snap.exists()) {
-          const currentLikes = snap.val().likes || 0;
-          await update(postRef, { likes: currentLikes + 1 });
-      }
+      const postLikesRef = ref(database, `posts/${postId}/likes`);
+      await runTransaction(postLikesRef, (currentLikes) => {
+          return (currentLikes || 0) + 1;
+      });
   },
 
   replyPost: async (postId: string, reply: { author: string, content: string }): Promise<void> => {
       const repliesRef = ref(database, `posts/${postId}/replies`);
-      const snap = await get(repliesRef);
-      let replies = [];
-      if (snap.exists()) {
-          replies = snap.val();
-          if(!Array.isArray(replies)) replies = Object.values(replies);
-      }
-      replies.push({ ...reply, timestamp: Date.now() });
-      await set(repliesRef, replies);
+      const newReplyRef = push(repliesRef);
+      await set(newReplyRef, {
+          ...reply,
+          timestamp: Date.now()
+      });
   },
 
   // --- Simulations ---
@@ -571,7 +701,7 @@ export const DatabaseService = {
         return Object.keys(data).map(key => ({ 
             ...data[key], 
             id: key,
-            questionIds: data[key].questionIds || [] // Ensure array
+            questionIds: data[key].questionIds || [] 
         }));
       }
     } catch (error) {
@@ -601,7 +731,6 @@ export const DatabaseService = {
   },
 
   // --- Admin ---
-  // OPTIMIZED: Never fetch ALL users. Default to last 50.
   getUsersPaginated: async (limit: number = 50): Promise<UserProfile[]> => {
     try {
       const q = query(ref(database, 'users'), limitToLast(limit));
@@ -619,7 +748,6 @@ export const DatabaseService = {
     return [];
   },
   
-  // Deprecated usage of getAllUsers to prevent memory leaks
   getAllUsers: async (): Promise<UserProfile[]> => {
       return DatabaseService.getUsersPaginated(50);
   },

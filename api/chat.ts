@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, get, update, push, set } from "firebase/database";
@@ -31,11 +32,11 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const apiKey = process.env.SECRET_APIKEY;
+  const apiKey = process.env.API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Server Config Error' });
 
   try {
-    const { message, history, mode, uid } = req.body;
+    const { message, history, mode, uid, image } = req.body;
 
     if (!uid) return res.status(401).json({ error: 'User ID required' });
 
@@ -49,6 +50,64 @@ export default async function handler(req: any, res: any) {
     const user = userSnap.val();
     const config = configSnap.val() || { intermediateLimits: { canUseChat: false, canUseExplanation: true } };
 
+    // --- ESSAY CORRECTION LOGIC ---
+    if (mode === 'essay-correction') {
+        const credits = user.essayCredits || 0;
+        if (credits <= 0) {
+            return res.status(402).json({ error: 'Sem créditos de redação.' });
+        }
+
+        const ai = new GoogleGenAI({ apiKey: apiKey });
+        // Use flash-latest which supports vision
+        const modelId = 'gemini-2.5-flash-latest'; 
+
+        const imagePart = {
+            inlineData: {
+                mimeType: 'image/jpeg', 
+                data: image.split(',')[1] // Remove data:image/jpeg;base64,
+            }
+        };
+
+        const prompt = `
+            Você é um corretor especialista do ENEM.
+            TEMA: ${message}
+            TAREFA: Analise a imagem da redação manuscrita.
+            SAÍDA: Retorne APENAS um JSON (sem markdown, sem code block) com o formato:
+            {
+                "c1": (nota 0-200),
+                "c2": (nota 0-200),
+                "c3": (nota 0-200),
+                "c4": (nota 0-200),
+                "c5": (nota 0-200),
+                "total": (soma),
+                "feedback": "Resumo geral curto de 2 frases",
+                "errors": ["erro especifico 1", "erro especifico 2", "ponto de melhoria"]
+            }
+        `;
+
+        const response = await ai.models.generateContent({
+            model: modelId,
+            contents: { parts: [imagePart, { text: prompt }] }
+        });
+
+        // Deduct 1 credit
+        await update(userRef, { essayCredits: credits - 1 });
+        
+        // Log transaction
+        const transRef = push(ref(db, `users/${uid}/transactions`));
+        await set(transRef, {
+            id: transRef.key,
+            type: 'debit',
+            amount: 1,
+            description: 'Correção de Redação',
+            timestamp: Date.now(),
+            currencyType: 'CREDIT'
+        });
+
+        return res.status(200).json({ text: response.text });
+    }
+
+    // --- STANDARD CHAT LOGIC ---
     if (user.plan === 'basic') {
         return res.status(403).json({ error: 'Plano Básico não permite acesso à IA.' });
     }
@@ -73,17 +132,18 @@ export default async function handler(req: any, res: any) {
     let fullPrompt = "";
     if (mode === 'explanation') {
       fullPrompt = `
-      Você é um tutor.
-      TAREFA: Explicar o erro na questão.
-      REGRAS: 
-      1. Seja direto e curto (max 100 palavras).
-      2. Use **negrito** para destacar conceitos chave.
-      3. Não use blocos de código ou markdown complexo.
-      DADOS: ${message}`;
+      Atue como Tutor Sênior.
+      OBJETIVO: Explicar o erro do aluno de forma DIDÁTICA e MUITO BREVE.
+      CONTEXTO: ${message}
+      REGRAS:
+      1. Use estritamente **negrito** para palavras-chave.
+      2. Máximo 40 palavras.
+      3. Vá direto ao ponto. Sem saudações.
+      `;
     } else {
-      fullPrompt = "Você é o NeuroTutor. Responda de forma didática e curta. Use **negrito** para destaques.\n\n";
+      fullPrompt = "Tutor Sênior. Responda de forma curta, direta e didática. Max 30 palavras por resposta. Use **negrito** nos conceitos.\n\n";
       if (history && Array.isArray(history)) {
-        history.slice(-5).forEach((msg: any) => { // Limit context to 5 msgs for tokens
+        history.slice(-3).forEach((msg: any) => { 
           fullPrompt += `${msg.role === 'user' ? 'Aluno' : 'Tutor'}: ${msg.content}\n`;
         });
       }
@@ -103,10 +163,8 @@ export default async function handler(req: any, res: any) {
     const pricePerMillionOutputBRL = 0.30 * 6;
 
     const rawCost = (inputTokens * (pricePerMillionInputBRL / 1000000)) + (outputTokens * (pricePerMillionOutputBRL / 1000000));
-    
     const finalCostToUser = rawCost * 1.10;
     const chargeAmount = Math.max(finalCostToUser, 0.00001);
-
     const newBalance = currentBalance - chargeAmount;
     
     await update(userRef, { balance: newBalance });
@@ -118,7 +176,8 @@ export default async function handler(req: any, res: any) {
         amount: chargeAmount,
         description: mode === 'explanation' ? 'Explicação IA' : 'Chat IA',
         timestamp: Date.now(),
-        tokensUsed: inputTokens + outputTokens
+        tokensUsed: inputTokens + outputTokens,
+        currencyType: 'BRL'
     });
 
     return res.status(200).json({ 

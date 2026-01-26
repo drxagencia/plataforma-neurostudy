@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import Auth from './components/Auth';
@@ -10,6 +11,8 @@ import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
 import Competitivo from './components/Competitivo';
 import AiTutor from './components/AiTutor';
+import Redacao from './components/Redacao';
+import Militares from './components/Militares';
 import AccessDenied from './components/AccessDenied'; 
 import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
@@ -33,14 +36,12 @@ const App: React.FC = () => {
   // Theme Application Logic
   useEffect(() => {
       const root = document.documentElement;
-      // Clear all potential themes first
       root.classList.remove('light');
       root.classList.remove('dark');
       
       if (user && user.theme === 'light') {
           root.classList.add('light');
       } else {
-          // Default to dark
           root.classList.add('dark');
       }
   }, [user?.theme]);
@@ -94,12 +95,17 @@ const App: React.FC = () => {
     if (user.isAdmin || user.plan === 'admin' || user.plan === 'advanced') return true;
 
     if (user.plan === 'basic') {
-        if (['comunidade', 'competitivo', 'simulados', 'tutor'].includes(view)) return false;
+        if (['comunidade', 'competitivo', 'simulados', 'tutor', 'redacao'].includes(view)) return false;
     }
     
     if (user.plan === 'intermediate') return true; 
 
     return true;
+  };
+
+  // Helper to update local user state when credits/balance change
+  const handleUpdateUser = (updatedUser: UserProfile) => {
+      setUser(updatedUser);
   };
 
   if (loadingAuth) {
@@ -149,11 +155,13 @@ const App: React.FC = () => {
                     <>
                     {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} />}
                     {currentView === 'aulas' && <Classes />}
+                    {currentView === 'militares' && <Militares />}
+                    {currentView === 'redacao' && <Redacao user={user} onUpdateUser={handleUpdateUser} />}
                     {currentView === 'questoes' && <QuestionBank />}
-                    {currentView === 'comunidade' && <Community />}
+                    {currentView === 'comunidade' && <Community user={user} />}
                     {currentView === 'simulados' && <Simulations />}
-                    {currentView === 'tutor' && <AiTutor />}
-                    {currentView === 'ajustes' && <Settings user={user} onUpdateUser={setUser} />}
+                    {currentView === 'tutor' && <AiTutor user={user} onUpdateUser={handleUpdateUser} />}
+                    {currentView === 'ajustes' && <Settings user={user} onUpdateUser={handleUpdateUser} />}
                     {currentView === 'competitivo' && <Competitivo />}
                     {currentView === 'admin' && (user.isAdmin ? <AdminPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />)}
                     </>

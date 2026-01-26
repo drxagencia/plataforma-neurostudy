@@ -1,32 +1,54 @@
+
 import React, { useState, useEffect } from 'react';
-import { CommunityPost } from '../types';
+import { CommunityPost, UserProfile } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { auth } from '../services/firebaseConfig';
-import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle, Clock } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle, Clock, CornerDownRight } from 'lucide-react';
 
-const Community: React.FC = () => {
+interface CommunityProps {
+    user: UserProfile;
+}
+
+const Community: React.FC<CommunityProps> = ({ user }) => {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState<string>("");
+  const [timerString, setTimerString] = useState<string | null>(null);
 
   // Replies State
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
 
+  // 1. Fetch Posts
   useEffect(() => {
     fetchPosts();
-    // Check timer
-    const interval = setInterval(checkTimer, 1000);
-    return () => clearInterval(interval);
+    // Start local timer loop
+    const timerInterval = setInterval(updateTimerDisplay, 1000);
+    updateTimerDisplay(); // Initial call
+    return () => clearInterval(timerInterval);
   }, []);
 
-  const checkTimer = async () => {
-      if(!auth.currentUser) return;
-      // In a real optimized app, we'd cache lastPostedAt locally to avoid DB hits every second
-      // For this structure, we assume user profile is loaded in App level or we check roughly
+  // 2. Timer Logic using props (No DB fetch)
+  const updateTimerDisplay = () => {
+      if (!user.lastPostedAt) {
+          setTimerString(null);
+          return;
+      }
+      
+      const nextPostTime = user.lastPostedAt + (24 * 60 * 60 * 1000);
+      const diff = nextPostTime - Date.now();
+
+      if (diff <= 0) {
+          setTimerString(null); // Timer finished
+      } else {
+          // Format HH:MM:SS
+          const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+          const minutes = Math.floor((diff / (1000 * 60)) % 60);
+          const seconds = Math.floor((diff / 1000) % 60);
+          setTimerString(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      }
   };
 
   const fetchPosts = async () => {
@@ -39,18 +61,25 @@ const Community: React.FC = () => {
     e.preventDefault();
     if (!newPost.trim() || !auth.currentUser) return;
 
+    if (timerString) {
+        setErrorMsg(`Aguarde ${timerString} para postar novamente.`);
+        return;
+    }
+
     setSubmitting(true);
     setErrorMsg(null);
     try {
       await DatabaseService.createPost({
-        authorName: auth.currentUser.displayName || 'Estudante',
-        authorAvatar: auth.currentUser.photoURL || `https://ui-avatars.com/api/?name=${auth.currentUser.displayName}`,
+        authorName: user.displayName || 'Estudante',
+        authorAvatar: user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`,
         content: newPost,
         timestamp: Date.now(),
         likes: 0
-      }, auth.currentUser.uid);
+      }, user.uid);
       
       setNewPost('');
+      // Force refresh posts. Note: User prop won't update instantly here without parent refresh,
+      // but for Community limiting, the backend rejection handles it, and we optimistically assume timer started.
       fetchPosts(); 
     } catch (error: any) {
       setErrorMsg(error.message);
@@ -61,20 +90,35 @@ const Community: React.FC = () => {
 
   const handleLike = async (postId: string) => {
       if (!auth.currentUser) return;
-      await DatabaseService.likePost(postId, auth.currentUser.uid);
-      // Optimistic update
-      setPosts(prev => prev.map(p => p.id === postId ? {...p, likes: p.likes + 1} : p));
+      
+      // Optimistic UI Update (Instant feedback)
+      setPosts(prev => prev.map(p => p.id === postId ? {...p, likes: (p.likes || 0) + 1} : p));
+
+      // Database Transaction
+      try {
+        await DatabaseService.likePost(postId, auth.currentUser.uid);
+      } catch (e) {
+        console.error("Like failed", e);
+        // Revert on fail
+        setPosts(prev => prev.map(p => p.id === postId ? {...p, likes: (p.likes || 0) - 1} : p));
+      }
   };
 
   const handleReplySubmit = async (postId: string) => {
       if (!auth.currentUser || !replyContent.trim()) return;
-      await DatabaseService.replyPost(postId, {
-          author: auth.currentUser.displayName || 'User',
-          content: replyContent
-      });
-      setReplyContent('');
-      setReplyingTo(null);
-      fetchPosts();
+      
+      try {
+          await DatabaseService.replyPost(postId, {
+              author: user.displayName || 'User',
+              content: replyContent
+          });
+          
+          setReplyContent('');
+          setReplyingTo(null);
+          fetchPosts(); // Reload to show new reply
+      } catch (e) {
+          alert("Erro ao responder");
+      }
   };
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
@@ -92,8 +136,9 @@ const Community: React.FC = () => {
           <textarea
             value={newPost}
             onChange={(e) => setNewPost(e.target.value)}
-            placeholder="No que você está pensando? Dúvidas, dicas..."
-            className="w-full bg-transparent text-white placeholder-slate-500 resize-none focus:outline-none min-h-[80px]"
+            placeholder={timerString ? `Você poderá postar novamente em ${timerString}` : "No que você está pensando? Dúvidas, dicas..."}
+            disabled={!!timerString}
+            className="w-full bg-transparent text-white placeholder-slate-500 resize-none focus:outline-none min-h-[80px] disabled:opacity-50"
           />
           
           {errorMsg && (
@@ -104,12 +149,13 @@ const Community: React.FC = () => {
           )}
 
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
-             <div className="flex gap-2 text-xs text-slate-500 items-center">
-                <Clock size={12} /> Limite: 1 post a cada 24h
+             <div className={`flex gap-2 text-xs items-center ${timerString ? 'text-yellow-400 font-mono font-bold' : 'text-slate-500'}`}>
+                <Clock size={12} /> 
+                {timerString ? `Próximo post em: ${timerString}` : 'Limite: 1 post a cada 24h'}
              </div>
              <button 
                type="submit" 
-               disabled={!newPost.trim() || submitting}
+               disabled={!newPost.trim() || submitting || !!timerString}
                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
              >
                {submitting ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
@@ -136,8 +182,22 @@ const Community: React.FC = () => {
                  </div>
                  <p className="text-slate-300 mt-2 text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
                  
-                 {/* Replies Display would go here (requires DB struct update to fetch) */}
-                 
+                 {/* Replies Section */}
+                 {post.replies && post.replies.length > 0 && (
+                     <div className="mt-4 space-y-3 pl-4 border-l-2 border-white/5">
+                         {post.replies.map((reply, idx) => (
+                             <div key={idx} className="bg-slate-800/50 p-3 rounded-xl">
+                                 <div className="flex items-center gap-2 mb-1">
+                                     <span className="text-xs font-bold text-indigo-300">{reply.author}</span>
+                                     <span className="text-[10px] text-slate-500">{new Date(reply.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                 </div>
+                                 <p className="text-slate-300 text-xs">{reply.content}</p>
+                             </div>
+                         ))}
+                     </div>
+                 )}
+
+                 {/* Action Bar */}
                  <div className="flex items-center gap-6 mt-4 pt-4 border-t border-white/5">
                    <button 
                     onClick={() => handleLike(post.id)}
@@ -148,22 +208,32 @@ const Community: React.FC = () => {
                    </button>
                    <button 
                     onClick={() => setReplyingTo(replyingTo === post.id ? null : post.id)}
-                    className="flex items-center gap-2 text-slate-500 hover:text-indigo-400 transition-colors"
+                    className={`flex items-center gap-2 transition-colors ${replyingTo === post.id ? 'text-indigo-400' : 'text-slate-500 hover:text-indigo-400'}`}
                    >
                      <MessageCircle size={18} />
                      <span className="text-xs font-medium">Responder</span>
                    </button>
                  </div>
 
+                 {/* Reply Input */}
                  {replyingTo === post.id && (
-                     <div className="mt-4 flex gap-2 animate-in fade-in">
-                         <input 
-                            className="flex-1 glass-input rounded-lg px-3 py-2 text-sm" 
-                            placeholder="Escreva sua resposta..."
-                            value={replyContent}
-                            onChange={(e) => setReplyContent(e.target.value)}
-                         />
-                         <button onClick={() => handleReplySubmit(post.id)} className="p-2 bg-indigo-600 rounded-lg text-white"><Send size={16}/></button>
+                     <div className="mt-4 flex gap-2 animate-in fade-in items-start">
+                         <CornerDownRight size={16} className="text-slate-600 mt-3" />
+                         <div className="flex-1 flex gap-2">
+                            <textarea 
+                                className="flex-1 glass-input rounded-xl px-3 py-2 text-sm min-h-[40px] resize-none" 
+                                placeholder="Escreva sua resposta..."
+                                value={replyContent}
+                                onChange={(e) => setReplyContent(e.target.value)}
+                            />
+                            <button 
+                                onClick={() => handleReplySubmit(post.id)} 
+                                disabled={!replyContent.trim()}
+                                className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl text-white h-[40px] w-[40px] flex items-center justify-center"
+                            >
+                                <Send size={16}/>
+                            </button>
+                         </div>
                      </div>
                  )}
                </div>
