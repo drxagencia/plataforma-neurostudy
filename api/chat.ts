@@ -58,8 +58,8 @@ export default async function handler(req: any, res: any) {
         }
 
         const ai = new GoogleGenAI({ apiKey: apiKey });
-        // Corrected Model ID for Vision capabilities
-        const modelId = 'gemini-2.0-flash-exp'; 
+        // Use Flash Lite 2.0 (Stable, High Quota, Multimodal)
+        const modelId = 'gemini-flash-lite-latest'; 
 
         const imagePart = {
             inlineData: {
@@ -85,26 +85,34 @@ export default async function handler(req: any, res: any) {
             }
         `;
 
-        const response = await ai.models.generateContent({
-            model: modelId,
-            contents: { parts: [imagePart, { text: prompt }] }
-        });
+        try {
+            const response = await ai.models.generateContent({
+                model: modelId,
+                contents: { parts: [imagePart, { text: prompt }] }
+            });
 
-        // Deduct 1 credit
-        await update(userRef, { essayCredits: credits - 1 });
-        
-        // Log transaction
-        const transRef = push(ref(db, `users/${uid}/transactions`));
-        await set(transRef, {
-            id: transRef.key,
-            type: 'debit',
-            amount: 1,
-            description: 'Correção de Redação',
-            timestamp: Date.now(),
-            currencyType: 'CREDIT'
-        });
+            // Deduct 1 credit
+            await update(userRef, { essayCredits: credits - 1 });
+            
+            // Log transaction
+            const transRef = push(ref(db, `users/${uid}/transactions`));
+            await set(transRef, {
+                id: transRef.key,
+                type: 'debit',
+                amount: 1,
+                description: 'Correção de Redação',
+                timestamp: Date.now(),
+                currencyType: 'CREDIT'
+            });
 
-        return res.status(200).json({ text: response.text });
+            return res.status(200).json({ text: response.text });
+        } catch (innerError: any) {
+            console.error("Gemini Vision Error:", innerError);
+            if (innerError.status === 429 || innerError.message?.includes('429')) {
+                 return res.status(429).json({ error: 'Limite de uso da IA atingido temporariamente. Tente novamente em 1 minuto.' });
+            }
+            throw innerError;
+        }
     }
 
     // --- STANDARD CHAT LOGIC ---
@@ -188,6 +196,8 @@ export default async function handler(req: any, res: any) {
 
   } catch (error: any) {
     console.error("API Error:", error);
-    return res.status(500).json({ error: `Server Error: ${error.message}` });
+    const status = error.status || 500;
+    const message = error.message || 'Unknown Server Error';
+    return res.status(status).json({ error: `Server Error: ${message}` });
   }
 }
