@@ -4,7 +4,7 @@ import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { auth } from '../services/firebaseConfig';
 import { EssayCorrection, UserProfile } from '../types';
-import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2 } from 'lucide-react';
+import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle } from 'lucide-react';
 
 interface RedacaoProps {
     user: UserProfile;
@@ -30,20 +30,29 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [currentResult, setCurrentResult] = useState<EssayCorrection | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  // Notification State
+  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
   useEffect(() => {
     fetchHistory();
   }, []);
 
+  // Auto-dismiss notification
+  useEffect(() => {
+      if (notification) {
+          const timer = setTimeout(() => setNotification(null), 4000);
+          return () => clearTimeout(timer);
+      }
+  }, [notification]);
+
   const fetchHistory = async () => {
     if (!auth.currentUser) return;
-    // We only fetch history here. Credits are from `user` prop.
     const essays = await DatabaseService.getEssayCorrections(auth.currentUser.uid);
     setHistory(essays.reverse());
   };
 
   const handleSelectHistoryItem = async (item: EssayCorrection) => {
       setLoadingDetails(true);
-      // Fetch the full image only now
       if (item.id && !item.imageUrl) {
           const imgUrl = await DatabaseService.getEssayImage(item.id);
           if (imgUrl) item.imageUrl = imgUrl;
@@ -55,9 +64,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   // --- Pricing Logic ---
   const getPricePerUnit = (qty: number) => {
-      if (qty >= 10) return 2.00;
-      if (qty >= 5) return 2.40;
-      return 3.00;
+      if (qty >= 10) return 3.50;
+      if (qty >= 5) return 3.75;
+      return 4.00;
   };
 
   const totalPrice = buyQty * getPricePerUnit(buyQty);
@@ -70,19 +79,18 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           setPixPayload(payload);
           setShowPix(true);
       } catch (e) {
-          alert("Erro ao gerar PIX");
+          setNotification({ type: 'error', message: "Erro ao gerar PIX" });
       }
   };
 
   const handleConfirmPayment = async () => {
       if (!auth.currentUser) return;
       await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'User', totalPrice, 'CREDIT', buyQty);
-      alert("Solicitação enviada! Aguarde a aprovação dos créditos.");
+      setNotification({ type: 'success', message: "Solicitação enviada! Aguarde a aprovação." });
       setShowPix(false);
       setView('home');
   };
 
-  // --- Upload Handlers ---
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
@@ -95,8 +103,17 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   };
 
   const handleCorrectionSubmit = async () => {
+      // 1. Credit Check
+      const availableCredits = Number(user.essayCredits || 0);
+      if (availableCredits <= 0) {
+          setNotification({ type: 'error', message: "Sem créditos suficientes para enviar a redação." });
+          // Optional: redirect to buy screen after delay?
+          setTimeout(() => setView('buy'), 1500);
+          return;
+      }
+
       if (confirmText !== 'CONFIRMAR') {
-          alert("Digite CONFIRMAR corretamente.");
+          setNotification({ type: 'error', message: "Digite CONFIRMAR corretamente para prosseguir." });
           return;
       }
       if (!image || !theme || !auth.currentUser) return;
@@ -121,11 +138,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           }
 
           const data = await res.json();
-          // Extract JSON from text (Gemini sometimes adds markdown blocks)
           let cleanJson = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
 
-          // Fix for TS error: explicit number conversion and variable assignment
           const c1 = Number(parsed.c1) || 0;
           const c2 = Number(parsed.c2) || 0;
           const c3 = Number(parsed.c3) || 0;
@@ -136,44 +151,53 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
           const result: EssayCorrection = {
               theme,
-              imageUrl: image, // Kept in memory for immediate display
+              imageUrl: image,
               date: Date.now(),
               scoreTotal: finalTotal,
-              competencies: {
-                  c1,
-                  c2,
-                  c3,
-                  c4,
-                  c5
-              },
+              competencies: { c1, c2, c3, c4, c5 },
               feedback: parsed.feedback,
               errors: parsed.errors
           };
 
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
-          // Update local credits immediately
+          const currentCredits = Number(user.essayCredits || 0);
           onUpdateUser({
               ...user,
-              essayCredits: Number(user.essayCredits || 0) - 1
+              essayCredits: Math.max(0, currentCredits - 1)
           });
 
           setCurrentResult(result);
           setView('result');
-          fetchHistory(); // Refresh list
+          fetchHistory();
 
       } catch (e: any) {
-          alert(`Falha: ${e.message}`);
+          setNotification({ type: 'error', message: `Falha: ${e.message}` });
           setView('upload');
       }
   };
 
   // --- RENDERERS ---
 
+  // NOTIFICATION TOAST
+  const renderNotification = () => {
+      if (!notification) return null;
+      return (
+        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl backdrop-blur-md border animate-in slide-in-from-top-4 duration-300 ${
+            notification.type === 'error' 
+            ? 'bg-red-500/90 border-red-400/50 text-white' 
+            : 'bg-emerald-500/90 border-emerald-400/50 text-white'
+        }`}>
+            {notification.type === 'error' ? <AlertCircle size={24} /> : <CheckCircle size={24} />}
+            <span className="font-bold text-sm md:text-base">{notification.message}</span>
+            <button onClick={() => setNotification(null)} className="ml-2 opacity-80 hover:opacity-100"><X size={18}/></button>
+        </div>
+      );
+  };
+
   if (view === 'scanning') {
       return (
           <div className="h-full flex flex-col items-center justify-center relative overflow-hidden">
-              {/* Fake scanning effect */}
               <div className="absolute inset-0 bg-slate-900/50 z-10 flex items-center justify-center flex-col">
                   <div className="relative w-64 h-80 border-2 border-indigo-500 rounded-lg overflow-hidden bg-white/5">
                       {image && <img src={image} className="w-full h-full object-cover opacity-50" />}
@@ -198,6 +222,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   if (view === 'result' && currentResult) {
       return (
           <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 pb-20">
+              {renderNotification()}
               <div className="flex items-center gap-4 mb-4">
                   <button onClick={() => setView('home')} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
                   <h2 className="text-2xl font-bold text-white">Correção Finalizada</h2>
@@ -234,7 +259,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                   <p className="text-slate-300 leading-relaxed">{currentResult.feedback}</p>
               </div>
 
-              {/* Image Preview (If available) */}
+              {/* Image Preview */}
               {currentResult.imageUrl && (
                   <div className="glass-card p-4 rounded-xl">
                       <h3 className="font-bold text-white mb-4 text-sm">Imagem Enviada</h3>
@@ -259,7 +284,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   if (view === 'upload') {
       return (
-          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in pb-20">
+          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in pb-20 relative">
+              {renderNotification()}
               <button onClick={() => setView('home')} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4">
                   <X size={20} /> Cancelar
               </button>
@@ -315,80 +341,126 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   if (view === 'buy') {
       return (
-          <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-right pb-20">
+          <div className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-right pb-20 relative">
+              {renderNotification()}
               <button onClick={() => setView('home')} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4">
                   <X size={20} /> Voltar
               </button>
 
               <div className="text-center mb-8">
-                  <h2 className="text-3xl font-bold text-white mb-2">Loja de Créditos</h2>
-                  <p className="text-slate-400">Adquira correções profissionais com IA.</p>
+                  <h2 className="text-3xl font-bold text-white mb-2">Pacotes de Correção</h2>
+                  <p className="text-slate-400">Escolha a quantidade ideal para sua rotina de estudos.</p>
               </div>
 
               {!showPix ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                      {/* Pricing Table */}
-                      <div className="glass-card p-6 rounded-2xl space-y-4">
-                          <h3 className="font-bold text-white flex items-center gap-2"><Wallet size={20} className="text-emerald-400"/> Tabela de Preços</h3>
-                          <div className="space-y-2 text-sm">
-                              <div className="flex justify-between p-3 bg-slate-900/50 rounded-lg">
-                                  <span className="text-slate-300">1 a 4 créditos</span>
-                                  <span className="font-bold text-white">R$ 3,00 / un</span>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                      {/* Left: Pricing Tiers Visualization */}
+                      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Tier 1 */}
+                          <div className="glass-card p-6 rounded-2xl border border-white/5 flex flex-col justify-between hover:border-white/20 transition-all">
+                              <div>
+                                <h3 className="font-bold text-white text-lg">Básico</h3>
+                                <p className="text-slate-400 text-xs mt-1">Para correções pontuais.</p>
+                                <div className="mt-4">
+                                    <span className="text-3xl font-bold text-white">R$ 4,00</span>
+                                    <span className="text-slate-500 text-sm"> /un</span>
+                                </div>
                               </div>
-                              <div className="flex justify-between p-3 bg-slate-900/50 rounded-lg border border-indigo-500/30">
-                                  <span className="text-indigo-300">5 a 9 créditos</span>
-                                  <span className="font-bold text-indigo-300">R$ 2,40 / un</span>
+                              <div className="mt-6 pt-4 border-t border-white/5">
+                                  <p className="text-xs text-slate-400">Ao comprar 1 a 4 créditos</p>
                               </div>
-                              <div className="flex justify-between p-3 bg-slate-900/50 rounded-lg border border-emerald-500/30 relative overflow-hidden">
-                                  <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 text-[9px] font-bold px-2">MELHOR VALOR</div>
-                                  <span className="text-emerald-300">10 ou + créditos</span>
-                                  <span className="font-bold text-emerald-300">R$ 2,00 / un</span>
+                          </div>
+
+                          {/* Tier 2 */}
+                          <div className="glass-card p-6 rounded-2xl border border-indigo-500/30 flex flex-col justify-between bg-indigo-900/5 hover:bg-indigo-900/10 transition-all relative overflow-hidden">
+                              <div>
+                                <h3 className="font-bold text-indigo-300 text-lg">Intermediário</h3>
+                                <p className="text-slate-400 text-xs mt-1">Foco e constância.</p>
+                                <div className="mt-4">
+                                    <span className="text-3xl font-bold text-white">R$ 3,75</span>
+                                    <span className="text-slate-500 text-sm"> /un</span>
+                                </div>
+                              </div>
+                              <div className="mt-6 pt-4 border-t border-white/5">
+                                  <p className="text-xs text-indigo-300 font-bold">Ao comprar 5 a 9 créditos</p>
+                              </div>
+                          </div>
+
+                          {/* Tier 3 (Best Value) */}
+                          <div className="glass-card p-6 rounded-2xl border border-emerald-500/50 flex flex-col justify-between bg-emerald-900/10 hover:bg-emerald-900/20 transition-all relative shadow-lg shadow-emerald-900/20">
+                              <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 text-[10px] font-bold px-3 py-1 rounded-bl-xl">MELHOR PREÇO</div>
+                              <div>
+                                <h3 className="font-bold text-emerald-400 text-lg">Pro</h3>
+                                <p className="text-slate-300 text-xs mt-1">Intensivo reta final.</p>
+                                <div className="mt-4">
+                                    <span className="text-3xl font-bold text-white">R$ 3,50</span>
+                                    <span className="text-slate-500 text-sm"> /un</span>
+                                </div>
+                              </div>
+                              <div className="mt-6 pt-4 border-t border-white/5">
+                                  <p className="text-xs text-emerald-400 font-bold">Ao comprar 10+ créditos</p>
                               </div>
                           </div>
                       </div>
 
-                      {/* Calculator */}
-                      <div className="glass-card p-6 rounded-2xl border-indigo-500/30 bg-indigo-900/10">
-                          <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Quantidade Desejada</label>
-                          <div className="flex items-center gap-4 mb-6">
-                              <button onClick={() => setBuyQty(Math.max(1, buyQty - 1))} className="w-10 h-10 bg-slate-800 rounded-lg text-white font-bold hover:bg-slate-700">-</button>
-                              <input 
-                                type="number" 
-                                value={buyQty} 
-                                onChange={e => setBuyQty(Math.max(1, parseInt(e.target.value) || 0))}
-                                className="flex-1 bg-slate-950 p-2 text-center text-2xl font-bold text-white rounded-lg outline-none"
-                              />
-                              <button onClick={() => setBuyQty(buyQty + 1)} className="w-10 h-10 bg-slate-800 rounded-lg text-white font-bold hover:bg-slate-700">+</button>
+                      {/* Right: Interactive Calculator */}
+                      <div className="glass-card p-8 rounded-3xl border-t-4 border-t-indigo-500 bg-slate-900/80 shadow-2xl">
+                          <label className="text-xs text-slate-400 font-bold uppercase mb-4 block tracking-wider">Calculadora de Investimento</label>
+                          
+                          <div className="flex items-center gap-2 mb-8">
+                              <button onClick={() => setBuyQty(Math.max(1, buyQty - 1))} className="w-12 h-12 bg-slate-800 rounded-xl text-white font-bold hover:bg-slate-700 transition-colors text-xl">-</button>
+                              <div className="flex-1 text-center">
+                                  <input 
+                                    type="number" 
+                                    value={buyQty} 
+                                    onChange={e => setBuyQty(Math.max(1, parseInt(e.target.value) || 0))}
+                                    className="w-full bg-transparent text-center text-4xl font-black text-white outline-none"
+                                  />
+                                  <p className="text-xs text-slate-500 mt-1 uppercase">Créditos</p>
+                              </div>
+                              <button onClick={() => setBuyQty(buyQty + 1)} className="w-12 h-12 bg-indigo-600 rounded-xl text-white font-bold hover:bg-indigo-500 transition-colors text-xl">+</button>
                           </div>
 
-                          <div className="flex justify-between items-end mb-6 pt-4 border-t border-white/10">
-                              <span className="text-sm text-slate-400">Total a Pagar</span>
-                              <span className="text-3xl font-bold text-emerald-400">R$ {totalPrice.toFixed(2)}</span>
+                          <div className="space-y-4 mb-8">
+                              <div className="flex justify-between items-center text-sm">
+                                  <span className="text-slate-400">Preço Unitário</span>
+                                  <span className="text-white font-medium">R$ {getPricePerUnit(buyQty).toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-4 border-t border-white/10">
+                                  <span className="text-slate-300 font-bold">Total</span>
+                                  <span className="text-3xl font-black text-emerald-400">R$ {totalPrice.toFixed(2)}</span>
+                              </div>
                           </div>
 
                           <button 
                             onClick={handleGeneratePix}
-                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                            className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-3 transform hover:scale-[1.02]"
                           >
-                              <QrCode size={20} /> Gerar PIX
+                              <QrCode size={20} /> Gerar Pagamento PIX
                           </button>
+                          <p className="text-center text-[10px] text-slate-500 mt-4">Liberação automática após verificação.</p>
                       </div>
                   </div>
               ) : (
                   // Pix Display
-                  <div className="max-w-md mx-auto glass-card p-8 rounded-2xl text-center animate-in zoom-in-95">
-                      <h3 className="text-xl font-bold text-white mb-6">Pagamento via PIX</h3>
-                      <div className="bg-white p-4 rounded-xl inline-block mb-6">
+                  <div className="max-w-md mx-auto glass-card p-8 rounded-2xl text-center animate-in zoom-in-95 relative border border-emerald-500/20 shadow-2xl">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
+                      <h3 className="text-2xl font-bold text-white mb-2">Pagamento via PIX</h3>
+                      <p className="text-slate-400 text-sm mb-6">Escaneie o QR Code ou copie o código abaixo.</p>
+                      
+                      <div className="bg-white p-4 rounded-2xl inline-block mb-6 shadow-inner">
                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-48 h-48 mix-blend-multiply" />
                       </div>
-                      <div className="flex gap-2 mb-6">
-                          <input readOnly value={pixPayload || ''} className="flex-1 bg-slate-900 rounded-lg px-3 text-xs text-slate-400 truncate" />
-                          <button onClick={() => {navigator.clipboard.writeText(pixPayload || ''); setCopied(true);}} className="p-3 bg-slate-800 rounded-lg text-white">
-                              {copied ? <Check size={18}/> : <Copy size={18}/>}
+                      
+                      <div className="flex gap-2 mb-8">
+                          <input readOnly value={pixPayload || ''} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 text-xs text-slate-400 truncate" />
+                          <button onClick={() => {navigator.clipboard.writeText(pixPayload || ''); setCopied(true);}} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-white transition-colors">
+                              {copied ? <Check size={18} className="text-emerald-400"/> : <Copy size={18}/>}
                           </button>
                       </div>
-                      <button onClick={handleConfirmPayment} className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl">
-                          Já realizei o pagamento
+                      
+                      <button onClick={handleConfirmPayment} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                          <CheckCircle size={20} /> Já realizei o pagamento
                       </button>
                   </div>
               )}
@@ -402,7 +474,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   // --- HOME VIEW ---
   return (
-    <div className="space-y-8 animate-slide-up pb-20">
+    <div className="space-y-8 animate-slide-up pb-20 relative">
+      {renderNotification()}
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-3xl font-bold text-white mb-2">Correção de Redação</h2>
@@ -423,8 +496,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       </div>
 
       {/* Action Card */}
-      <div className="relative overflow-hidden rounded-3xl glass-card p-8 flex flex-col md:flex-row items-center justify-between gap-8 border-indigo-500/30">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px]" />
+      <div className="relative overflow-hidden rounded-3xl glass-card p-8 flex flex-col md:flex-row items-center justify-between gap-8 border-indigo-500/30 group">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] group-hover:bg-indigo-600/30 transition-all duration-700" />
           
           <div className="relative z-10 max-w-lg">
               <h3 className="text-2xl font-bold text-white mb-2">Envie sua redação agora</h3>
@@ -434,14 +507,17 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               <button 
                 onClick={() => {
                     if((user.essayCredits || 0) > 0) setView('upload');
-                    else { alert("Sem créditos suficientes."); setView('buy'); }
+                    else { 
+                        setNotification({type: 'error', message: 'Sem créditos suficientes.'});
+                        setTimeout(() => setView('buy'), 1000); 
+                    }
                 }}
                 className="px-8 py-4 bg-white text-indigo-950 font-bold rounded-xl hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-xl shadow-white/10"
               >
                   <Camera size={20} /> Corrigir Minha Redação
               </button>
           </div>
-          <div className="relative z-10 bg-slate-950 p-4 rounded-2xl border border-white/10 rotate-3 shadow-2xl">
+          <div className="relative z-10 bg-slate-950 p-4 rounded-2xl border border-white/10 rotate-3 shadow-2xl group-hover:rotate-6 transition-transform duration-500">
               <div className="w-48 h-64 bg-slate-900 rounded-lg flex flex-col gap-2 p-4 opacity-50">
                   <div className="w-full h-2 bg-slate-800 rounded" />
                   <div className="w-3/4 h-2 bg-slate-800 rounded" />

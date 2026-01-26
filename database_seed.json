@@ -1,80 +1,94 @@
+
 {
-  "announcements": [
-    {
-      "id": "1",
+  "announcements": {
+    "announcement_01": {
+      "id": "announcement_01",
       "title": "Super Revisão ENEM 2025",
       "description": "Acesse o cronograma completo da reta final.",
       "image": "https://picsum.photos/seed/enem/800/400",
       "ctaText": "Ver Cronograma"
     },
-    {
-      "id": "2",
+    "announcement_02": {
+      "id": "announcement_02",
       "title": "Novo Módulo de Redação",
       "description": "Aprenda a estruturar sua nota 1000 com IA.",
       "image": "https://picsum.photos/seed/writing/800/400",
       "ctaText": "Começar Agora"
     }
-  ],
-  "subjects": [
-    { "id": "math", "name": "Matemática", "iconName": "Calculator", "color": "text-blue-400" },
-    { "id": "physics", "name": "Física", "iconName": "Zap", "color": "text-yellow-400" },
-    { "id": "chem", "name": "Química", "iconName": "Beaker", "color": "text-purple-400" },
-    { "id": "bio", "name": "Biologia", "iconName": "Microscope", "color": "text-green-400" },
-    { "id": "lit", "name": "Literatura", "iconName": "BookOpen", "color": "text-pink-400" },
-    { "id": "gram", "name": "Gramática", "iconName": "PenTool", "color": "text-red-400" },
-    { "id": "hist", "name": "História", "iconName": "ScrollText", "color": "text-orange-400" },
-    { "id": "geo", "name": "Geografia", "iconName": "Map", "color": "text-emerald-400" },
-    { "id": "phil", "name": "Filosofia/Soc.", "iconName": "Scale", "color": "text-indigo-400" },
-    { "id": "eng", "name": "Inglês", "iconName": "Languages", "color": "text-cyan-400" },
-    { "id": "spa", "name": "Espanhol", "iconName": "MessageCircle", "color": "text-rose-400" },
-    { "id": "text", "name": "Interpretação", "iconName": "BrainCircuit", "color": "text-teal-400" }
-  ],
+  },
+  "subjects": {
+    "math": { "id": "math", "name": "Matemática", "iconName": "Calculator", "color": "text-blue-400", "category": "regular" },
+    "physics": { "id": "physics", "name": "Física", "iconName": "Zap", "color": "text-yellow-400", "category": "regular" },
+    "chem": { "id": "chem", "name": "Química", "iconName": "Beaker", "color": "text-purple-400", "category": "regular" },
+    "bio": { "id": "bio", "name": "Biologia", "iconName": "Microscope", "color": "text-green-400", "category": "regular" },
+    "lit": { "id": "lit", "name": "Literatura", "iconName": "BookOpen", "color": "text-pink-400", "category": "regular" },
+    "gram": { "id": "gram", "name": "Gramática", "iconName": "PenTool", "color": "text-red-400", "category": "regular" },
+    "hist": { "id": "hist", "name": "História", "iconName": "ScrollText", "color": "text-orange-400", "category": "regular" },
+    "geo": { "id": "geo", "name": "Geografia", "iconName": "Map", "color": "text-emerald-400", "category": "regular" },
+    "phil": { "id": "phil", "name": "Filosofia/Soc.", "iconName": "Scale", "color": "text-indigo-400", "category": "regular" },
+    "eng": { "id": "eng", "name": "Inglês", "iconName": "Languages", "color": "text-cyan-400", "category": "regular" },
+    "spa": { "id": "spa", "name": "Espanhol", "iconName": "MessageCircle", "color": "text-rose-400", "category": "regular" },
+    "text": { "id": "text", "name": "Interpretação", "iconName": "BrainCircuit", "color": "text-teal-400", "category": "regular" },
+    "esa": { "id": "esa", "name": "ESA", "iconName": "Target", "color": "text-emerald-600", "category": "military" },
+    "espcex": { "id": "espcex", "name": "ESPCEX", "iconName": "Sword", "color": "text-emerald-800", "category": "military" }
+  },
   "topics": {
     "physics": ["Cinemática", "Dinâmica", "Eletrodinâmica", "Termodinâmica", "Óptica"],
     "math": ["Álgebra", "Geometria Plana", "Geometria Espacial", "Trigonometria", "Estatística"],
-    "chem": ["Química Geral", "Físico-Química", "Química Orgânica", "Atomística"]
+    "chem": ["Química Geral", "Físico-Química", "Química Orgânica", "Atomística"],
+    "esa": ["Matemática Militar", "História do Brasil", "Geografia do Brasil"]
   },
   "subtopics": {
     "Cinemática": ["Movimento Uniforme", "Movimento Uniformemente Variado", "Vetores", "Lançamento Oblíquo"],
     "Dinâmica": ["Leis de Newton", "Força de Atrito", "Trabalho e Energia", "Impulso"],
-    "Álgebra": ["Funções", "Logaritmos", "Matrizes", "Polinômios"]
+    "Álgebra": ["Funções", "Logaritmos", "Matrizes", "Polinômios"],
+    "Matemática Militar": ["Logaritmos", "Análise Combinatória", "Probabilidade"]
   },
   "posts": {
     "-Nt123abc": {
+      "id": "-Nt123abc",
       "authorName": "Ana Silva",
       "authorAvatar": "https://picsum.photos/seed/u1/100",
       "content": "Alguém tem resumo de Eletroquímica pra compartilhar? Tô travada na parte de pilhas 🔋",
       "timestamp": 1709800000000,
-      "likes": 12
+      "likes": 12,
+      "likedBy": { "user_abc": true, "user_def": true }
     },
     "-Nt123def": {
+      "id": "-Nt123def",
       "authorName": "Carlos Mendes",
       "authorAvatar": "https://picsum.photos/seed/u2/100",
       "content": "Acabei de fazer o simulado de Humanas. A questão sobre Revolução Industrial tava bem difícil, o que acharam?",
       "timestamp": 1709790000000,
-      "likes": 24
+      "likes": 24,
+      "likedBy": { "user_xyz": true }
     }
   },
   "simulations": {
     "sim_001": {
+      "id": "sim_001",
       "title": "Simulado Nacional ENEM 2025",
       "description": "Prova completa com 90 questões e redação. Teste oficial.",
       "questionCount": 90,
       "durationMinutes": 300,
       "type": "official",
       "status": "open",
+      "questionIds": ["-KeyQ1", "-KeyQ2", "-KeyQ3", "-KeyQ4"],
       "subjects": ["math", "human", "nature", "linguages"]
     },
     "sim_002": {
+      "id": "sim_002",
       "title": "Mini-Simulado de Exatas",
       "description": "Foco em Matemática e Física.",
       "questionCount": 45,
       "durationMinutes": 120,
       "type": "training",
       "status": "closed",
+      "questionIds": ["-KeyQ1", "-KeyQ4"],
       "subjects": ["math", "physics"]
     },
     "sim_003": {
+      "id": "sim_003",
       "title": "Simulado FUVEST 1ª Fase",
       "description": "Modelo específico da USP.",
       "questionCount": 90,
@@ -86,41 +100,53 @@
   },
   "users": {
     "admin_uid_placeholder": {
+      "uid": "admin_uid_placeholder",
       "displayName": "Admin Master",
       "email": "master@admin.com",
       "photoURL": "",
       "plan": "admin",
       "balance": 100.00,
+      "essayCredits": 50,
       "subscriptionExpiry": "2030-01-01",
-      "isAdmin": true
+      "isAdmin": true,
+      "xp": 5000,
+      "questionsAnswered": 150
     },
     "student_uid_placeholder": {
+      "uid": "student_uid_placeholder",
       "displayName": "Estudante Demo",
       "email": "aluno@email.com",
       "photoURL": "",
       "plan": "basic",
       "balance": 0,
-      "subscriptionExpiry": "2024-12-31"
+      "essayCredits": 0,
+      "subscriptionExpiry": "2024-12-31",
+      "xp": 120,
+      "questionsAnswered": 12
+    }
+  },
+  "leaderboard": {
+    "admin_uid_placeholder": {
+        "displayName": "Admin Master",
+        "photoURL": "",
+        "xp": 5000
+    },
+    "student_uid_placeholder": {
+        "displayName": "Estudante Demo",
+        "photoURL": "",
+        "xp": 120
     }
   },
   "lessons": {
     "physics": {
-      "cinematica": [
-        {
+      "Cinemática": {
+        "l1": {
           "id": "l1",
           "title": "Introdução aos Vetores",
-          "videoUrl": "https://youtube.com/...",
-          "duration": "15:00"
+          "videoUrl": "https://www.youtube.com/watch?v=6J1WbK0Xy0g",
+          "duration": "15:00",
+          "materials": []
         }
-      ]
-    }
-  },
-  "config": {
-    "ai": {
-      "intermediateLimits": {
-        "canUseChat": false,
-        "canUseExplanation": true,
-        "dailyMessageLimit": 10
       }
     }
   },
@@ -166,6 +192,15 @@
                 }
             }
         }
+    }
+  },
+  "config": {
+    "ai": {
+      "intermediateLimits": {
+        "canUseChat": false,
+        "canUseExplanation": true,
+        "dailyMessageLimit": 10
+      }
     }
   }
 }

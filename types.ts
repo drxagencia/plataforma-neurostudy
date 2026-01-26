@@ -110,6 +110,7 @@ export interface CommunityPost {
   content: string;
   timestamp: number;
   likes: number;
+  likedBy?: Record<string, boolean>; // Map of UIDs who liked
   replies?: Reply[];
 }
 

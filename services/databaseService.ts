@@ -203,7 +203,8 @@ export const DatabaseService = {
             status: 'pending',
             timestamp: Date.now(),
             type,
-            quantityCredits
+            // FIX: Only add quantityCredits if defined. Firebase throws on undefined.
+            ...(quantityCredits !== undefined ? { quantityCredits } : {})
         };
         await set(reqRef, request);
     } catch (error) {
@@ -642,6 +643,8 @@ export const DatabaseService = {
             return {
               ...p,
               id: key,
+              // Keep likedBy map to let frontend know if user liked
+              likedBy: p.likedBy || {},
               replies
             };
         });
@@ -676,10 +679,22 @@ export const DatabaseService = {
     }
   },
 
-  likePost: async (postId: string, uid: string): Promise<void> => {
-      const postLikesRef = ref(database, `posts/${postId}/likes`);
-      await runTransaction(postLikesRef, (currentLikes) => {
-          return (currentLikes || 0) + 1;
+  toggleLike: async (postId: string, uid: string): Promise<void> => {
+      const postRef = ref(database, `posts/${postId}`);
+      await runTransaction(postRef, (post) => {
+          if (post) {
+              if (post.likedBy && post.likedBy[uid]) {
+                  // Already liked: Remove like
+                  post.likes = (post.likes || 1) - 1;
+                  delete post.likedBy[uid];
+              } else {
+                  // Not liked: Add like
+                  post.likes = (post.likes || 0) + 1;
+                  if (!post.likedBy) post.likedBy = {};
+                  post.likedBy[uid] = true;
+              }
+          }
+          return post;
       });
   },
 

@@ -88,19 +88,40 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
     }
   };
 
-  const handleLike = async (postId: string) => {
+  const handleToggleLike = async (postId: string) => {
       if (!auth.currentUser) return;
+      const uid = auth.currentUser.uid;
       
-      // Optimistic UI Update (Instant feedback)
-      setPosts(prev => prev.map(p => p.id === postId ? {...p, likes: (p.likes || 0) + 1} : p));
+      // 1. Optimistic Update
+      setPosts(prevPosts => prevPosts.map(p => {
+          if (p.id === postId) {
+              const isLiked = p.likedBy && p.likedBy[uid];
+              const newLikesCount = isLiked ? (p.likes - 1) : (p.likes + 1);
+              
+              // Create new likedBy object
+              const newLikedBy = { ...(p.likedBy || {}) };
+              if (isLiked) {
+                  delete newLikedBy[uid];
+              } else {
+                  newLikedBy[uid] = true;
+              }
 
-      // Database Transaction
+              return {
+                  ...p,
+                  likes: newLikesCount,
+                  likedBy: newLikedBy
+              };
+          }
+          return p;
+      }));
+
+      // 2. Database Transaction
       try {
-        await DatabaseService.likePost(postId, auth.currentUser.uid);
+        await DatabaseService.toggleLike(postId, uid);
       } catch (e) {
-        console.error("Like failed", e);
-        // Revert on fail
-        setPosts(prev => prev.map(p => p.id === postId ? {...p, likes: (p.likes || 0) - 1} : p));
+        console.error("Like toggle failed", e);
+        // Revert (could fetch posts again or revert logic)
+        fetchPosts(); 
       }
   };
 
@@ -167,7 +188,10 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
 
       {/* Feed */}
       <div className="space-y-4 flex-1 overflow-y-auto pr-2 pb-20 custom-scrollbar">
-        {posts.map((post) => (
+        {posts.map((post) => {
+          const isLikedByMe = auth.currentUser && post.likedBy && post.likedBy[auth.currentUser.uid];
+          
+          return (
           <div key={post.id} className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 hover:bg-slate-900/60 transition-colors animate-in slide-in-from-bottom-2">
              <div className="flex items-start gap-4">
                <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full border border-white/10 object-cover" />
@@ -200,10 +224,10 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
                  {/* Action Bar */}
                  <div className="flex items-center gap-6 mt-4 pt-4 border-t border-white/5">
                    <button 
-                    onClick={() => handleLike(post.id)}
-                    className="flex items-center gap-2 text-slate-500 hover:text-pink-500 transition-colors group"
+                    onClick={() => handleToggleLike(post.id)}
+                    className={`flex items-center gap-2 transition-all group ${isLikedByMe ? 'text-pink-500' : 'text-slate-500 hover:text-pink-500'}`}
                    >
-                     <Heart size={18} className="group-hover:fill-pink-500/20" />
+                     <Heart size={18} className={`transition-all ${isLikedByMe ? 'fill-pink-500 scale-110' : 'group-hover:fill-pink-500/20'}`} />
                      <span className="text-xs font-medium">{post.likes}</span>
                    </button>
                    <button 
@@ -239,7 +263,7 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
                </div>
              </div>
           </div>
-        ))}
+        )})}
         {posts.length === 0 && (
           <p className="text-center text-slate-500 mt-10">Nenhuma postagem ainda.</p>
         )}
