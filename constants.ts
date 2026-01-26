@@ -1,3 +1,4 @@
+
 import { Subject, Announcement } from './types';
 import { 
   Beaker, 
@@ -11,7 +12,10 @@ import {
   BrainCircuit,
   ScrollText,
   Map,
-  MessageCircle
+  MessageCircle,
+  Zap,
+  Target,
+  Sword
 } from 'lucide-react';
 
 export const APP_NAME = "NeuroStudy AI";
@@ -33,25 +37,29 @@ export const ANNOUNCEMENTS: Announcement[] = [
   }
 ];
 
+// IDs must match database keys (lowercase, no accents)
 export const SUBJECTS: Subject[] = [
-  { id: 'math', name: 'Matemática', iconName: 'Calculator', color: 'text-blue-400' },
-  { id: 'physics', name: 'Física', iconName: 'Zap', color: 'text-yellow-400' },
-  { id: 'chem', name: 'Química', iconName: 'Beaker', color: 'text-purple-400' },
-  { id: 'bio', name: 'Biologia', iconName: 'Microscope', color: 'text-green-400' },
-  { id: 'lit', name: 'Literatura', iconName: 'BookOpen', color: 'text-pink-400' },
-  { id: 'gram', name: 'Gramática', iconName: 'PenTool', color: 'text-red-400' },
-  { id: 'hist', name: 'História', iconName: 'ScrollText', color: 'text-orange-400' },
-  { id: 'geo', name: 'Geografia', iconName: 'Map', color: 'text-emerald-400' },
-  { id: 'phil', name: 'Filosofia/Soc.', iconName: 'Scale', color: 'text-indigo-400' },
-  { id: 'eng', name: 'Inglês', iconName: 'Languages', color: 'text-cyan-400' },
-  { id: 'spa', name: 'Espanhol', iconName: 'MessageCircle', color: 'text-rose-400' },
-  { id: 'text', name: 'Interpretação', iconName: 'BrainCircuit', color: 'text-teal-400' },
+  { id: 'matematica', name: 'Matemática', iconName: 'Calculator', color: 'text-blue-400', category: 'regular' },
+  { id: 'fisica', name: 'Física', iconName: 'Zap', color: 'text-yellow-400', category: 'regular' },
+  { id: 'quimica', name: 'Química', iconName: 'Beaker', color: 'text-purple-400', category: 'regular' },
+  { id: 'biologia', name: 'Biologia', iconName: 'Microscope', color: 'text-green-400', category: 'regular' },
+  { id: 'literatura', name: 'Literatura', iconName: 'BookOpen', color: 'text-pink-400', category: 'regular' },
+  { id: 'gramatica', name: 'Gramática', iconName: 'PenTool', color: 'text-red-400', category: 'regular' },
+  { id: 'historia', name: 'História', iconName: 'ScrollText', color: 'text-orange-400', category: 'regular' },
+  { id: 'geografia', name: 'Geografia', iconName: 'Map', color: 'text-emerald-400', category: 'regular' },
+  { id: 'filosofia', name: 'Filosofia/Soc.', iconName: 'Scale', color: 'text-indigo-400', category: 'regular' },
+  { id: 'ingles', name: 'Inglês', iconName: 'Languages', color: 'text-cyan-400', category: 'regular' },
+  { id: 'espanhol', name: 'Espanhol', iconName: 'MessageCircle', color: 'text-rose-400', category: 'regular' },
+  { id: 'interpretacao', name: 'Interpretação', iconName: 'BrainCircuit', color: 'text-teal-400', category: 'regular' },
+  // Military
+  { id: 'esa', name: 'ESA', iconName: 'Target', color: 'text-emerald-600', category: 'military' },
+  { id: 'espcex', name: 'ESPCEX', iconName: 'Sword', color: 'text-emerald-800', category: 'military' },
 ];
 
 export const MOCK_TOPICS: Record<string, string[]> = {
-  'physics': ['Cinemática', 'Dinâmica', 'Eletrodinâmica', 'Termodinâmica', 'Óptica'],
-  'math': ['Álgebra', 'Geometria Plana', 'Geometria Espacial', 'Trigonometria', 'Estatística'],
-  'chem': ['Química Geral', 'Físico-Química', 'Química Orgânica', 'Atomística'],
+  'fisica': ['Cinemática', 'Dinâmica', 'Eletrodinâmica', 'Termodinâmica', 'Óptica'],
+  'matematica': ['Álgebra', 'Geometria Plana', 'Geometria Espacial', 'Trigonometria', 'Estatística'],
+  'quimica': ['Química Geral', 'Físico-Química', 'Química Orgânica', 'Atomística'],
 };
 
 export const MOCK_SUBTOPICS: Record<string, string[]> = {

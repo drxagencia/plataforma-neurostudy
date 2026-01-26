@@ -194,7 +194,7 @@ const QuestionBank: React.FC = () => {
         auth.currentUser ? DatabaseService.getAnsweredQuestions(auth.currentUser.uid) : Promise.resolve({})
       ]);
       
-      // FIX 1: Filter subjects that actually have topics/content
+      // Filter subjects that actually have topics/content
       const validSubjects = subs.filter(s => tops[s.id] && tops[s.id].length > 0);
       
       setSubjects(validSubjects);
@@ -382,8 +382,10 @@ const QuestionBank: React.FC = () => {
                  {selectedSubject && selectedTopic ? (
                      <>
                         <Filter size={40} className="mb-4 opacity-30" />
-                        <p>Nenhuma questão encontrada com esses filtros.</p>
-                        {hideAnswered && <p className="text-xs mt-2 text-indigo-400">Tente desativar "Ocultar Feitas"</p>}
+                        <p>Nenhuma questão encontrada.</p>
+                        <p className="text-xs text-indigo-400 mt-2 font-mono">
+                            Buscado em: {selectedCategory}/{selectedSubject}/{selectedTopic}
+                        </p>
                      </>
                  ) : (
                      <>
