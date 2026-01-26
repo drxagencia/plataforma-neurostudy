@@ -67,16 +67,6 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   };
 
   const updateBalanceLocally = async () => {
-      // Small optimization: re-fetch only the balance/user specific data if we really need strong consistency,
-      // but usually for chat cost we can rely on what the API returns or just fetch user.
-      // In this case, to keep it simple and consistent with bandwidth saving:
-      // We know the API chat handler subtracts balance. We should fetch the updated user to sync state.
-      // But we will use the lightweight `getUserProfile` (which now we know downloads everything), 
-      // so actually, we rely on the backend response to tell us the new balance if possible, or we re-fetch.
-      
-      // Since we modified chat API to return remaining balance, let's use that if we can.
-      // But `AiService` abstracts it.
-      // Let's fallback to refetching user profile but assume it's acceptable for "Chat" interactions which are lower frequency than navigation.
       if (!auth.currentUser) return;
       const updatedUser = await DatabaseService.getUserProfile(auth.currentUser.uid);
       if (updatedUser) onUpdateUser(updatedUser);
@@ -136,6 +126,15 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
           setShowRecharge(true);
       } else if (error.message.includes('403')) {
           triggerNotification('error', 'Seu plano não permite o uso do chat livre.');
+      } else if (error.message.includes('Server Config Error') || error.message.includes('500')) {
+          // Specific handling for the error you are seeing
+          const errorMsg: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'ai',
+            content: '⚠️ **Erro de Configuração**\n\nO servidor não conseguiu acessar a API Key da IA. Por favor, contate o administrador para configurar a variável de ambiente `API_KEY`.'
+          };
+          setMessages(prev => [...prev, errorMsg]);
+          triggerNotification('error', 'Erro interno de configuração (500).');
       } else {
           const errorMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),

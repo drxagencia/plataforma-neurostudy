@@ -58,8 +58,8 @@ export default async function handler(req: any, res: any) {
         }
 
         const ai = new GoogleGenAI({ apiKey: apiKey });
-        // Use flash-latest which supports vision
-        const modelId = 'gemini-2.5-flash-latest'; 
+        // Corrected Model ID for Vision capabilities
+        const modelId = 'gemini-2.0-flash-exp'; 
 
         const imagePart = {
             inlineData: {
@@ -188,6 +188,6 @@ export default async function handler(req: any, res: any) {
 
   } catch (error: any) {
     console.error("API Error:", error);
-    return res.status(500).json({ error: 'Erro no servidor' });
+    return res.status(500).json({ error: `Server Error: ${error.message}` });
   }
 }
