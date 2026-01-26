@@ -4,7 +4,7 @@ import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { auth } from '../services/firebaseConfig';
 import { EssayCorrection, UserProfile } from '../types';
-import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle } from 'lucide-react';
+import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText } from 'lucide-react';
 
 interface RedacaoProps {
     user: UserProfile;
@@ -29,6 +29,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [confirmText, setConfirmText] = useState('');
   const [currentResult, setCurrentResult] = useState<EssayCorrection | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Competency Detail State
+  const [expandedCompetency, setExpandedCompetency] = useState<string | null>(null);
 
   // Notification State
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -58,6 +61,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           if (imgUrl) item.imageUrl = imgUrl;
       }
       setCurrentResult(item);
+      setExpandedCompetency(null);
       setLoadingDetails(false);
       setView('result');
   };
@@ -104,7 +108,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   const handleCorrectionSubmit = async () => {
       // 1. Credit Check
-      const availableCredits = Number(user.essayCredits || 0);
+      const availableCredits = typeof user.essayCredits === 'number' ? user.essayCredits : 0;
       if (availableCredits <= 0) {
           setNotification({ type: 'error', message: "Sem créditos suficientes para enviar a redação." });
           // Optional: redirect to buy screen after delay?
@@ -141,11 +145,19 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           let cleanJson = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
 
-          const c1 = Number(parsed.c1) || 0;
-          const c2 = Number(parsed.c2) || 0;
-          const c3 = Number(parsed.c3) || 0;
-          const c4 = Number(parsed.c4) || 0;
-          const c5 = Number(parsed.c5) || 0;
+          // Parse new structure (Object with score & comment)
+          // Helper to safely extract number
+          const parseScore = (val: any) => {
+            const num = Number(val?.score ?? val);
+            return isNaN(num) ? 0 : num;
+          };
+
+          const c1 = parseScore(parsed.c1);
+          const c2 = parseScore(parsed.c2);
+          const c3 = parseScore(parsed.c3);
+          const c4 = parseScore(parsed.c4);
+          const c5 = parseScore(parsed.c5);
+          
           const calculatedTotal = c1 + c2 + c3 + c4 + c5;
           const finalTotal = Number(parsed.total) || calculatedTotal;
 
@@ -155,19 +167,27 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               date: Date.now(),
               scoreTotal: finalTotal,
               competencies: { c1, c2, c3, c4, c5 },
+              competencyFeedback: {
+                  c1: parsed.c1?.comment || "Sem comentário.",
+                  c2: parsed.c2?.comment || "Sem comentário.",
+                  c3: parsed.c3?.comment || "Sem comentário.",
+                  c4: parsed.c4?.comment || "Sem comentário.",
+                  c5: parsed.c5?.comment || "Sem comentário."
+              },
               feedback: parsed.feedback,
               errors: parsed.errors
           };
 
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
-          const currentCredits = Number(user.essayCredits || 0);
+          const currentCredits = typeof user.essayCredits === 'number' ? user.essayCredits : 0;
           onUpdateUser({
               ...user,
               essayCredits: Math.max(0, currentCredits - 1)
           });
 
           setCurrentResult(result);
+          setExpandedCompetency(null);
           setView('result');
           fetchHistory();
 
@@ -241,15 +261,42 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                   {/* Competencies */}
                   <div className="md:col-span-2 glass-card p-6 rounded-2xl space-y-4">
                       <h3 className="font-bold text-white flex items-center gap-2"><FileText size={18} /> Competências ENEM</h3>
-                      {Object.entries(currentResult.competencies).map(([key, score], idx) => (
-                          <div key={key} className="flex items-center gap-4">
-                              <span className="text-xs font-bold text-slate-500 w-8 uppercase">{key}</span>
-                              <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden">
-                                  <div className="h-full bg-indigo-500" style={{width: `${(score/200)*100}%`}} />
+                      {Object.entries(currentResult.competencies).map(([key, score]) => {
+                          const feedbackText = currentResult.competencyFeedback ? (currentResult.competencyFeedback as any)[key] : null;
+                          const isExpanded = expandedCompetency === key;
+
+                          return (
+                          <div key={key} className="flex flex-col">
+                              <div className="flex items-center gap-4">
+                                  <span className="text-xs font-bold text-slate-500 w-8 uppercase">{key}</span>
+                                  <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden">
+                                      <div className="h-full bg-indigo-500" style={{width: `${(score/200)*100}%`}} />
+                                  </div>
+                                  <span className="text-sm font-bold text-white w-8 text-right">{score}</span>
+                                  
+                                  {/* Info Icon Button */}
+                                  {feedbackText && (
+                                    <button 
+                                        onClick={() => setExpandedCompetency(isExpanded ? null : key)}
+                                        className={`p-1.5 rounded-lg transition-colors ${isExpanded ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:bg-white/10 hover:text-indigo-400'}`}
+                                        title="Ver explicação da nota"
+                                    >
+                                        <MessageSquareText size={16} />
+                                    </button>
+                                  )}
                               </div>
-                              <span className="text-sm font-bold text-white w-8 text-right">{score}</span>
+                              
+                              {/* Expandable Feedback */}
+                              {isExpanded && feedbackText && (
+                                  <div className="mt-3 ml-12 p-3 bg-indigo-900/20 border border-indigo-500/20 rounded-xl rounded-tl-none animate-in slide-in-from-top-2 fade-in duration-300">
+                                      <div className="flex items-start gap-2">
+                                          <Sparkles size={14} className="text-indigo-400 mt-1 flex-shrink-0" />
+                                          <p className="text-sm text-slate-300 italic">"{feedbackText}"</p>
+                                      </div>
+                                  </div>
+                              )}
                           </div>
-                      ))}
+                      )})}
                   </div>
               </div>
 
@@ -556,3 +603,4 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 };
 
 export default Redacao;
+    

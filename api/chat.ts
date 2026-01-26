@@ -1,5 +1,4 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, get, update, push, set } from "firebase/database";
 
@@ -18,6 +17,15 @@ try {
 }
 const db = getDatabase(app);
 
+// Configuration for "GPT 5 Nano" (using gpt-4o-mini)
+const AI_MODEL = "gpt-4o-mini"; 
+const USD_TO_BRL = 6.0; // Fixed exchange rate assumption
+const PROFIT_MARGIN = 1.5; // 1.5x markup
+
+// Updated Pricing per 1 Million Tokens (USD)
+const PRICE_INPUT_1M = 0.15;
+const PRICE_OUTPUT_1M = 0.60;
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -33,7 +41,7 @@ export default async function handler(req: any, res: any) {
   }
 
   const apiKey = process.env.API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'Server Config Error' });
+  if (!apiKey) return res.status(500).json({ error: 'Server Config Error: Missing OpenAI API Key' });
 
   try {
     const { message, history, mode, uid, image } = req.body;
@@ -50,46 +58,66 @@ export default async function handler(req: any, res: any) {
     const user = userSnap.val();
     const config = configSnap.val() || { intermediateLimits: { canUseChat: false, canUseExplanation: true } };
 
-    // --- ESSAY CORRECTION LOGIC ---
+    // --- ESSAY CORRECTION LOGIC (VISION) ---
     if (mode === 'essay-correction') {
         const credits = user.essayCredits || 0;
         if (credits <= 0) {
             return res.status(402).json({ error: 'Sem créditos de redação.' });
         }
 
-        const ai = new GoogleGenAI({ apiKey: apiKey });
-        // Use Flash Lite 2.0 (Stable, High Quota, Multimodal)
-        const modelId = 'gemini-flash-lite-latest'; 
-
-        const imagePart = {
-            inlineData: {
-                mimeType: 'image/jpeg', 
-                data: image.split(',')[1] // Remove data:image/jpeg;base64,
-            }
-        };
-
         const prompt = `
             Você é um corretor especialista do ENEM.
             TEMA: ${message}
             TAREFA: Analise a imagem da redação manuscrita.
-            SAÍDA: Retorne APENAS um JSON (sem markdown, sem code block) com o formato:
+            
+            SAÍDA: Retorne ESTRITAMENTE um JSON com o seguinte formato exato (sem markdown):
             {
-                "c1": (nota 0-200),
-                "c2": (nota 0-200),
-                "c3": (nota 0-200),
-                "c4": (nota 0-200),
-                "c5": (nota 0-200),
-                "total": (soma),
-                "feedback": "Resumo geral curto de 2 frases",
-                "errors": ["erro especifico 1", "erro especifico 2", "ponto de melhoria"]
+                "c1": { "score": (0-200), "comment": "Explicação breve do erro ou acerto na C1" },
+                "c2": { "score": (0-200), "comment": "Explicação breve na C2" },
+                "c3": { "score": (0-200), "comment": "Explicação breve na C3" },
+                "c4": { "score": (0-200), "comment": "Explicação breve na C4" },
+                "c5": { "score": (0-200), "comment": "Explicação breve na C5" },
+                "total": (soma das notas),
+                "feedback": "Resumo geral curto de 2 frases sobre o texto todo",
+                "errors": ["erro gramatical 1", "erro de coesão 2", "ponto de melhoria"]
             }
         `;
 
         try {
-            const response = await ai.models.generateContent({
-                model: modelId,
-                contents: { parts: [imagePart, { text: prompt }] }
+            const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: AI_MODEL,
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: prompt },
+                                { 
+                                    type: "image_url", 
+                                    image_url: { 
+                                        url: image 
+                                    } 
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens: 1500,
+                    response_format: { type: "json_object" }
+                })
             });
+
+            const data = await openAiResponse.json();
+
+            if (!openAiResponse.ok) {
+                throw new Error(data.error?.message || 'OpenAI API Error');
+            }
+
+            const responseText = data.choices[0].message.content;
 
             // Deduct 1 credit
             await update(userRef, { essayCredits: credits - 1 });
@@ -105,17 +133,17 @@ export default async function handler(req: any, res: any) {
                 currencyType: 'CREDIT'
             });
 
-            return res.status(200).json({ text: response.text });
+            return res.status(200).json({ text: responseText });
         } catch (innerError: any) {
-            console.error("Gemini Vision Error:", innerError);
-            if (innerError.status === 429 || innerError.message?.includes('429')) {
-                 return res.status(429).json({ error: 'Limite de uso da IA atingido temporariamente. Tente novamente em 1 minuto.' });
+            console.error("OpenAI Vision Error:", innerError);
+            if (innerError.message?.includes('429')) {
+                 return res.status(429).json({ error: 'Sistema sobrecarregado. Tente novamente em 1 minuto.' });
             }
             throw innerError;
         }
     }
 
-    // --- STANDARD CHAT LOGIC ---
+    // --- STANDARD CHAT LOGIC (TEXT) ---
     if (user.plan === 'basic') {
         return res.status(403).json({ error: 'Plano Básico não permite acesso à IA.' });
     }
@@ -134,46 +162,75 @@ export default async function handler(req: any, res: any) {
         return res.status(402).json({ error: 'Saldo insuficiente.' });
     }
 
-    const ai = new GoogleGenAI({ apiKey: apiKey });
-    const modelId = 'gemini-flash-lite-latest'; 
-
-    let fullPrompt = "";
+    let systemInstruction = "";
     if (mode === 'explanation') {
-      fullPrompt = `
+      systemInstruction = `
       Atue como Tutor Sênior.
       OBJETIVO: Explicar o erro do aluno de forma DIDÁTICA e MUITO BREVE.
-      CONTEXTO: ${message}
       REGRAS:
       1. Use estritamente **negrito** para palavras-chave.
       2. Máximo 40 palavras.
       3. Vá direto ao ponto. Sem saudações.
       `;
     } else {
-      fullPrompt = "Tutor Sênior. Responda de forma curta, direta e didática. Max 30 palavras por resposta. Use **negrito** nos conceitos.\n\n";
-      if (history && Array.isArray(history)) {
-        history.slice(-3).forEach((msg: any) => { 
-          fullPrompt += `${msg.role === 'user' ? 'Aluno' : 'Tutor'}: ${msg.content}\n`;
-        });
-      }
-      fullPrompt += `Aluno: ${message}\nTutor:`;
+      systemInstruction = "Tutor Sênior. Responda de forma curta, direta e didática. Max 30 palavras por resposta. Use **negrito** nos conceitos.";
     }
 
-    const response = await ai.models.generateContent({
-      model: modelId,
-      contents: fullPrompt,
+    // Prepare Messages
+    const messagesPayload = [
+        { role: "system", content: systemInstruction }
+    ];
+
+    if (history && Array.isArray(history)) {
+        // OpenAI expects 'assistant' instead of 'ai' for role
+        history.slice(-3).forEach((msg: any) => {
+            messagesPayload.push({
+                role: msg.role === 'ai' ? 'assistant' : 'user',
+                content: msg.content
+            });
+        });
+    }
+    
+    messagesPayload.push({ role: "user", content: message });
+
+    const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: AI_MODEL,
+            messages: messagesPayload,
+            max_tokens: 300
+        })
     });
 
-    const usage = response.usageMetadata;
-    const inputTokens = usage?.promptTokenCount || fullPrompt.length / 4;
-    const outputTokens = usage?.candidatesTokenCount || response.text.length / 4;
+    const data = await openAiResponse.json();
 
-    const pricePerMillionInputBRL = 0.075 * 6;
-    const pricePerMillionOutputBRL = 0.30 * 6;
+    if (!openAiResponse.ok) {
+        throw new Error(data.error?.message || 'OpenAI API Error');
+    }
 
-    const rawCost = (inputTokens * (pricePerMillionInputBRL / 1000000)) + (outputTokens * (pricePerMillionOutputBRL / 1000000));
-    const finalCostToUser = rawCost * 1.10;
-    const chargeAmount = Math.max(finalCostToUser, 0.00001);
-    const newBalance = currentBalance - chargeAmount;
+    const responseText = data.choices[0].message.content;
+    const usage = data.usage;
+    
+    // Calculate Pricing
+    const inputTokens = usage?.prompt_tokens || 0;
+    const outputTokens = usage?.completion_tokens || 0;
+
+    // USD Cost
+    const costInputUSD = (inputTokens / 1000000) * PRICE_INPUT_1M;
+    const costOutputUSD = (outputTokens / 1000000) * PRICE_OUTPUT_1M;
+    const totalCostUSD = costInputUSD + costOutputUSD;
+
+    // Convert to BRL
+    const totalCostBRL = totalCostUSD * USD_TO_BRL;
+
+    // Apply Markup (1.5x)
+    const finalChargeAmount = Math.max(totalCostBRL * PROFIT_MARGIN, 0.00001);
+    
+    const newBalance = currentBalance - finalChargeAmount;
     
     await update(userRef, { balance: newBalance });
     
@@ -181,7 +238,7 @@ export default async function handler(req: any, res: any) {
     await set(transRef, {
         id: transRef.key,
         type: 'debit',
-        amount: chargeAmount,
+        amount: finalChargeAmount,
         description: mode === 'explanation' ? 'Explicação IA' : 'Chat IA',
         timestamp: Date.now(),
         tokensUsed: inputTokens + outputTokens,
@@ -189,14 +246,14 @@ export default async function handler(req: any, res: any) {
     });
 
     return res.status(200).json({ 
-        text: response.text, 
-        cost: chargeAmount,
+        text: responseText, 
+        cost: finalChargeAmount,
         remainingBalance: newBalance 
     });
 
   } catch (error: any) {
     console.error("API Error:", error);
-    const status = error.status || 500;
+    const status = 500;
     const message = error.message || 'Unknown Server Error';
     return res.status(status).json({ error: `Server Error: ${message}` });
   }

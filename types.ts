@@ -150,6 +150,13 @@ export interface EssayCorrection {
     c4: number;
     c5: number;
   };
+  competencyFeedback?: {
+    c1: string;
+    c2: string;
+    c3: string;
+    c4: string;
+    c5: string;
+  };
   feedback: string;
   errors: string[];
 }
