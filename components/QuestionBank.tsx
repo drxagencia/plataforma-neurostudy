@@ -249,6 +249,9 @@ const QuestionBank: React.FC = () => {
       return true;
   });
 
+  // Filter subjects based on selected category (regular vs military)
+  const filteredSubjects = subjects.filter(s => s.category === selectedCategory);
+
   const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
   const subTopicOptions = selectedTopic ? subtopics[selectedTopic] || [] : [];
 
@@ -283,7 +286,9 @@ const QuestionBank: React.FC = () => {
               value={selectedCategory}
               onChange={(e) => {
                   setSelectedCategory(e.target.value);
-                  // Optional: clear other selections if category changes logic substantially
+                  setSelectedSubject(''); // Reset subject when category changes
+                  setSelectedTopic('');
+                  setSelectedSubTopic('');
               }}
               className="w-full appearance-none glass-input p-3 rounded-xl focus:outline-none focus:border-indigo-500 text-white text-sm font-bold"
             >
@@ -305,7 +310,7 @@ const QuestionBank: React.FC = () => {
               className="w-full appearance-none glass-input p-3 rounded-xl focus:outline-none focus:border-indigo-500 text-white text-sm"
             >
               <option value="" disabled>Disciplina</option>
-              {subjects.map((s) => (
+              {filteredSubjects.map((s) => (
                 <option key={s.id} value={s.id} className="bg-slate-900">{s.name}</option>
               ))}
             </select>

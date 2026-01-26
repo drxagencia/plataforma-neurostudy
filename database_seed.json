@@ -151,44 +151,61 @@
     }
   },
   "questions": {
-    "physics": {
-      "Cinemática": {
-         "Movimento Uniforme": {
-            "-KeyQ1": {
-               "text": "Um carro percorre uma estrada reta com velocidade constante de 72 km/h. Qual a distância percorrida em 10 segundos?",
-               "options": ["100 m", "200 m", "300 m", "400 m"],
-               "correctAnswer": 1,
-               "difficulty": "easy",
-               "explanation": "Primeiro converta 72 km/h para m/s dividindo por 3,6 = 20 m/s. Distância = Velocidade x Tempo. D = 20 * 10 = 200m."
+    "regular": {
+        "physics": {
+          "Cinemática": {
+            "Movimento Uniforme": {
+                "-KeyQ1": {
+                  "text": "Um carro percorre uma estrada reta com velocidade constante de 72 km/h. Qual a distância percorrida em 10 segundos?",
+                  "options": ["100 m", "200 m", "300 m", "400 m"],
+                  "correctAnswer": 1,
+                  "difficulty": "easy",
+                  "explanation": "Primeiro converta 72 km/h para m/s dividindo por 3,6 = 20 m/s. Distância = Velocidade x Tempo. D = 20 * 10 = 200m."
+                },
+                "-KeyQ2": {
+                  "text": "Dois móveis A e B partem simultaneamente de um mesmo ponto, com velocidades constantes de 10m/s e 15m/s, mesma direção e sentido. Após 20s, qual a distância entre eles?",
+                  "options": ["50 m", "100 m", "200 m", "150 m"],
+                  "correctAnswer": 1,
+                  "difficulty": "medium",
+                  "explanation": "Velocidade relativa = 15 - 10 = 5m/s. Distância = 5m/s * 20s = 100m."
+                }
             },
-            "-KeyQ2": {
-               "text": "Dois móveis A e B partem simultaneamente de um mesmo ponto, com velocidades constantes de 10m/s e 15m/s, mesma direção e sentido. Após 20s, qual a distância entre eles?",
-               "options": ["50 m", "100 m", "200 m", "150 m"],
-               "correctAnswer": 1,
-               "difficulty": "medium",
-               "explanation": "Velocidade relativa = 15 - 10 = 5m/s. Distância = 5m/s * 20s = 100m."
-            }
-         },
-         "Vetores": {
-             "-KeyQ3": {
-                 "text": "Dois vetores de módulos 3u e 4u formam um ângulo de 90º entre si. Qual o módulo do vetor resultante?",
-                 "options": ["5u", "7u", "1u", "12u"],
-                 "correctAnswer": 0,
-                 "difficulty": "easy",
-                 "explanation": "Teorema de Pitágoras: R² = 3² + 4² = 9 + 16 = 25. R = 5."
-             }
-         }
-      }
-    },
-    "math": {
-        "Álgebra": {
-            "Funções": {
-                "-KeyQ4": {
-                    "text": "Dada a função f(x) = 2x - 3, qual o valor de f(5)?",
-                    "options": ["5", "7", "8", "10"],
-                    "correctAnswer": 1,
+            "Vetores": {
+                "-KeyQ3": {
+                    "text": "Dois vetores de módulos 3u e 4u formam um ângulo de 90º entre si. Qual o módulo do vetor resultante?",
+                    "options": ["5u", "7u", "1u", "12u"],
+                    "correctAnswer": 0,
                     "difficulty": "easy",
-                    "explanation": "f(5) = 2(5) - 3 = 10 - 3 = 7."
+                    "explanation": "Teorema de Pitágoras: R² = 3² + 4² = 9 + 16 = 25. R = 5."
+                }
+            }
+          }
+        },
+        "math": {
+            "Álgebra": {
+                "Funções": {
+                    "-KeyQ4": {
+                        "text": "Dada a função f(x) = 2x - 3, qual o valor de f(5)?",
+                        "options": ["5", "7", "8", "10"],
+                        "correctAnswer": 1,
+                        "difficulty": "easy",
+                        "explanation": "f(5) = 2(5) - 3 = 10 - 3 = 7."
+                    }
+                }
+            }
+        }
+    },
+    "military": {
+        "esa": {
+            "Matemática Militar": {
+                "Logaritmos": {
+                    "-KeyQ5": {
+                        "text": "Se log2(x) = 5, qual o valor de x?",
+                        "options": ["10", "25", "32", "64"],
+                        "correctAnswer": 2,
+                        "difficulty": "medium",
+                        "explanation": "Definição de logaritmo: 2^5 = x. x = 32."
+                    }
                 }
             }
         }
