@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config'>('leads');
+  const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config' | 'metrics'>('leads');
   const [contentTab, setContentTab] = useState<'question' | 'lesson' | 'subject' | 'simulation' | 'import'>('question');
   
   // View Mode: Create New vs Manage Existing
@@ -25,6 +25,9 @@ const AdminPanel: React.FC = () => {
   const [aiConfig, setAiConfig] = useState<AiConfig | null>(null);
   const [simulations, setSimulations] = useState<Simulation[]>([]);
   
+  // Metrics Specific
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
+
   // Management Lists
   const [filteredQuestions, setFilteredQuestions] = useState<(Question & { path: string, subtopic: string })[]>([]);
   
@@ -130,8 +133,9 @@ const AdminPanel: React.FC = () => {
 
   // LAZY LOAD: Users (Only when tab active)
   useEffect(() => {
-      if (activeTab === 'users') {
-          DatabaseService.getUsersPaginated(50).then(u => {
+      if (activeTab === 'users' || activeTab === 'metrics') {
+          // For metrics we ideally need ALL users, asking for 100 for now to get a sample
+          DatabaseService.getUsersPaginated(100).then(u => {
               const realUsers = u.filter(user => 
                   user.uid !== 'student_uid_placeholder' && 
                   user.uid !== 'admin_uid_placeholder'
@@ -143,14 +147,14 @@ const AdminPanel: React.FC = () => {
 
   // LAZY LOAD: Leads
   useEffect(() => {
-      if (activeTab === 'leads') {
+      if (activeTab === 'leads' || activeTab === 'metrics') {
           DatabaseService.getLeads().then(l => setLeads(l));
       }
   }, [activeTab]);
 
   // LAZY LOAD: Finance
   useEffect(() => {
-      if (activeTab === 'finance') {
+      if (activeTab === 'finance' || activeTab === 'metrics') {
           DatabaseService.getRechargeRequests().then(r => setRecharges(r));
       }
   }, [activeTab]);
@@ -570,10 +574,6 @@ const AdminPanel: React.FC = () => {
             await DatabaseService.updateUserPlan(editingUserId, userDataForm.plan as UserPlan, userDataForm.expiry);
             alert("Usuário atualizado!");
         } else if (newUserMode) {
-            // New user creation logic is handled via "Approve Lead" mostly, 
-            // but if manual creation is needed we would use authService.registerStudent here.
-            // For now, this just updates DB profile if UID existed, or creates a mock one.
-            // Real manual creation requires email/password which are not in this form.
             alert("Use a aba 'Novos Alunos' para criar contas com senha.");
         }
         setEditingUserId(null);
@@ -592,6 +592,103 @@ const AdminPanel: React.FC = () => {
       const r = await DatabaseService.getRechargeRequests();
       setRecharges(r);
   };
+
+  // --- METRICS CALCULATION LOGIC ---
+  const metrics = useMemo(() => {
+      if (!users.length && !leads.length) return null;
+
+      const totalUsers = users.length;
+      
+      // 1. Subscription Metrics
+      const planDistribution = {
+          basic: 0,
+          intermediate: 0,
+          advanced: 0,
+          admin: 0
+      };
+      
+      let totalDurationDays = 0;
+      let durationCount = 0;
+      let essayUsersCount = 0;
+      let aiRechargeUsersCount = 0;
+
+      // Iterate users for plan dist and usage
+      users.forEach(u => {
+          if (planDistribution[u.plan] !== undefined) planDistribution[u.plan]++;
+          
+          // Approx duration based on expiry (very rough estimation as we don't have start date in this object easily, assuming 1 year standard for calcs or using diff from now)
+          // Better: Use Leads for Monthly vs Annual ratios
+          
+          if ((u as any).essays && Object.keys((u as any).essays).length > 0) essayUsersCount++;
+          if (u.balance > 0) aiRechargeUsersCount++; // Rough proxy
+      });
+
+      // 2. Revenue & Leads Metrics
+      const monthlyRevenue = {
+          subscriptions: 0,
+          essayCredits: 0,
+          aiRecharges: 0,
+          total: 0
+      };
+
+      let monthlySubs = 0;
+      let annualSubs = 0;
+      let pixCount = 0;
+      let cardCount = 0;
+
+      // Filter Leads by Selected Month for Revenue
+      leads.forEach(l => {
+          const leadDate = new Date(l.timestamp);
+          const leadMonth = leadDate.toISOString().slice(0, 7); // YYYY-MM
+          
+          // General Stats (All time)
+          if (l.amount > 100) annualSubs++; // Heuristic: > 100 likely annual
+          else monthlySubs++;
+
+          if (l.paymentMethod?.toLowerCase().includes('pix')) pixCount++;
+          else cardCount++;
+
+          // Monthly Revenue Calculation
+          if (leadMonth === selectedMonth && (l.status === 'paid' || l.status === 'approved_access')) {
+              monthlyRevenue.subscriptions += l.amount;
+              monthlyRevenue.total += l.amount;
+          }
+      });
+
+      // Filter Recharges for Add-on Revenue
+      recharges.forEach(r => {
+          const rDate = new Date(r.timestamp);
+          const rMonth = rDate.toISOString().slice(0, 7);
+
+          if (rMonth === selectedMonth && r.status === 'approved') {
+              if (r.type === 'CREDIT') {
+                  monthlyRevenue.essayCredits += r.amount; // Note: Amount here is price paid
+              } else {
+                  monthlyRevenue.aiRecharges += r.amount;
+              }
+              monthlyRevenue.total += r.amount;
+          }
+      });
+
+      return {
+          planDistribution,
+          subscriptions: {
+              monthly: monthlySubs,
+              annual: annualSubs,
+              monthlyPercent: ((monthlySubs / (monthlySubs + annualSubs || 1)) * 100).toFixed(1),
+              annualPercent: ((annualSubs / (monthlySubs + annualSubs || 1)) * 100).toFixed(1)
+          },
+          payments: {
+              pixPercent: ((pixCount / (pixCount + cardCount || 1)) * 100).toFixed(1),
+              cardPercent: ((cardCount / (pixCount + cardCount || 1)) * 100).toFixed(1)
+          },
+          usage: {
+              essayPercent: ((essayUsersCount / totalUsers || 1) * 100).toFixed(1),
+              aiRechargePercent: ((aiRechargeUsersCount / totalUsers || 1) * 100).toFixed(1),
+          },
+          revenue: monthlyRevenue
+      };
+  }, [users, leads, recharges, selectedMonth]);
 
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
@@ -698,6 +795,7 @@ const AdminPanel: React.FC = () => {
             {[
                 { id: 'leads', label: 'Novos Alunos', icon: UserCheck },
                 { id: 'users', label: 'Gerenciar Usuários', icon: Users },
+                { id: 'metrics', label: 'Métricas', icon: BarChart3 },
                 { id: 'content', label: 'Conteúdo', icon: BookOpen },
                 { id: 'finance', label: 'Financeiro', icon: Wallet },
                 { id: 'config', label: 'Config. IA', icon: SettingsIcon }
@@ -712,6 +810,147 @@ const AdminPanel: React.FC = () => {
             ))}
         </div>
       </header>
+
+      {/* --- METRICS TAB --- */}
+      {activeTab === 'metrics' && metrics && (
+          <div className="space-y-8 animate-fade-in">
+              {/* Top KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="glass-card p-6 rounded-2xl border border-white/5 bg-indigo-900/10">
+                      <div className="flex justify-between items-start mb-2">
+                          <p className="text-xs text-indigo-300 font-bold uppercase">Receita Total ({selectedMonth})</p>
+                          <DollarSign size={16} className="text-indigo-400" />
+                      </div>
+                      <p className="text-3xl font-bold text-white">R$ {metrics.revenue.total.toFixed(2)}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                          <input 
+                            type="month" 
+                            value={selectedMonth} 
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="bg-slate-900 border border-white/10 rounded-lg text-xs p-1 text-slate-300"
+                          />
+                      </div>
+                  </div>
+
+                  <div className="glass-card p-6 rounded-2xl border border-white/5">
+                      <div className="flex justify-between items-start mb-2">
+                          <p className="text-xs text-slate-400 font-bold uppercase">Uso de Redação</p>
+                          <PenTool size={16} className="text-purple-400" />
+                      </div>
+                      <p className="text-3xl font-bold text-white">{metrics.usage.essayPercent}%</p>
+                      <p className="text-xs text-slate-500 mt-1">da base de usuários ativa</p>
+                  </div>
+
+                  <div className="glass-card p-6 rounded-2xl border border-white/5">
+                      <div className="flex justify-between items-start mb-2">
+                          <p className="text-xs text-slate-400 font-bold uppercase">Recarregam IA</p>
+                          <Activity size={16} className="text-emerald-400" />
+                      </div>
+                      <p className="text-3xl font-bold text-white">{metrics.usage.aiRechargePercent}%</p>
+                      <p className="text-xs text-slate-500 mt-1">compra créditos extras</p>
+                  </div>
+
+                  <div className="glass-card p-6 rounded-2xl border border-white/5">
+                      <div className="flex justify-between items-start mb-2">
+                          <p className="text-xs text-slate-400 font-bold uppercase">Plano Avançado</p>
+                          <TrendingUp size={16} className="text-yellow-400" />
+                      </div>
+                      <p className="text-3xl font-bold text-white">
+                          {((metrics.planDistribution.advanced / (users.length || 1)) * 100).toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">taxa de conversão pro</p>
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Revenue Breakdown */}
+                  <div className="glass-card p-6 rounded-2xl">
+                      <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                          <PieChart size={20} className="text-emerald-400" /> Distribuição de Receita
+                      </h3>
+                      <div className="space-y-4">
+                          <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                  <span className="text-slate-300">Assinaturas</span>
+                                  <span className="text-white font-bold">R$ {metrics.revenue.subscriptions.toFixed(2)}</span>
+                              </div>
+                              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                  <div className="h-full bg-indigo-500" style={{width: `${(metrics.revenue.subscriptions / metrics.revenue.total * 100) || 0}%`}} />
+                              </div>
+                          </div>
+                          <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                  <span className="text-slate-300">Créditos Redação</span>
+                                  <span className="text-white font-bold">R$ {metrics.revenue.essayCredits.toFixed(2)}</span>
+                              </div>
+                              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                  <div className="h-full bg-purple-500" style={{width: `${(metrics.revenue.essayCredits / metrics.revenue.total * 100) || 0}%`}} />
+                              </div>
+                          </div>
+                          <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                  <span className="text-slate-300">Recargas IA</span>
+                                  <span className="text-white font-bold">R$ {metrics.revenue.aiRecharges.toFixed(2)}</span>
+                              </div>
+                              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500" style={{width: `${(metrics.revenue.aiRecharges / metrics.revenue.total * 100) || 0}%`}} />
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* User Behavior Stats */}
+                  <div className="glass-card p-6 rounded-2xl grid grid-cols-2 gap-4">
+                      <div className="col-span-2 mb-2">
+                          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                              <Users size={20} className="text-blue-400" /> Comportamento
+                          </h3>
+                      </div>
+                      
+                      <div className="bg-slate-900 p-4 rounded-xl border border-white/5">
+                          <p className="text-xs text-slate-500 uppercase font-bold mb-2">Tipo de Assinatura</p>
+                          <div className="flex items-end gap-2">
+                              <div className="flex-1">
+                                  <div className="h-16 bg-indigo-900/50 rounded-t-lg relative group">
+                                      <div className="absolute bottom-0 w-full bg-indigo-500 rounded-t-lg transition-all" style={{height: `${metrics.subscriptions.monthlyPercent}%`}} />
+                                      <span className="absolute bottom-1 w-full text-center text-[10px] font-bold text-white z-10">{metrics.subscriptions.monthlyPercent}%</span>
+                                  </div>
+                                  <p className="text-center text-[10px] text-slate-400 mt-1">Mensal</p>
+                              </div>
+                              <div className="flex-1">
+                                  <div className="h-16 bg-indigo-900/50 rounded-t-lg relative group">
+                                      <div className="absolute bottom-0 w-full bg-purple-500 rounded-t-lg transition-all" style={{height: `${metrics.subscriptions.annualPercent}%`}} />
+                                      <span className="absolute bottom-1 w-full text-center text-[10px] font-bold text-white z-10">{metrics.subscriptions.annualPercent}%</span>
+                                  </div>
+                                  <p className="text-center text-[10px] text-slate-400 mt-1">Anual</p>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-slate-900 p-4 rounded-xl border border-white/5">
+                          <p className="text-xs text-slate-500 uppercase font-bold mb-2">Método Pagamento</p>
+                          <div className="space-y-3 mt-4">
+                              <div className="flex justify-between text-xs">
+                                  <span className="text-emerald-400 font-bold">PIX</span>
+                                  <span className="text-white">{metrics.payments.pixPercent}%</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-slate-800 rounded-full">
+                                  <div className="h-full bg-emerald-500 rounded-full" style={{width: `${metrics.payments.pixPercent}%`}} />
+                              </div>
+                              
+                              <div className="flex justify-between text-xs">
+                                  <span className="text-blue-400 font-bold">Cartão</span>
+                                  <span className="text-white">{metrics.payments.cardPercent}%</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-slate-800 rounded-full">
+                                  <div className="h-full bg-blue-500 rounded-full" style={{width: `${metrics.payments.cardPercent}%`}} />
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* --- LEADS TAB --- */}
       {activeTab === 'leads' && (
