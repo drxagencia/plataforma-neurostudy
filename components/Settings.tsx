@@ -36,6 +36,9 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
 
   // Apply theme preview immediately
   const handleThemeChange = (theme: 'dark' | 'light') => {
+      // Force Dark Mode Only for now
+      if (theme === 'light') return;
+
       setSelectedTheme(theme);
       
       const root = document.documentElement;
@@ -64,7 +67,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
       await DatabaseService.saveUserProfile(user.uid, {
         displayName,
         photoURL,
-        theme: selectedTheme
+        theme: 'dark' // Force save as dark for consistency
       });
 
       // Merge updated User fields back into UserProfile
@@ -72,7 +75,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
           ...user, 
           ...updatedAuthUser, 
           photoURL, 
-          theme: selectedTheme
+          theme: 'dark'
       };
 
       onUpdateUser(updatedProfile);
@@ -157,7 +160,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
                 <div className="grid grid-cols-2 gap-4">
                     <button 
                         onClick={() => handleThemeChange('dark')}
-                        className={`p-4 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-3 ${selectedTheme === 'dark' ? 'bg-slate-950 border-indigo-500 text-indigo-400' : 'bg-slate-900 border-transparent text-slate-400'}`}
+                        className={`p-4 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-3 bg-slate-950 border-indigo-500 text-indigo-400`}
                     >
                         <div className="w-8 h-8 rounded-full bg-slate-950 border border-white/20 flex items-center justify-center">
                             <Moon size={16} />
@@ -165,10 +168,13 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
                         <span>Dark Mode</span>
                     </button>
                     <button 
-                        onClick={() => handleThemeChange('light')}
-                        className={`p-4 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-3 ${selectedTheme === 'light' ? 'bg-white border-indigo-500 text-indigo-600 shadow-md' : 'bg-slate-100 border-transparent text-slate-500'}`}
+                        disabled={true}
+                        className={`p-4 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-3 bg-slate-900 border-transparent text-slate-600 opacity-50 cursor-not-allowed relative overflow-hidden`}
                     >
-                        <div className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center text-orange-500">
+                        <div className="absolute inset-0 bg-slate-950/80 flex items-center justify-center z-10 backdrop-blur-[1px]">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 border border-slate-700 px-2 py-1 rounded bg-slate-900">Em Breve</span>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center text-orange-500 opacity-50">
                             <Sun size={16} />
                         </div>
                         <span>White Mode</span>

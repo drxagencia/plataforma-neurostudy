@@ -99,14 +99,18 @@ const App: React.FC = () => {
   // Theme Application Logic
   useEffect(() => {
       const root = document.documentElement;
+      // Force Dark Mode always for now, regardless of user preference
       root.classList.remove('light');
-      root.classList.remove('dark');
+      root.classList.add('dark');
       
+      /* 
+      // DISABLED WHITE MODE TEMPORARILY
       if (user && user.theme === 'light') {
           root.classList.add('light');
       } else {
           root.classList.add('dark');
       }
+      */
   }, [user?.theme]);
 
   // Auth Persistence & DB Structure Enforcement
