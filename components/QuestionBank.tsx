@@ -9,18 +9,51 @@ import { auth } from '../services/firebaseConfig';
 // --- HELPER COMPONENT: Simple Markdown Parser ---
 const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
     if (!text) return null;
+    
+    // Clean up LaTeX style block delimiters if they slip through
+    const cleanText = text
+        .replace(/\\\[/g, '')
+        .replace(/\\\]/g, '')
+        .replace(/\\\(/g, '')
+        .replace(/\\\)/g, '');
+
     return (
-        <div className="leading-relaxed text-lg">
-            {text.split('\n').map((line, i) => (
-                <p key={i} className="mb-4 last:mb-0">
-                    {line.split(/(\*\*.*?\*\*)/g).map((part, j) => {
-                        if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={j} className="text-indigo-300 font-bold">{part.slice(2, -2)}</strong>;
-                        }
-                        return part;
-                    })}
-                </p>
-            ))}
+        <div className="leading-relaxed text-lg text-slate-300">
+            {cleanText.split('\n').map((line, i) => {
+                // Handle Lists
+                if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+                    return (
+                        <div key={i} className="flex gap-2 mb-2 ml-4">
+                            <span className="text-indigo-400 mt-1.5">•</span>
+                            <p className="flex-1">
+                                {line.replace(/^[-*]\s+/, '').split(/(\*\*.*?\*\*)/g).map((part, j) => {
+                                    if (part.startsWith('**') && part.endsWith('**')) {
+                                        return <strong key={j} className="text-indigo-200 font-bold">{part.slice(2, -2)}</strong>;
+                                    }
+                                    return part;
+                                })}
+                            </p>
+                        </div>
+                    );
+                }
+
+                // Handle Headers (Simple)
+                if (line.trim().startsWith('###')) {
+                    return <h4 key={i} className="text-xl font-bold text-white mt-6 mb-3">{line.replace('###', '').trim()}</h4>
+                }
+
+                // Standard Paragraphs
+                return (
+                    <p key={i} className="mb-4 last:mb-0">
+                        {line.split(/(\*\*.*?\*\*)/g).map((part, j) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={j} className="text-indigo-200 font-bold">{part.slice(2, -2)}</strong>;
+                            }
+                            return part;
+                        })}
+                    </p>
+                );
+            })}
         </div>
     );
 };
@@ -54,6 +87,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [eliminatedOptions, setEliminatedOptions] = useState<Record<string, Record<number, boolean>>>({});
   const [maybeOptions, setMaybeOptions] = useState<Record<string, Record<number, boolean>>>({});
   
+  // Track User Selection for AI Context
+  const [userSelection, setUserSelection] = useState<number | null>(null);
+
   // Explanation State
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
@@ -99,6 +135,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       setQuestions([]); 
       setCurrentIndex(0);
       setIsFilterOpen(false); // Auto close filter on fetch
+      setUserSelection(null); // Reset selection
+      setAiExplanation(null);
       
       try {
         const fetched = await DatabaseService.getQuestions(selectedCategory, selectedSubject, selectedTopic, selectedSubTopic || undefined);
@@ -129,11 +167,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       if (answeredMap[currentQ.id]) return;
 
       const isCorrect = optionIdx === currentQ.correctAnswer;
+      setUserSelection(optionIdx); // Store what user clicked for AI Context
       
       // Optimistic update map
       setAnsweredMap(prev => ({...prev, [currentQ.id!]: { correct: isCorrect }}));
-      // Save user answer locally (optional, for session persistence without refresh)
-      // Actually answeredMap is enough to lock it.
 
       await DatabaseService.markQuestionAsAnswered(auth.currentUser.uid, currentQ.id, isCorrect);
       
@@ -175,17 +212,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
 
   const handleExplain = async () => {
       const currentQ = questions[currentIndex];
-      // Find the WRONG answer the user clicked? 
-      // Since we don't track *which* wrong option they clicked in `answeredMap` (only correct/incorrect),
-      // we can ask AI to explain the question generally or compare Correct vs Common Mistake.
-      // Ideally, we'd store the selectedOption in DB or state.
-      // For now, let's explain the Correct Answer generally.
-      
       if (!currentQ) return;
+
+      // Determine text context
+      const correctTxt = currentQ.options[currentQ.correctAnswer];
+      let wrongTxt = "Não informado";
+      
+      // Try to find the specific wrong option selected
+      if (userSelection !== null && userSelection !== currentQ.correctAnswer) {
+          wrongTxt = currentQ.options[userSelection];
+      }
+
       setIsExplaining(true);
       try {
-          const wrongTxt = "Alternativa Incorreta"; // Placeholder
-          const correctTxt = currentQ.options[currentQ.correctAnswer];
           const text = await AiService.explainError(currentQ.text, wrongTxt, correctTxt);
           setAiExplanation(text);
           handleUpdateBalance(); 
@@ -202,6 +241,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       if (currentIndex < questions.length - 1) {
           setCurrentIndex(prev => prev + 1);
           setAiExplanation(null); // Clear previous explanation
+          setUserSelection(null);
           window.scrollTo({ top: 0, behavior: 'smooth' });
       }
   };
@@ -210,6 +250,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       if (currentIndex > 0) {
           setCurrentIndex(prev => prev - 1);
           setAiExplanation(null);
+          setUserSelection(null);
           window.scrollTo({ top: 0, behavior: 'smooth' });
       }
   };

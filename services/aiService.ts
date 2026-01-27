@@ -1,3 +1,4 @@
+
 import { auth } from "./firebaseConfig";
 
 export interface ChatMessage {
@@ -37,10 +38,18 @@ export const AiService = {
 
   explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string): Promise<string> => {
     try {
+      // Force strict structure to prevent AI confusion
       const promptContext = `
-        Questão: "${questionText}"
-        Aluno marcou (Errada): "${wrongAnswerText}"
-        A correta era: "${correctAnswerText}"
+[DADOS DA QUESTÃO]
+ENUNCIADO: "${questionText}"
+
+[AÇÃO DO ALUNO]
+ALTERNATIVA SELECIONADA (INCORRETA): "${wrongAnswerText}"
+
+[GABARITO OFICIAL]
+ALTERNATIVA CORRETA: "${correctAnswerText}"
+
+INSTRUÇÃO: Compare a alternativa incorreta com a correta. Explique onde está o erro conceitual do aluno. Use APENAS os dados acima como verdade.
       `;
 
       const response = await fetch('/api/chat', {
