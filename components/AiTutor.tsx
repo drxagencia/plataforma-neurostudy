@@ -394,7 +394,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                                       </span>
                                   </div>
                                   <div className="flex justify-between items-center text-[10px] text-slate-500">
-                                      <span>{new Date(t.timestamp).toLocaleDateString()}</p>
+                                      <span>{new Date(t.timestamp).toLocaleDateString()}</span>
                                   </div>
                               </div>
                           ))}
