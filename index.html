@@ -60,6 +60,9 @@
     <style>
       :root {
         --bg-body: #000000;
+        --glass-bg: rgba(15, 23, 42, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.05);
+        --star-color: #475569;
       }
 
       /* Dark Mode (Default) - Deep Universe Background */
@@ -73,14 +76,57 @@
         background-attachment: fixed;
         color: #f8fafc;
         overflow-x: hidden; 
-        font-feature-settings: "cv11", "ss01"; /* Enable cleaner font alternates */
-        letter-spacing: -0.015em; /* Tighter tracking for premium feel */
+        font-feature-settings: "cv11", "ss01"; 
+        letter-spacing: -0.015em; 
+      }
+
+      /* LIGHT MODE OVERHAUL */
+      html.light {
+        --glass-bg: rgba(255, 255, 255, 0.85); /* Frosted White */
+        --glass-border: rgba(0, 0, 0, 0.05);
+        --star-color: #cbd5e1; /* Subtle Grey Stars/Clouds */
       }
 
       html.light body {
-        background-color: #f8fafc;
-        color: #0f172a;
+        background-color: #f0f9ff;
+        background-image: 
+          radial-gradient(circle at 50% 0%, #e0f2fe, transparent 70%),
+          radial-gradient(circle at 0% 100%, #f0f9ff, transparent 60%),
+          radial-gradient(circle at 100% 100%, #e0e7ff, transparent 60%);
+        color: #0f172a; /* Slate 900 */
+        background-attachment: fixed;
+        overflow-x: hidden;
       }
+
+      /* FIX: Global Contrast Fix for Light Mode */
+      /* Invert text-white to dark slate in light mode, EXCEPT inside buttons/badges that have colored backgrounds */
+      html.light .text-white { color: #1e293b !important; } /* Default swap to Slate-800 */
+      
+      /* Preserve white text on colored components */
+      html.light .bg-indigo-600 .text-white,
+      html.light .bg-emerald-600 .text-white,
+      html.light .bg-red-600 .text-white,
+      html.light .bg-slate-800 .text-white,
+      html.light .bg-slate-900 .text-white,
+      html.light .bg-slate-950 .text-white,
+      html.light button.text-white, 
+      html.light [class*='bg-gradient'] .text-white {
+          color: #ffffff !important;
+      }
+      
+      /* Make slate-400 slightly darker in light mode for readability */
+      html.light .text-slate-400 { color: #64748b !important; }
+      html.light .text-slate-300 { color: #334155 !important; }
+      html.light .text-slate-500 { color: #475569 !important; }
+
+      /* Fix Glass Inputs in Light Mode */
+      html.light .glass-input {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #0f172a;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      }
+      html.light .glass-input::placeholder { color: #94a3b8; }
 
       h1, h2, h3, h4, h5, h6 {
         font-family: 'Outfit', sans-serif; /* Use Outfit for all headers by default */
@@ -130,10 +176,10 @@
         height: 1px;
         background: transparent;
         box-shadow: 
-          10vw 10vh #475569, 80vw 5vh #475569, 5vw 85vh #475569, 30vw 15vh #475569, 90vw 60vh #475569,
-          15vw 40vh #475569, 55vw 25vh #475569, 70vw 90vh #475569, 45vw 55vh #475569, 25vw 75vh #475569,
-          60vw 10vh #475569, 85vw 35vh #475569, 35vw 95vh #475569, 10vw 65vh #475569, 95vw 20vh #475569,
-          50vw 50vh #475569, 20vw 30vh #475569, 75vw 80vh #475569, 40vw 10vh #475569, 65vw 45vh #475569;
+          10vw 10vh var(--star-color), 80vw 5vh var(--star-color), 5vw 85vh var(--star-color), 30vw 15vh var(--star-color), 90vw 60vh var(--star-color),
+          15vw 40vh var(--star-color), 55vw 25vh var(--star-color), 70vw 90vh var(--star-color), 45vw 55vh var(--star-color), 25vw 75vh var(--star-color),
+          60vw 10vh var(--star-color), 85vw 35vh var(--star-color), 35vw 95vh var(--star-color), 10vw 65vh var(--star-color), 95vw 20vh var(--star-color),
+          50vw 50vh var(--star-color), 20vw 30vh var(--star-color), 75vw 80vh var(--star-color), 40vw 10vh var(--star-color), 65vw 45vh var(--star-color);
         animation: animStar 100s linear infinite;
         opacity: 0.3; /* Dimmer for depth */
       }
@@ -144,9 +190,9 @@
         height: 2px;
         background: transparent;
         box-shadow: 
-          20vw 20vh #94a3b8, 60vw 80vh #94a3b8, 10vw 60vh #94a3b8, 90vw 10vh #94a3b8,
-          40vw 40vh #94a3b8, 80vw 30vh #94a3b8, 30vw 90vh #94a3b8, 70vw 50vh #94a3b8,
-          50vw 10vh #94a3b8, 15vw 85vh #94a3b8, 85vw 55vh #94a3b8, 35vw 25vh #94a3b8;
+          20vw 20vh var(--star-color), 60vw 80vh var(--star-color), 10vw 60vh var(--star-color), 90vw 10vh var(--star-color),
+          40vw 40vh var(--star-color), 80vw 30vh var(--star-color), 30vw 90vh var(--star-color), 70vw 50vh var(--star-color),
+          50vw 10vh var(--star-color), 15vw 85vh var(--star-color), 85vw 55vh var(--star-color), 35vw 25vh var(--star-color);
         animation: animStar 60s linear infinite;
         opacity: 0.5;
       }
@@ -158,11 +204,13 @@
         height: 2px;
         background: transparent;
         box-shadow: 
-          50vw 30vh #e2e8f0, 10vw 80vh #e2e8f0, 85vw 15vh #e2e8f0, 25vw 60vh #e2e8f0;
+          50vw 30vh var(--star-color), 10vw 80vh var(--star-color), 85vw 15vh var(--star-color), 25vw 60vh var(--star-color);
         animation: animStar 40s linear infinite;
         opacity: 0.8;
+        /* Only apply glow filter in Dark Mode */
         filter: drop-shadow(0 0 2px #6366f1);
       }
+      html.light .stars-3 { filter: none; }
       .stars-3::after { width: 2px; height: 2px; }
 
       @keyframes animStar {
@@ -181,29 +229,30 @@
           radial-gradient(circle at 85% 25%, rgba(49, 46, 129, 0.05), transparent 40%);
         animation: pulseGlow 15s ease-in-out infinite alternate;
       }
+      
+      html.light .nebula-glow {
+          background: 
+          radial-gradient(circle at 15% 55%, rgba(56, 189, 248, 0.1), transparent 40%),
+          radial-gradient(circle at 85% 25%, rgba(99, 102, 241, 0.05), transparent 40%);
+      }
 
       @keyframes pulseGlow {
         0% { opacity: 0.3; transform: scale(1); }
         100% { opacity: 0.6; transform: scale(1.05); }
       }
-
-      html.light .stars-container { display: none; }
       
       .glass-card {
         background: var(--glass-bg);
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         border: 1px solid var(--glass-border);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
       }
+      
       .glass-input {
         background: rgba(2, 6, 23, 0.5);
         border: 1px solid rgba(255, 255, 255, 0.05);
         color: white;
-      }
-      html.light .glass-input {
-        background: white;
-        color: black;
-        border-color: #cbd5e1;
       }
 
       #root { position: relative; z-index: 1; min-height: 100vh; }

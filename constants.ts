@@ -95,6 +95,8 @@ export const RANKS: Rank[] = [
 
 export const getRank = (xp: number) => {
     // Reverse find to get the highest rank achieved
+    // Ensure Bronze is returned correctly if xp is 0
+    if (xp === undefined || xp === null) return RANKS[0];
     return [...RANKS].reverse().find(r => xp >= r.minXp) || RANKS[0];
 };
 

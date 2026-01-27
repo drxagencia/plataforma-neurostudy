@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navigation from './components/Navigation';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -14,13 +14,15 @@ import AiTutor from './components/AiTutor';
 import Redacao from './components/Redacao';
 import Militares from './components/Militares';
 import AccessDenied from './components/AccessDenied'; 
-import FullScreenPrompt from './components/FullScreenPrompt'; // Imported
+import FullScreenPrompt from './components/FullScreenPrompt'; 
+import RankUpOverlay from './components/RankUpOverlay'; // Imported
 import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Zap } from 'lucide-react';
+import { getRank } from './constants';
 
 const XP_TOAST_DURATION = 3000;
 
@@ -82,6 +84,11 @@ const App: React.FC = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
+  // Rank Up Logic
+  const [showRankUp, setShowRankUp] = useState(false);
+  const prevXpRef = useRef<number>(0);
+  const [rankTransition, setRankTransition] = useState<{old: any, new: any} | null>(null);
+
   // Responsive Check
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -117,6 +124,11 @@ const App: React.FC = () => {
                isAdmin: mappedUser.isAdmin
         });
 
+        // Initialize XP Ref on first load
+        if (prevXpRef.current === 0 && dbUser?.xp) {
+            prevXpRef.current = dbUser.xp;
+        }
+
         // Fallback for deprecated 'midnight' theme in DB to 'dark'
         const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
 
@@ -140,6 +152,25 @@ const App: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // Monitor XP for Rank Up
+  useEffect(() => {
+      if (user && user.xp !== undefined) {
+          const oldXp = prevXpRef.current;
+          const newXp = user.xp;
+
+          if (newXp > oldXp) {
+              const oldRank = getRank(oldXp);
+              const newRank = getRank(newXp);
+
+              if (newRank.name !== oldRank.name) {
+                  setRankTransition({ old: oldRank, new: newRank });
+                  setShowRankUp(true);
+              }
+          }
+          prevXpRef.current = newXp;
+      }
+  }, [user?.xp]);
 
   const handleLogin = (loggedInUser: User) => {
     setLoadingAuth(true); 
@@ -184,8 +215,16 @@ const App: React.FC = () => {
     // REMOVED bg-slate-950 here to allow body background to show
     <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       
-      <FullScreenPrompt /> {/* New Full Screen Suggestion */}
-      <XpToast /> {/* Global XP Notification */}
+      <FullScreenPrompt /> 
+      <XpToast /> 
+      
+      {showRankUp && rankTransition && (
+          <RankUpOverlay 
+            oldRank={rankTransition.old} 
+            newRank={rankTransition.new} 
+            onClose={() => setShowRankUp(false)} 
+          />
+      )}
 
       {/* Background Animation Container */}
       <div className="stars-container">
