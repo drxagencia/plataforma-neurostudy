@@ -187,7 +187,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
   };
 
   // --- ULTRA TUTOR LOGIC ---
-  const handleTutorAction = async (actionType: 'summary' | 'mindmap' | 'graph' | 'custom') => {
+  const handleTutorAction = async (actionType: 'summary' | 'mindmap' | 'custom') => {
       if (!selectedLesson) return;
       if (user.balance < 0.05) {
           alert("Saldo insuficiente para utilizar o NeuroTutor Avançado.");
@@ -205,9 +205,6 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
       if (actionType === 'mindmap') {
           userQuery = "Crie um MAPA MENTAL esquematizado desta aula.";
           systemPrompt = `${contextHeader}\n\nVocê é um especialista em Aprendizagem Acelerada. Crie um mapa mental usando Markdown (listas com indentação - ou *). Use EMOJIS para categorizar. Seja hierárquico e visual.`;
-      } else if (actionType === 'graph') {
-          userQuery = "Desenhe/Explique os GRÁFICOS ou ESQUEMAS visuais importantes deste conceito.";
-          systemPrompt = `${contextHeader}\n\nSe a matéria envolve exatas, descreva detalhadamente os eixos, comportamento da curva e desenhe usando arte ASCII ou Markdown code blocks se possível. Se for humanas, faça um esquema de causa/consequência. Foco no ENEM.`;
       } else if (actionType === 'summary') {
           userQuery = "Gere um RESUMO DE ALTA PERFORMANCE focado no ENEM.";
           systemPrompt = `${contextHeader}\n\nVocê é um Professor Sênior de Cursinho. Crie um resumo 'direto ao ponto'. Use negrito para conceitos chave. Liste 'O que cai no ENEM' no final.`;
@@ -287,7 +284,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                   </div>
 
                   {/* Quick Actions */}
-                  <div className="p-4 grid grid-cols-3 gap-2 border-b border-white/5 bg-slate-900/30">
+                  <div className="p-4 grid grid-cols-2 gap-2 border-b border-white/5 bg-slate-900/30">
                       <button 
                         onClick={() => handleTutorAction('mindmap')}
                         disabled={tutorLoading}
@@ -303,14 +300,6 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                       >
                           <FileType size={20} className="mb-2 text-emerald-400 group-hover:text-white" />
                           <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Resumo Top</span>
-                      </button>
-                      <button 
-                        onClick={() => handleTutorAction('graph')}
-                        disabled={tutorLoading}
-                        className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-800 hover:bg-purple-600/20 border border-white/5 hover:border-purple-500/50 transition-all group"
-                      >
-                          <BarChart size={20} className="mb-2 text-purple-400 group-hover:text-white" />
-                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Gráficos</span>
                       </button>
                   </div>
 

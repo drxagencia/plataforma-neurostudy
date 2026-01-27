@@ -27,25 +27,50 @@ const XP_TOAST_DURATION = 3000;
 // Sub-component for XP Notification
 const XpToast = () => {
     const [xpNotification, setXpNotification] = useState<{amount: number, reason: string} | null>(null);
+    const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
         const unsubscribe = DatabaseService.onXpEarned((amount, reason) => {
             setXpNotification({ amount, reason });
-            setTimeout(() => setXpNotification(null), XP_TOAST_DURATION);
+            setIsVisible(true);
+            
+            // Hide after duration
+            const timer = setTimeout(() => {
+                setIsVisible(false);
+            }, XP_TOAST_DURATION);
+
+            return () => clearTimeout(timer);
         });
         return () => unsubscribe();
     }, []);
 
+    // Helper to format reason text nicely
+    const getReasonLabel = (reason: string) => {
+        switch(reason) {
+            case 'QUESTION_CORRECT': return 'Resposta Correta';
+            case 'LESSON_WATCHED': return 'Aula Concluída';
+            case 'SIMULATION_FINISH': return 'Simulado Finalizado';
+            case 'ESSAY_CORRECTION': return 'Redação Corrigida';
+            case 'AI_CHAT_MESSAGE': return 'Interação IA';
+            case 'DAILY_LOGIN_BASE': return 'Login Diário';
+            case 'LIKE_COMMENT': return 'Interação Social';
+            case 'FULLSCREEN_MODE': return 'Modo Foco';
+            default: return 'Atividade';
+        }
+    };
+
     if (!xpNotification) return null;
 
     return (
-        <div className="fixed top-24 right-4 z-[100] bg-slate-900/90 backdrop-blur-xl border border-yellow-500/30 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right duration-500">
-            <div className="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center border border-yellow-500/50">
-                <Zap className="text-yellow-400 fill-yellow-400" size={24} />
-            </div>
-            <div>
-                <p className="text-2xl font-black text-white leading-none">+{xpNotification.amount} <span className="text-sm font-bold text-yellow-400 uppercase tracking-widest">XP</span></p>
-                <p className="text-xs text-slate-400 font-medium uppercase mt-1">Conquista Desbloqueada</p>
+        <div className={`fixed bottom-6 left-6 z-[100] transition-all duration-500 ease-out transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
+            <div className="bg-slate-950/80 backdrop-blur-md border border-white/5 pr-5 pl-4 py-3 rounded-full shadow-2xl flex items-center gap-3">
+                <div className="bg-yellow-500/10 p-1.5 rounded-full">
+                    <Zap className="text-yellow-400 fill-yellow-400" size={14} />
+                </div>
+                <div className="flex items-baseline gap-2">
+                    <span className="font-bold text-white text-sm">+{xpNotification.amount} XP</span>
+                    <span className="text-xs text-slate-500 border-l border-white/10 pl-2">{getReasonLabel(xpNotification.reason)}</span>
+                </div>
             </div>
         </div>
     );

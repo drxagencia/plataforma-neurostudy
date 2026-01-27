@@ -116,7 +116,7 @@ const AdminPanel: React.FC = () => {
   });
 
   // NEW: Helper State for existing lessons in Create Mode (for dropdown ordering)
-  const [createModeExistingLessons, setCreateModeExistingLessons] = useState<Lesson[]>([]);
+  const [createModeExistingLessons, setCreateModeExistingLessons] = useState<{lesson: Lesson, topic: string}[]>([]);
 
   // INITIAL LOAD: Load lightweight configs only
   useEffect(() => {
@@ -204,14 +204,18 @@ const AdminPanel: React.FC = () => {
 
   // NEW: Fetch existing lessons for Ordering Dropdown in Create Mode
   useEffect(() => {
-      if (viewMode === 'create' && contentTab === 'lesson' && contentForm.subjectId && contentForm.topicName) {
+      if (viewMode === 'create' && contentTab === 'lesson' && contentForm.subjectId) {
           DatabaseService.getLessonsByTopic(contentForm.subjectId).then(res => {
-              setCreateModeExistingLessons(res[contentForm.topicName] || []);
+              const flattened: {lesson: Lesson, topic: string}[] = [];
+              Object.keys(res).forEach(topic => {
+                  res[topic].forEach(l => flattened.push({ lesson: l, topic }));
+              });
+              setCreateModeExistingLessons(flattened);
           });
       } else {
           setCreateModeExistingLessons([]);
       }
-  }, [contentForm.subjectId, contentForm.topicName, viewMode, contentTab]);
+  }, [contentForm.subjectId, viewMode, contentTab]);
 
   // --- ACTIONS ---
 
@@ -538,7 +542,11 @@ const AdminPanel: React.FC = () => {
                       targetIndex = 0;
                   } else {
                       // Find index of the selected ID
-                      const prevIndex = createModeExistingLessons.findIndex(l => l.id === contentForm.lInsertAfterId);
+                      // Need to filter lessons by the CURRENT topic (contentForm.topicName)
+                      // Because `createLessonWithOrder` works on that specific topic list.
+                      const topicLessons = createModeExistingLessons.filter(i => i.topic === contentForm.topicName).map(i => i.lesson);
+                      
+                      const prevIndex = topicLessons.findIndex(l => l.id === contentForm.lInsertAfterId);
                       if (prevIndex !== -1) {
                           targetIndex = prevIndex + 1;
                       }
@@ -551,7 +559,13 @@ const AdminPanel: React.FC = () => {
               alert("Aula criada com sucesso!");
               setMaterials([]);
               // Refresh dropdown list
-              DatabaseService.getLessonsByTopic(contentForm.subjectId).then(res => setCreateModeExistingLessons(res[contentForm.topicName] || []));
+              DatabaseService.getLessonsByTopic(contentForm.subjectId).then(res => {
+                  const flattened: {lesson: Lesson, topic: string}[] = [];
+                  Object.entries(res).forEach(([topic, lessons]) => {
+                      lessons.forEach(l => flattened.push({ lesson: l, topic }));
+                  });
+                  setCreateModeExistingLessons(flattened);
+              });
           }
           resetForms();
       } catch (e) {
@@ -1244,13 +1258,23 @@ const AdminPanel: React.FC = () => {
                                                      <select 
                                                         className="w-full glass-input p-3 rounded-lg" 
                                                         value={contentForm.lInsertAfterId} 
-                                                        onChange={e => setContentForm({...contentForm, lInsertAfterId: e.target.value})}
-                                                        disabled={!contentForm.topicName}
+                                                        onChange={e => {
+                                                            const val = e.target.value;
+                                                            const selectedItem = createModeExistingLessons.find(i => i.lesson.id === val);
+                                                            setContentForm(prev => ({
+                                                                ...prev, 
+                                                                lInsertAfterId: val,
+                                                                topicName: selectedItem ? selectedItem.topic : prev.topicName
+                                                            }));
+                                                        }}
+                                                        disabled={!contentForm.subjectId}
                                                      >
                                                          <option value="end">Ao final (Padrão)</option>
                                                          <option value="start">No Início (Primeira Aula)</option>
-                                                         {createModeExistingLessons.map((l, idx) => (
-                                                             <option key={l.id} value={l.id}>Após: {idx + 1}. {l.title}</option>
+                                                         {createModeExistingLessons.map((item, idx) => (
+                                                             <option key={item.lesson.id} value={item.lesson.id}>
+                                                                 [{item.topic}] {item.lesson.title}
+                                                             </option>
                                                          ))}
                                                      </select>
                                                  </div>
