@@ -3,6 +3,20 @@ export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidad
 
 export type UserPlan = 'basic' | 'intermediate' | 'advanced' | 'admin';
 
+export interface Lead {
+  id: string;
+  amount: number;
+  billing: string;
+  contact: string;
+  name: string;
+  paymentMethod: string;
+  planId: string; // 'adv', 'basic', etc
+  status: string; // 'pending_pix', 'paid', etc
+  timestamp: string; // ISO String
+  name_pix?: string;
+  processed?: boolean; // Internal control
+}
+
 export interface Transaction {
   id: string;
   type: 'debit' | 'credit';

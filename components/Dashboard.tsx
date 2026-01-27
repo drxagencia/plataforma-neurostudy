@@ -49,13 +49,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       {/* Header */}
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">
+          <h2 className="text-4xl font-bold text-white mb-2 tracking-tight font-display">
             Olá, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">{user.displayName.split(' ')[0]}</span>
           </h2>
-          <p className="text-slate-400 font-medium">Vamos elevar seu nível hoje?</p>
+          <p className="text-slate-400 font-medium font-sans">Vamos elevar seu nível hoje?</p>
         </div>
         <div className="hidden md:block text-right">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-indigo-300 uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-indigo-300 uppercase tracking-wider font-sans">
              {user.isAdmin ? 'Administrador' : user.plan !== 'basic' ? 'Assinante Pro' : 'Plano Gratuito'}
           </div>
         </div>
@@ -73,20 +73,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                     <span className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300">
                         <Sparkles size={18} />
                     </span>
-                    <span className="text-indigo-300 font-semibold tracking-wide text-sm">FOCO DIÁRIO</span>
+                    <span className="text-indigo-300 font-semibold tracking-wide text-sm font-sans">FOCO DIÁRIO</span>
                 </div>
                 
-                <h3 className="text-3xl font-bold text-white mb-4 leading-tight">
+                <h3 className="text-3xl font-bold text-white mb-4 leading-tight font-display">
                     Pronto para começar?
                 </h3>
-                <p className="text-slate-300 mb-8 text-lg leading-relaxed">
+                <p className="text-slate-300 mb-8 text-lg leading-relaxed font-sans">
                     Acesse o banco de questões ou inicie uma nova aula para começar a ganhar XP.
                 </p>
                 
                 <div className="flex gap-4">
                     <button 
                         onClick={() => onNavigate('questoes')}
-                        className="px-8 py-4 bg-white text-slate-950 font-bold rounded-2xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer"
+                        className="px-8 py-4 bg-white text-slate-950 font-bold rounded-2xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer font-sans"
                     >
                         Explorar Conteúdos
                         <ArrowRight size={20} />
@@ -107,8 +107,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                     />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Nível</span>
-                    <span className="text-4xl font-black">{level}</span>
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider font-sans">Nível</span>
+                    <span className="text-4xl font-black font-display">{level}</span>
                 </div>
             </div>
         </div>
@@ -148,9 +148,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                 {stat.icon}
               </div>
             </div>
-            <p className="text-slate-400 text-sm font-medium">{stat.label}</p>
-            <p className="text-3xl font-bold text-white mt-1 mb-1">{stat.value}</p>
-            <p className="text-xs text-slate-500 font-medium">{stat.sub}</p>
+            <p className="text-slate-400 text-sm font-medium font-sans">{stat.label}</p>
+            <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{stat.value}</p>
+            <p className="text-xs text-slate-500 font-medium font-sans">{stat.sub}</p>
           </div>
         ))}
       </div>

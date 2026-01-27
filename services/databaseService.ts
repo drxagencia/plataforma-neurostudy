@@ -1,7 +1,7 @@
 
 import { ref, get, child, update, push, set, query, orderByChild, equalTo, limitToLast, remove, startAfter, limitToFirst, runTransaction } from "firebase/database";
 import { database } from "./firebaseConfig";
-import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan, SimulationResult, EssayCorrection } from "../types";
+import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan, SimulationResult, EssayCorrection, Lead } from "../types";
 
 // --- MEMORY CACHE TO PREVENT REDUNDANT DOWNLOADS ---
 const CACHE: {
@@ -38,6 +38,39 @@ export const DatabaseService = {
       }
   },
 
+  // --- LEADS & LANDING PAGE INTEGRATION ---
+  getLeads: async (): Promise<Lead[]> => {
+      try {
+          const snapshot = await get(ref(database, 'leads'));
+          if (snapshot.exists()) {
+              const data = snapshot.val();
+              // Convert object to array and sort by timestamp desc
+              return Object.keys(data)
+                .map(key => ({ ...data[key], id: key }))
+                .sort((a, b) => {
+                    const timeA = new Date(a.timestamp).getTime();
+                    const timeB = new Date(b.timestamp).getTime();
+                    return timeB - timeA;
+                });
+          }
+          return [];
+      } catch (e) {
+          console.error("Error fetching leads", e);
+          return [];
+      }
+  },
+
+  markLeadProcessed: async (leadId: string): Promise<void> => {
+      try {
+          await update(ref(database, `leads/${leadId}`), { 
+              processed: true,
+              status: 'approved_access' 
+          });
+      } catch (e) {
+          throw e;
+      }
+  },
+
   // --- User Profile & XP ---
   getUserProfile: async (uid: string): Promise<UserProfile | null> => {
     try {
@@ -67,7 +100,7 @@ export const DatabaseService = {
         ...data,
         balance: 0,
         essayCredits: 0,
-        plan: data.isAdmin ? 'admin' : 'basic'
+        plan: data.plan || (data.isAdmin ? 'admin' : 'basic')
       });
       // Sync with lightweight leaderboard
       await DatabaseService.syncLeaderboard(uid, data.displayName || 'User', data.photoURL || '', 0);

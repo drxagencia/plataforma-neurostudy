@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation } from '../types';
+import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload } from 'lucide-react';
+import { AuthService } from '../services/authService';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'users' | 'content' | 'finance' | 'config'>('users');
+  const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config'>('leads');
   const [contentTab, setContentTab] = useState<'question' | 'lesson' | 'subject' | 'simulation' | 'import'>('question');
   
   // View Mode: Create New vs Manage Existing
@@ -15,6 +16,7 @@ const AdminPanel: React.FC = () => {
   const [editingPath, setEditingPath] = useState<string | null>(null);
 
   // Data
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
@@ -38,6 +40,11 @@ const AdminPanel: React.FC = () => {
   const [importText, setImportText] = useState('');
   const [importCategory, setImportCategory] = useState('regular');
   const [isImporting, setIsImporting] = useState(false);
+
+  // Lead Approval State
+  const [approvingLead, setApprovingLead] = useState<Lead | null>(null);
+  const [newStudentEmail, setNewStudentEmail] = useState('');
+  const [newStudentPassword, setNewStudentPassword] = useState('mudar123'); // Default password
 
   // Simulation Form
   const [simForm, setSimForm] = useState({
@@ -126,6 +133,13 @@ const AdminPanel: React.FC = () => {
       }
   }, [activeTab]);
 
+  // LAZY LOAD: Leads
+  useEffect(() => {
+      if (activeTab === 'leads') {
+          DatabaseService.getLeads().then(l => setLeads(l));
+      }
+  }, [activeTab]);
+
   // LAZY LOAD: Finance
   useEffect(() => {
       if (activeTab === 'finance') {
@@ -175,6 +189,64 @@ const AdminPanel: React.FC = () => {
   const normalizeId = (str: string) => {
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
   };
+
+  // Leads Approval Logic
+  const handleOpenApproveModal = (lead: Lead) => {
+      setApprovingLead(lead);
+      // Auto-fill basic data
+      setNewStudentEmail(''); // Must be manual as per requirement
+      setNewStudentPassword('mudar123');
+  };
+
+  const handleApproveLead = async () => {
+      if (!approvingLead || !newStudentEmail || !newStudentPassword) {
+          alert("Preencha o email e senha para criar a conta.");
+          return;
+      }
+
+      setLoading(true);
+      try {
+          // 1. Create User in Auth (using secondary app to avoid admin logout)
+          const newUid = await AuthService.registerStudent(newStudentEmail, newStudentPassword, approvingLead.name);
+
+          // 2. Map Plan
+          let userPlan: UserPlan = 'basic';
+          const pid = approvingLead.planId.toLowerCase();
+          if (pid.includes('adv') || pid.includes('pro')) userPlan = 'advanced';
+          else if (pid.includes('int') || pid.includes('med')) userPlan = 'intermediate';
+
+          // 3. Create Database Profile
+          const expiryDate = new Date();
+          expiryDate.setFullYear(expiryDate.getFullYear() + 1); // 1 year subscription
+
+          await DatabaseService.createUserProfile(newUid, {
+              displayName: approvingLead.name,
+              email: newStudentEmail,
+              plan: userPlan,
+              subscriptionExpiry: expiryDate.toISOString().split('T')[0],
+              xp: 0,
+              balance: 0,
+              essayCredits: 0
+          });
+
+          // 4. Mark Lead as Processed
+          await DatabaseService.markLeadProcessed(approvingLead.id);
+
+          alert(`Aluno ${approvingLead.name} aprovado com sucesso!\nLogin: ${newStudentEmail}\nSenha: ${newStudentPassword}`);
+          setApprovingLead(null);
+          
+          // Refresh Leads
+          const l = await DatabaseService.getLeads();
+          setLeads(l);
+
+      } catch (e: any) {
+          console.error(e);
+          alert(`Erro ao aprovar: ${e.message}`);
+      } finally {
+          setLoading(false);
+      }
+  };
+
 
   const handleImportQuestions = async () => {
       if (!importText.trim()) return alert("Cole o texto para importar.");
@@ -480,7 +552,65 @@ const AdminPanel: React.FC = () => {
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
   return (
-    <div className="space-y-6 animate-slide-up pb-20">
+    <div className="space-y-6 animate-slide-up pb-20 relative">
+      
+      {/* --- LEAD APPROVAL MODAL --- */}
+      {approvingLead && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-indigo-500/30 p-8 rounded-2xl w-full max-w-lg shadow-2xl">
+                  <h3 className="text-2xl font-bold text-white mb-4">Aprovar Aluno</h3>
+                  
+                  <div className="space-y-4 mb-6">
+                      <div className="bg-slate-800 p-4 rounded-xl border border-white/5">
+                          <p className="text-slate-400 text-xs uppercase font-bold">Aluno</p>
+                          <p className="text-white font-medium text-lg">{approvingLead.name}</p>
+                          <div className="flex gap-4 mt-2">
+                              <p className="text-slate-400 text-xs">Plano: <span className="text-indigo-400 font-bold uppercase">{approvingLead.planId}</span></p>
+                              <p className="text-slate-400 text-xs">Valor: <span className="text-emerald-400 font-bold">R$ {approvingLead.amount}</span></p>
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="text-slate-400 text-xs font-bold uppercase mb-1 block">Email de Login</label>
+                          <input 
+                            type="email" 
+                            className="w-full glass-input p-3 rounded-xl focus:border-indigo-500 transition-colors"
+                            placeholder="email@aluno.com"
+                            value={newStudentEmail}
+                            onChange={(e) => setNewStudentEmail(e.target.value)}
+                          />
+                      </div>
+
+                      <div>
+                          <label className="text-slate-400 text-xs font-bold uppercase mb-1 block">Senha Provisória</label>
+                          <input 
+                            type="text" 
+                            className="w-full glass-input p-3 rounded-xl focus:border-indigo-500 transition-colors"
+                            value={newStudentPassword}
+                            onChange={(e) => setNewStudentPassword(e.target.value)}
+                          />
+                      </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                      <button 
+                        onClick={() => setApprovingLead(null)}
+                        className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-slate-400 font-bold"
+                      >
+                          Cancelar
+                      </button>
+                      <button 
+                        onClick={handleApproveLead}
+                        disabled={loading}
+                        className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-900/20 disabled:opacity-50"
+                      >
+                          {loading ? <Loader2 className="animate-spin mx-auto"/> : 'Criar Acesso'}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white mb-1">Painel Administrativo</h2>
@@ -489,7 +619,8 @@ const AdminPanel: React.FC = () => {
         
         <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10 overflow-x-auto">
             {[
-                { id: 'users', label: 'Usuários', icon: UserPlus },
+                { id: 'leads', label: 'Novos Alunos', icon: UserCheck },
+                { id: 'users', label: 'Gerenciar Usuários', icon: Users },
                 { id: 'content', label: 'Conteúdo', icon: BookOpen },
                 { id: 'finance', label: 'Financeiro', icon: Wallet },
                 { id: 'config', label: 'Config. IA', icon: SettingsIcon }
@@ -504,6 +635,68 @@ const AdminPanel: React.FC = () => {
             ))}
         </div>
       </header>
+
+      {/* --- LEADS TAB --- */}
+      {activeTab === 'leads' && (
+          <div className="space-y-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <UserPlus className="text-emerald-400" /> Aprovação de Alunos (Landing Page)
+              </h3>
+              
+              <div className="glass-card rounded-2xl overflow-hidden">
+                  <table className="w-full text-left">
+                      <thead className="bg-slate-900/50">
+                          <tr>
+                              <th className="p-4 text-slate-400">Nome</th>
+                              <th className="p-4 text-slate-400">Plano</th>
+                              <th className="p-4 text-slate-400">Contato</th>
+                              <th className="p-4 text-slate-400">Status</th>
+                              <th className="p-4 text-slate-400">Data</th>
+                              <th className="p-4 text-slate-400 text-right">Ação</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                          {leads.map(lead => (
+                              <tr key={lead.id} className="hover:bg-white/5 transition-colors">
+                                  <td className="p-4 font-medium text-white">{lead.name}</td>
+                                  <td className="p-4">
+                                      <span className="bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded text-xs font-bold uppercase">{lead.planId}</span>
+                                  </td>
+                                  <td className="p-4 text-slate-400 text-sm">{lead.contact}</td>
+                                  <td className="p-4">
+                                      {lead.processed ? (
+                                        <span className="text-emerald-400 text-xs font-bold flex items-center gap-1"><CheckCircle size={14}/> Aprovado</span>
+                                      ) : (
+                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${lead.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-300'}`}>
+                                            {lead.status === 'pending_pix' ? 'Pendente' : lead.status}
+                                        </span>
+                                      )}
+                                  </td>
+                                  <td className="p-4 text-slate-500 text-xs">
+                                      {new Date(lead.timestamp).toLocaleDateString()}
+                                  </td>
+                                  <td className="p-4 text-right">
+                                      {!lead.processed && (
+                                          <button 
+                                            onClick={() => handleOpenApproveModal(lead)}
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-emerald-900/20 transition-all hover:scale-105"
+                                          >
+                                              Criar Acesso
+                                          </button>
+                                      )}
+                                  </td>
+                              </tr>
+                          ))}
+                          {leads.length === 0 && (
+                              <tr>
+                                  <td colSpan={6} className="p-8 text-center text-slate-500">Nenhum novo aluno encontrado.</td>
+                              </tr>
+                          )}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      )}
 
       {/* --- CONTENT TAB --- */}
       {activeTab === 'content' && (

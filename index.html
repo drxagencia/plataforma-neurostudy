@@ -10,14 +10,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- New Fonts: Outfit (Display) and Plus Jakarta Sans (Body) -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['"Plus Jakarta Sans"', 'sans-serif'], // Professional Body Font
+              display: ['"Outfit"', 'sans-serif'], // Stylized Heading Font
+            },
+            // Hack to make the entire UI look thinner/cleaner automatically
+            fontWeight: {
+              light: '300',
+              normal: '400',
+              medium: '500',
+              semibold: '600',
+              bold: '600', // Remapping 'bold' to 600 makes everything cleaner
+              extrabold: '700', // Remapping 'extrabold' to 700
             },
             colors: {
               glass: {
@@ -62,11 +73,18 @@
         background-attachment: fixed;
         color: #f8fafc;
         overflow-x: hidden; 
+        font-feature-settings: "cv11", "ss01"; /* Enable cleaner font alternates */
+        letter-spacing: -0.015em; /* Tighter tracking for premium feel */
       }
 
       html.light body {
         background-color: #f8fafc;
         color: #0f172a;
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Outfit', sans-serif; /* Use Outfit for all headers by default */
+        letter-spacing: -0.025em;
       }
 
       /* Scrollbar */

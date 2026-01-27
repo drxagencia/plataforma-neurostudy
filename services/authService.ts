@@ -1,10 +1,12 @@
+
 import { 
   signInWithEmailAndPassword, 
   signOut as firebaseSignOut, 
   updateProfile as firebaseUpdateProfile,
+  createUserWithEmailAndPassword,
   User as FirebaseUser
 } from "firebase/auth";
-import { auth } from "./firebaseConfig";
+import { auth, secondaryAuth } from "./firebaseConfig";
 import { User } from '../types';
 
 // Helper to map Firebase User to our App User type
@@ -30,6 +32,26 @@ export const AuthService = {
       console.error("Auth Error:", error);
       throw new Error(error.message || 'Falha na autenticação');
     }
+  },
+
+  // NEW: Register a student using Secondary Auth (prevents Admin logout)
+  registerStudent: async (email: string, password: string, displayName: string): Promise<string> => {
+      try {
+          const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+          // Set display name immediately
+          await firebaseUpdateProfile(userCredential.user, { displayName });
+          
+          // Important: Sign out the secondary auth immediately so it doesn't interfere with state
+          await firebaseSignOut(secondaryAuth);
+          
+          return userCredential.user.uid;
+      } catch (error: any) {
+          console.error("Registration Error:", error);
+          if (error.code === 'auth/email-already-in-use') {
+              throw new Error('Este email já está cadastrado.');
+          }
+          throw new Error('Erro ao criar conta: ' + error.message);
+      }
   },
 
   logout: async (): Promise<void> => {
