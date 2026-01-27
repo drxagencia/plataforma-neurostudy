@@ -1,9 +1,39 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { Subject, Lesson } from '../types';
 import * as Icons from 'lucide-react';
 import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, ExternalLink, Clock, MonitorPlay, GraduationCap } from 'lucide-react';
+
+// --- OPTIMIZED VIDEO PLAYER COMPONENT ---
+// This component is memoized to prevent re-renders of the iframe when parent state changes
+const VideoPlayer = React.memo(({ videoId, title }: { videoId: string, title: string }) => {
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Reset loading state when video changes
+    useEffect(() => {
+        setIsLoading(true);
+    }, [videoId]);
+
+    return (
+        <div className="relative aspect-video w-full bg-black rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-slate-800 ring-1 ring-white/10 group">
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
+                    <Loader2 className="animate-spin text-indigo-500" size={48} />
+                </div>
+            )}
+            <iframe 
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&enablejsapi=1&origin=${window.location.origin}`} 
+                title={title}
+                className={`w-full h-full transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowFullScreen
+                loading="eager"
+                onLoad={() => setIsLoading(false)}
+            />
+        </div>
+    );
+});
 
 const Classes: React.FC = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -47,9 +77,12 @@ const Classes: React.FC = () => {
 
   const handleLessonClick = (lesson: Lesson) => {
       setSelectedLesson(lesson);
+      // Scroll to top when selecting a lesson
+      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getYouTubeId = (url: string) => {
+    if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
@@ -80,23 +113,16 @@ const Classes: React.FC = () => {
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                   {/* Left Column: Video & Details */}
                   <div className="xl:col-span-2 space-y-6">
-                      {/* Video Player Container - Cinema Mode */}
-                      <div className="relative aspect-video w-full bg-black rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-slate-800 ring-1 ring-white/10 group">
-                          {videoId ? (
-                              <iframe 
-                                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1`} 
-                                  title={selectedLesson.title}
-                                  className="w-full h-full" 
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                  allowFullScreen
-                              />
-                          ) : (
-                              <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                                  <Video size={64} className="mb-4 opacity-20" />
-                                  <p className="text-lg font-medium">Vídeo indisponível ou link inválido.</p>
-                              </div>
-                          )}
-                      </div>
+                      
+                      {/* Optimized Player Component */}
+                      {videoId ? (
+                          <VideoPlayer videoId={videoId} title={selectedLesson.title} />
+                      ) : (
+                          <div className="relative aspect-video w-full bg-black rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-slate-800 flex flex-col items-center justify-center text-slate-500">
+                              <Video size={64} className="mb-4 opacity-20" />
+                              <p className="text-lg font-medium">Vídeo indisponível ou link inválido.</p>
+                          </div>
+                      )}
                       
                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-white/5">
                         <div className="space-y-2">
@@ -172,7 +198,7 @@ const Classes: React.FC = () => {
                                   return (
                                     <button 
                                         key={idx}
-                                        onClick={() => setSelectedLesson(l)}
+                                        onClick={() => handleLessonClick(l)}
                                         className={`w-full p-3 rounded-xl flex items-start gap-3 text-left transition-all duration-200 group relative overflow-hidden ${
                                             isActive 
                                             ? 'bg-indigo-600/10 border border-indigo-500/20' 

@@ -48,153 +48,33 @@
     </script>
     <style>
       :root {
-        /* Default Variables (will vary by theme) */
         --bg-body: #020617;
         --text-main: #f8fafc;
         --glass-bg: rgba(15, 23, 42, 0.6);
         --glass-border: rgba(255, 255, 255, 0.08);
-        --glass-input: rgba(2, 6, 23, 0.5);
-        --glass-input-border: rgba(255, 255, 255, 0.1);
-        --glass-input-text: white;
-        --sidebar-bg: #020617;
-        --sidebar-border: rgba(255, 255, 255, 0.05);
       }
 
-      /* =========================================
-         THEME: DARK (Default)
-         ========================================= */
+      /* Dark Mode (Default) - Universe Background */
       html.dark body {
-        background-color: #020617; /* slate-950 */
-        color: #f8fafc; /* slate-50 */
-      }
-
-      /* =========================================
-         THEME: LIGHT (White Mode)
-         ========================================= */
-      html.light {
-        --bg-body: #f8fafc; /* slate-50 */
-        --text-main: #0f172a; /* slate-900 */
-        --glass-bg: rgba(255, 255, 255, 0.8);
-        --glass-border: rgba(203, 213, 225, 0.6); /* slate-300 */
-        --glass-input: #ffffff;
-        --glass-input-border: #cbd5e1; /* slate-300 */
-        --glass-input-text: #0f172a;
-        --sidebar-bg: #ffffff;
-        --sidebar-border: #e2e8f0;
+        background-color: #020617;
+        background-image: radial-gradient(circle at 50% 100%, #1e1b4b, #020617 50%);
+        background-attachment: fixed;
+        color: #f8fafc;
       }
 
       html.light body {
-        background-color: var(--bg-body);
-        color: var(--text-main);
+        background-color: #f8fafc;
+        color: #0f172a;
       }
 
-      /* --- LIGHT MODE COMPATIBILITY OVERRIDES --- */
-      
-      html.light .bg-slate-950 { background-color: #f8fafc !important; } /* Main BG */
-      html.light .bg-slate-900 { background-color: #ffffff !important; } /* Card BG Base */
-      html.light .bg-slate-900\/50, 
-      html.light .bg-slate-900\/40, 
-      html.light .bg-slate-900\/60 { background-color: rgba(255,255,255,0.7) !important; }
-      
-      html.light .bg-slate-800 { background-color: #f1f5f9 !important; } /* Secondary/Hover */
-      html.light .bg-slate-800\/80 { background-color: rgba(241, 245, 249, 0.9) !important; }
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+      html.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+      ::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
 
-      /* Borders */
-      html.light .border-white\/5, 
-      html.light .border-white\/10 { border-color: #e2e8f0 !important; } /* slate-200 */
-      html.light .divide-white\/5 { border-color: #e2e8f0 !important; }
-
-      /* Text Colors */
-      html.light .text-white { color: #0f172a !important; } /* Invert white to dark slate */
-      html.light .text-slate-100 { color: #1e293b !important; }
-      html.light .text-slate-200 { color: #334155 !important; }
-      html.light .text-slate-300 { color: #475569 !important; } /* Medium gray */
-      html.light .text-slate-400 { color: #64748b !important; } /* Muted text */
-      html.light .text-slate-500 { color: #64748b !important; } 
-
-      /* Sidebar Specifics */
-      html.light aside {
-        background-color: #ffffff !important;
-        border-right: 1px solid #e2e8f0 !important;
-      }
-      html.light nav button.text-slate-400:hover {
-        background-color: #f1f5f9 !important; /* slate-100 */
-        color: #0f172a !important;
-      }
-
-      /* Inputs */
-      html.light input::placeholder, 
-      html.light textarea::placeholder {
-        color: #94a3b8 !important; /* slate-400 */
-      }
-
-      /* =========================================
-         GLOBAL COMPONENT STYLES
-         ========================================= */
-
-      /* Glass Card - Adapts to Theme */
-      .glass-card {
-        background: var(--glass-bg);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid var(--glass-border);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-      }
-      
-      html.light .glass-card {
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
-      }
-
-      /* Glass Input */
-      .glass-input {
-        background: var(--glass-input);
-        border: 1px solid var(--glass-input-border);
-        color: var(--glass-input-text);
-      }
-      .glass-input:focus {
-        border-color: #6366f1; /* Indigo 500 */
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
-        outline: none;
-      }
-      html.light .glass-input:focus {
-        background: #ffffff;
-      }
-
-      /* Global Transitions */
-      * {
-        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-        transition-duration: 200ms;
-      }
-
-      body {
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        overflow-x: hidden;
-      }
-
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #334155; 
-        border-radius: 10px;
-      }
-      html.light ::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #4f46e5; 
-      }
-
-      /* =========================================
-         RISING STARS BACKGROUND ANIMATION
-         ========================================= */
+      /* --- RISING STARS ANIMATION --- */
       .stars-container {
         position: fixed;
         top: 0;
@@ -202,7 +82,7 @@
         width: 100%;
         height: 100%;
         pointer-events: none;
-        z-index: -10;
+        z-index: 0; /* Behind content, but on top of body bg */
         overflow: hidden;
       }
       
@@ -213,69 +93,98 @@
         right: 0;
         bottom: 0;
         width: 100%;
-        height: 100%;
+        height: 200%; /* Double height for scrolling loop */
         display: block;
-        background: transparent;
       }
 
-      /* Layer 1 - Smallest Stars (Slowest) */
+      /* Small Stars */
       .stars-1 {
-        background-image: radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
-                          radial-gradient(1px 1px at 40px 70px, #ffffff, rgba(0,0,0,0)),
-                          radial-gradient(1px 1px at 50px 160px, #ffffff, rgba(0,0,0,0)),
-                          radial-gradient(1px 1px at 90px 40px, #ffffff, rgba(0,0,0,0)),
-                          radial-gradient(1px 1px at 130px 80px, #ffffff, rgba(0,0,0,0)),
-                          radial-gradient(1px 1px at 160px 120px, #ffffff, rgba(0,0,0,0));
-        background-size: 200px 200px;
-        animation: floatUp 100s linear infinite;
-        opacity: 0.3;
-      }
-
-      /* Layer 2 - Medium Stars */
-      .stars-2 {
-        background-image: radial-gradient(2px 2px at 50px 100px, #e2e8f0, rgba(0,0,0,0)),
-                          radial-gradient(2px 2px at 120px 150px, #e2e8f0, rgba(0,0,0,0)),
-                          radial-gradient(2px 2px at 180px 40px, #e2e8f0, rgba(0,0,0,0));
-        background-size: 300px 300px;
-        animation: floatUp 70s linear infinite;
-        opacity: 0.5;
-      }
-
-      /* Layer 3 - Larger Stars (Fastest) */
-      .stars-3 {
-        background-image: radial-gradient(2px 2px at 100px 150px, #a5b4fc, rgba(0,0,0,0)),
-                          radial-gradient(2px 2px at 200px 50px, #c7d2fe, rgba(0,0,0,0));
-        background-size: 400px 400px;
+        background: transparent;
+        box-shadow: 
+          10vw 10vh #fff, 20vw 80vh #fff, 30vw 20vh #fff, 
+          40vw 40vh #fff, 50vw 90vh #fff, 60vw 10vh #fff, 
+          70vw 60vh #fff, 80vw 30vh #fff, 90vw 80vh #fff,
+          15vw 50vh #fff, 35vw 70vh #fff, 85vw 10vh #fff;
+        width: 2px;
+        height: 2px;
         animation: floatUp 50s linear infinite;
         opacity: 0.6;
       }
-
-      /* Layer 4 - Subtle Nebula Glows */
-      .nebula-glow {
+      /* Add pseudo-element to duplicate content for seamless loop */
+      .stars-1::after {
+        content: " ";
         position: absolute;
+        top: 100%;
+        width: 2px;
+        height: 2px;
+        box-shadow: inherit;
+      }
+
+      /* Medium Stars */
+      .stars-2 {
+        background: transparent;
+        box-shadow: 
+          5vw 5vh #cbd5e1, 25vw 25vh #cbd5e1, 45vw 45vh #cbd5e1, 
+          65vw 65vh #cbd5e1, 85vw 85vh #cbd5e1, 15vw 75vh #cbd5e1;
+        width: 3px;
+        height: 3px;
+        animation: floatUp 100s linear infinite;
+        opacity: 0.4;
+      }
+      .stars-2::after {
+        content: " ";
+        position: absolute;
+        top: 100%;
+        width: 3px;
+        height: 3px;
+        box-shadow: inherit;
+      }
+
+      /* Nebula Glows */
+      .nebula-glow {
+        position: fixed;
         width: 100%;
         height: 100%;
+        z-index: -1;
         background: 
-          radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.08), transparent 25%),
-          radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.08), transparent 25%);
-        animation: pulseGlow 10s ease-in-out infinite alternate;
+          radial-gradient(circle at 20% 60%, rgba(99, 102, 241, 0.05), transparent 40%),
+          radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.05), transparent 40%);
+        animation: pulseGlow 8s ease-in-out infinite alternate;
       }
 
       @keyframes floatUp {
-        from { background-position: 0 0; }
-        to { background-position: 0 -1000px; }
+        from { transform: translateY(0); }
+        to { transform: translateY(-100%); }
       }
 
       @keyframes pulseGlow {
-        0% { opacity: 0.5; }
-        100% { opacity: 1; }
+        0% { opacity: 0.4; }
+        100% { opacity: 0.8; }
       }
 
-      /* Hide stars in light mode to keep it clean */
-      html.light .stars-container {
-        display: none;
+      /* Disable in light mode */
+      html.light .stars-container { display: none; }
+      
+      /* Base Classes overrides */
+      .glass-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border);
+      }
+      .glass-input {
+        background: rgba(2, 6, 23, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+      }
+      html.light .glass-input {
+        background: white;
+        color: black;
+        border-color: #cbd5e1;
       }
 
+      /* Ensure content sits above stars */
+      #root { position: relative; z-index: 1; height: 100%; }
     </style>
   <script type="importmap">
 {
@@ -294,15 +203,7 @@
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
-    <div id="root">
-      <!-- Fallback Loading State -->
-      <div style="height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center; background-color: #020617; color: #6366f1;">
-        <svg class="animate-spin" width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      </div>
-    </div>
+    <div id="root"></div>
     <!-- Vite entry point -->
     <script type="module" src="/index.tsx"></script>
   </body>

@@ -121,7 +121,16 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
+    // REMOVED bg-slate-950 here to allow body background to show
+    <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
+      
+      {/* Background Animation Container */}
+      <div className="stars-container">
+          <div className="stars stars-1"></div>
+          <div className="stars stars-2"></div>
+          <div className="nebula-glow"></div>
+      </div>
+
       <Navigation 
         currentView={currentView} 
         onNavigate={setCurrentView} 
@@ -131,20 +140,12 @@ const App: React.FC = () => {
       />
 
       <main 
-        className={`flex-1 relative overflow-y-auto overflow-x-hidden transition-all duration-300 ${
+        className={`flex-1 relative overflow-y-auto overflow-x-hidden transition-all duration-300 z-10 ${
           isMobile ? 'pb-20 p-4' : 'ml-64 p-8'
         }`}
         style={{ height: '100vh' }}
       >
-        {/* === PROFESSIONAL ANIMATED BACKGROUND === */}
-        <div className="stars-container">
-            <div className="stars stars-1"></div>
-            <div className="stars stars-2"></div>
-            <div className="stars stars-3"></div>
-            <div className="nebula-glow"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto h-full relative z-10">
+        <div className="max-w-7xl mx-auto h-full relative">
             {/* View Rendering Logic */}
             {!checkAccess(currentView) 
                 ? <AccessDenied currentPlan={user.plan} requiredPlan={user.plan === 'basic' ? 'intermediate' : 'advanced'} />

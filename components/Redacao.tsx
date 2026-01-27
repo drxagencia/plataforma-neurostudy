@@ -180,7 +180,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
-          const currentCredits = user.essayCredits ? Number(user.essayCredits) : 0;
+          // Fix: Explicitly cast essayCredits to number to prevent arithmetic type error
+          const currentCredits = Number(user.essayCredits || 0);
           onUpdateUser({
               ...user,
               essayCredits: Math.max(0, currentCredits - 1)
