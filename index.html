@@ -24,7 +24,7 @@
                 100: 'rgba(255, 255, 255, 0.03)',
                 200: 'rgba(255, 255, 255, 0.08)',
                 300: 'rgba(255, 255, 255, 0.12)',
-                border: 'rgba(255, 255, 255, 0.08)',
+                border: 'rgba(255, 255, 255, 0.05)',
               }
             },
             animation: {
@@ -48,20 +48,20 @@
     </script>
     <style>
       :root {
-        --bg-body: #020617;
+        --bg-body: #000000;
       }
 
       /* Dark Mode (Default) - Deep Universe Background */
       html.dark body {
-        background-color: #020617;
-        /* Richer gradient for depth */
+        background-color: #000000;
+        /* Much darker gradients for deep space feel */
         background-image: 
-          radial-gradient(circle at 50% 0%, #172033, transparent 80%),
-          radial-gradient(circle at 0% 100%, #1e1b4b, transparent 60%),
-          radial-gradient(circle at 100% 100%, #312e81, transparent 60%);
+          radial-gradient(circle at 50% 0%, #0f172a, transparent 80%),
+          radial-gradient(circle at 0% 100%, #020617, transparent 60%),
+          radial-gradient(circle at 100% 100%, #171717, transparent 60%);
         background-attachment: fixed;
         color: #f8fafc;
-        overflow-x: hidden; /* Prevent horizontal scroll from effects */
+        overflow-x: hidden; 
       }
 
       html.light body {
@@ -72,9 +72,9 @@
       /* Scrollbar */
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
       html.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
-      ::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+      ::-webkit-scrollbar-thumb:hover { background: #334155; }
 
       /* --- INFINITE RISING STARS ANIMATION --- */
       .stars-container {
@@ -88,7 +88,6 @@
         overflow: hidden;
       }
 
-      /* Base star layer logic */
       .star-layer {
         position: absolute;
         top: 0;
@@ -96,16 +95,15 @@
         background: transparent;
       }
 
-      /* The duplicate stars for the infinite loop */
       .star-layer::after {
         content: " ";
         position: absolute;
-        top: 100vh; /* Exactly one viewport height down */
+        top: 100vh;
         left: 0;
         width: inherit;
         height: inherit;
         background: transparent;
-        box-shadow: inherit; /* Inherit the star map */
+        box-shadow: inherit;
       }
 
       /* Layer 1: Small stars, slower (background) */
@@ -113,75 +111,66 @@
         width: 1px;
         height: 1px;
         background: transparent;
-        /* Dense field of small stars */
         box-shadow: 
-          10vw 10vh #FFF, 80vw 5vh #FFF, 5vw 85vh #FFF, 30vw 15vh #FFF, 90vw 60vh #FFF,
-          15vw 40vh #FFF, 55vw 25vh #FFF, 70vw 90vh #FFF, 45vw 55vh #FFF, 25vw 75vh #FFF,
-          60vw 10vh #FFF, 85vw 35vh #FFF, 35vw 95vh #FFF, 10vw 65vh #FFF, 95vw 20vh #FFF,
-          50vw 50vh #FFF, 20vw 30vh #FFF, 75vw 80vh #FFF, 40vw 10vh #FFF, 65vw 45vh #FFF,
-          5vw 20vh #FFF, 85vw 85vh #FFF, 15vw 95vh #FFF, 35vw 35vh #FFF, 95vw 55vh #FFF,
-          25vw 5vh #FFF, 75vw 15vh #FFF, 45vw 70vh #FFF, 65vw 90vh #FFF, 55vw 40vh #FFF,
-          12vw 12vh #FFF, 88vw 88vh #FFF, 22vw 78vh #FFF, 68vw 22vh #FFF, 38vw 48vh #FFF,
-          42vw 82vh #FFF, 92vw 32vh #FFF, 52vw 62vh #FFF, 08vw 58vh #FFF, 78vw 08vh #FFF;
+          10vw 10vh #475569, 80vw 5vh #475569, 5vw 85vh #475569, 30vw 15vh #475569, 90vw 60vh #475569,
+          15vw 40vh #475569, 55vw 25vh #475569, 70vw 90vh #475569, 45vw 55vh #475569, 25vw 75vh #475569,
+          60vw 10vh #475569, 85vw 35vh #475569, 35vw 95vh #475569, 10vw 65vh #475569, 95vw 20vh #475569,
+          50vw 50vh #475569, 20vw 30vh #475569, 75vw 80vh #475569, 40vw 10vh #475569, 65vw 45vh #475569;
         animation: animStar 100s linear infinite;
-        opacity: 0.5;
+        opacity: 0.3; /* Dimmer for depth */
       }
 
-      /* Layer 2: Medium stars, medium speed */
+      /* Layer 2: Medium stars */
       .stars-2 {
         width: 2px;
         height: 2px;
         background: transparent;
         box-shadow: 
-          20vw 20vh #e2e8f0, 60vw 80vh #e2e8f0, 10vw 60vh #e2e8f0, 90vw 10vh #e2e8f0,
-          40vw 40vh #e2e8f0, 80vw 30vh #e2e8f0, 30vw 90vh #e2e8f0, 70vw 50vh #e2e8f0,
-          50vw 10vh #e2e8f0, 15vw 85vh #e2e8f0, 85vw 55vh #e2e8f0, 35vw 25vh #e2e8f0,
-          05vw 05vh #e2e8f0, 95vw 95vh #e2e8f0, 25vw 45vh #e2e8f0, 75vw 75vh #e2e8f0;
+          20vw 20vh #94a3b8, 60vw 80vh #94a3b8, 10vw 60vh #94a3b8, 90vw 10vh #94a3b8,
+          40vw 40vh #94a3b8, 80vw 30vh #94a3b8, 30vw 90vh #94a3b8, 70vw 50vh #94a3b8,
+          50vw 10vh #94a3b8, 15vw 85vh #94a3b8, 85vw 55vh #94a3b8, 35vw 25vh #94a3b8;
         animation: animStar 60s linear infinite;
-        opacity: 0.7;
+        opacity: 0.5;
       }
       .stars-2::after { width: 2px; height: 2px; }
 
-      /* Layer 3: Large stars, faster (foreground) */
+      /* Layer 3: Large, brighter stars */
       .stars-3 {
-        width: 3px;
-        height: 3px;
+        width: 2px;
+        height: 2px;
         background: transparent;
         box-shadow: 
-          50vw 30vh #a5b4fc, 10vw 80vh #a5b4fc, 85vw 15vh #a5b4fc, 25vw 60vh #a5b4fc,
-          70vw 90vh #a5b4fc, 90vw 40vh #a5b4fc, 35vw 10vh #a5b4fc;
+          50vw 30vh #e2e8f0, 10vw 80vh #e2e8f0, 85vw 15vh #e2e8f0, 25vw 60vh #e2e8f0;
         animation: animStar 40s linear infinite;
-        opacity: 0.9;
-        filter: drop-shadow(0 0 3px #6366f1); /* Glow effect */
+        opacity: 0.8;
+        filter: drop-shadow(0 0 2px #6366f1);
       }
-      .stars-3::after { width: 3px; height: 3px; }
+      .stars-3::after { width: 2px; height: 2px; }
 
       @keyframes animStar {
         from { transform: translateY(0); }
         to { transform: translateY(-100vh); }
       }
 
-      /* Nebula Glows - Ambient Pulse */
+      /* Nebula Glows - Darker and more subtle */
       .nebula-glow {
         position: fixed;
         width: 100vw;
         height: 100vh;
         z-index: -1;
         background: 
-          radial-gradient(circle at 15% 55%, rgba(99, 102, 241, 0.1), transparent 40%),
-          radial-gradient(circle at 85% 25%, rgba(168, 85, 247, 0.1), transparent 40%);
+          radial-gradient(circle at 15% 55%, rgba(30, 27, 75, 0.08), transparent 40%),
+          radial-gradient(circle at 85% 25%, rgba(49, 46, 129, 0.05), transparent 40%);
         animation: pulseGlow 15s ease-in-out infinite alternate;
       }
 
       @keyframes pulseGlow {
-        0% { opacity: 0.4; transform: scale(1); }
-        100% { opacity: 0.7; transform: scale(1.1); }
+        0% { opacity: 0.3; transform: scale(1); }
+        100% { opacity: 0.6; transform: scale(1.05); }
       }
 
-      /* Disable in light mode */
       html.light .stars-container { display: none; }
       
-      /* Base Classes overrides */
       .glass-card {
         background: var(--glass-bg);
         backdrop-filter: blur(16px);
@@ -190,7 +179,7 @@
       }
       .glass-input {
         background: rgba(2, 6, 23, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.05);
         color: white;
       }
       html.light .glass-input {
