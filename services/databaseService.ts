@@ -290,14 +290,6 @@ export const DatabaseService = {
 
             } else {
                 // Add Balance BRL
-                // NOTE: If it's an UNLIMITED plan (identified by planLabel), the Admin usually handles 
-                // giving credits manually or the system needs specific logic for 'unlimited'.
-                // For now, we credit the BRL amount as balance so user can use it, OR 
-                // (better) we assume the 'Amount' paid is what they get.
-                // However, 'Unlimited' implies they don't spend balance. 
-                // Since we don't have 'unlimited' boolean in user profile yet, we will just ADD the balance
-                // corresponding to the payment.
-                
                 const currentBalance = userSnap.val().balance || 0;
                 await update(userRef, { balance: currentBalance + request.amount });
 
@@ -817,7 +809,7 @@ export const DatabaseService = {
 
   updateUserPlan: async (uid: string, plan: UserPlan, expiry: string): Promise<void> => {
     try {
-      const userRef = child(ref(database, `users/${uid}`);
+      const userRef = ref(database, `users/${uid}`);
       await update(userRef, {
         plan: plan,
         subscriptionExpiry: expiry
