@@ -27,9 +27,9 @@ const PROFIT_MARGIN = 1.5; // 1.5x markup
 const PRICE_INPUT_1M = 0.15;
 const PRICE_OUTPUT_1M = 0.60;
 
-// AGGRESSIVE TOKEN MULTIPLIER (60x)
-// "A cada 1 token gasto, nós iremos computar 60"
-const TOKEN_COMPUTE_MULTIPLIER = 60; 
+// AGGRESSIVE TOKEN MULTIPLIER (100x)
+// "A cada 1 token gasto, nós iremos computar 100"
+const TOKEN_COMPUTE_MULTIPLIER = 100; 
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -74,12 +74,15 @@ export default async function handler(req: any, res: any) {
         const prompt = `
             ATUE COMO: Um Corretor Sênior da Banca do ENEM, extremamente técnico, exigente e detalhista.
             TEMA: ${message}
-            TAREFA: Analise a imagem da redação manuscrita e forneça uma correção completa e rigorosa.
+            TAREFA: Analise a imagem da redação MANUSCRITA e forneça uma correção completa e rigorosa.
+            
+            ATENÇÃO: A imagem contém texto escrito à mão. Considere possíveis ambiguidades de caligrafia típicas de estudantes. Se uma palavra parecer errada mas for apenas má caligrafia, seja ponderado, mas penalize ilegibilidade se afetar a compreensão.
 
             REGRAS DE PONTUAÇÃO (CRÍTICO):
             1. As notas de C1 a C5 DEVEM ser MÚLTIPLOS DE 20 (ex: 0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200).
             2. NÃO dê nota "média" (120) se o aluno for excelente (180/200) ou fraco (40/60). Seja justo e identifique os extremos.
             3. Analise com rigor: Coesão, Coerência, Gramática, Repertório Sociocultural e Proposta de Intervenção.
+            4. SOMA: O campo "total" DEVE SER EXATAMENTE a soma de c1+c2+c3+c4+c5. Verifique sua matemática.
 
             FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):
             {
@@ -239,7 +242,7 @@ export default async function handler(req: any, res: any) {
     const responseText = data.choices[0].message.content;
     const usage = data.usage;
     
-    // Calculate Pricing with 60x Multiplier
+    // Calculate Pricing with 100x Multiplier
     const rawInputTokens = usage?.prompt_tokens || 0;
     const rawOutputTokens = usage?.completion_tokens || 0;
 

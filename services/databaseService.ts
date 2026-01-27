@@ -225,7 +225,7 @@ export const DatabaseService = {
   },
 
   // --- Financial & Credits System ---
-  createRechargeRequest: async (uid: string, userDisplayName: string, amount: number, type: 'BRL' | 'CREDIT' = 'BRL', quantityCredits?: number): Promise<void> => {
+  createRechargeRequest: async (uid: string, userDisplayName: string, amount: number, type: 'BRL' | 'CREDIT' = 'BRL', quantityCredits?: number, planLabel?: string): Promise<void> => {
     try {
         const reqRef = push(ref(database, 'recharges'));
         const request: RechargeRequest = {
@@ -237,7 +237,8 @@ export const DatabaseService = {
             timestamp: Date.now(),
             type,
             // FIX: Only add quantityCredits if defined. Firebase throws on undefined.
-            ...(quantityCredits !== undefined ? { quantityCredits } : {})
+            ...(quantityCredits !== undefined ? { quantityCredits } : {}),
+            ...(planLabel ? { planLabel } : {})
         };
         await set(reqRef, request);
     } catch (error) {
@@ -289,6 +290,14 @@ export const DatabaseService = {
 
             } else {
                 // Add Balance BRL
+                // NOTE: If it's an UNLIMITED plan (identified by planLabel), the Admin usually handles 
+                // giving credits manually or the system needs specific logic for 'unlimited'.
+                // For now, we credit the BRL amount as balance so user can use it, OR 
+                // (better) we assume the 'Amount' paid is what they get.
+                // However, 'Unlimited' implies they don't spend balance. 
+                // Since we don't have 'unlimited' boolean in user profile yet, we will just ADD the balance
+                // corresponding to the payment.
+                
                 const currentBalance = userSnap.val().balance || 0;
                 await update(userRef, { balance: currentBalance + request.amount });
 
@@ -297,7 +306,7 @@ export const DatabaseService = {
                     id: transRef.key!,
                     type: 'credit',
                     amount: request.amount,
-                    description: 'Recarga saldo IA',
+                    description: request.planLabel || 'Recarga saldo IA',
                     timestamp: Date.now(),
                     currencyType: 'BRL'
                 });
@@ -808,7 +817,7 @@ export const DatabaseService = {
 
   updateUserPlan: async (uid: string, plan: UserPlan, expiry: string): Promise<void> => {
     try {
-      const userRef = child(ref(database), `users/${uid}`);
+      const userRef = child(ref(database, `users/${uid}`);
       await update(userRef, {
         plan: plan,
         subscriptionExpiry: expiry

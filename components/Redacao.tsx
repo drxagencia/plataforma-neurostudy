@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
@@ -179,7 +180,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           const c5Score = parseScore(parsed.c5);
           
           const calculatedTotal = c1Score + c2Score + c3Score + c4Score + c5Score;
-          const finalTotal = Number(parsed.total) || calculatedTotal;
+          
+          // Force use of calculatedTotal to avoid AI math errors (AI often hallucinates the total)
+          const finalTotal = calculatedTotal;
 
           const result: EssayCorrection = {
               theme,

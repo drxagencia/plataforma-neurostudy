@@ -36,6 +36,7 @@ export interface RechargeRequest {
   timestamp: number;
   type: 'BRL' | 'CREDIT'; // Distinguish between wallet balance and essay credits
   quantityCredits?: number; // Only if type is CREDIT
+  planLabel?: string; // NEW: Description for unlimited plans (e.g., "1 Ano Ilimitado")
 }
 
 export interface AiConfig {

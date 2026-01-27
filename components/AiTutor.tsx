@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit, Infinity } from 'lucide-react';
 import { AiService, ChatMessage } from '../services/aiService';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
@@ -31,12 +31,20 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   // Recharge & PIX State
+  const [rechargeTab, setRechargeTab] = useState<'credits' | 'unlimited'>('credits');
   const [rechargeAmount, setRechargeAmount] = useState('');
+  const [selectedUnlimitedPlan, setSelectedUnlimitedPlan] = useState<{label: string, price: number, months: number} | null>(null);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const unlimitedPlans = [
+      { label: '1 Mês Infinito', price: 37, months: 1, color: 'border-slate-500 bg-slate-900' },
+      { label: '6 Meses Infinitos', price: 57, months: 6, color: 'border-yellow-500/50 bg-yellow-900/10' },
+      { label: '1 Ano Infinito', price: 97, months: 12, color: 'border-indigo-500 bg-indigo-900/10 shadow-[0_0_20px_rgba(99,102,241,0.2)]' }
+  ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -153,18 +161,28 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   };
 
   const handleGeneratePix = () => {
-      // Normalize comma to dot for Brazilian users
-      const normalizedAmount = rechargeAmount.replace(',', '.');
-      const val = parseFloat(normalizedAmount);
+      let val = 0;
 
-      if (!normalizedAmount || isNaN(val)) {
-          triggerNotification('error', 'Por favor, digite um valor válido.');
-          return;
-      }
+      if (rechargeTab === 'credits') {
+          // Normalize comma to dot for Brazilian users
+          const normalizedAmount = rechargeAmount.replace(',', '.');
+          val = parseFloat(normalizedAmount);
 
-      if (val < 10) {
-          triggerNotification('error', 'O valor mínimo de recarga é R$ 10,00');
-          return;
+          if (!normalizedAmount || isNaN(val)) {
+              triggerNotification('error', 'Por favor, digite um valor válido.');
+              return;
+          }
+
+          if (val < 10) {
+              triggerNotification('error', 'O valor mínimo de recarga é R$ 10,00');
+              return;
+          }
+      } else {
+          if (!selectedUnlimitedPlan) {
+              triggerNotification('error', 'Selecione um plano.');
+              return;
+          }
+          val = selectedUnlimitedPlan.price;
       }
       
       try {
@@ -187,14 +205,32 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   };
 
   const handleConfirmPayment = async () => {
-      const normalizedAmount = rechargeAmount.replace(',', '.');
-      const val = parseFloat(normalizedAmount);
+      let val = 0;
+      let planLabel = undefined;
+
+      if (rechargeTab === 'credits') {
+          const normalizedAmount = rechargeAmount.replace(',', '.');
+          val = parseFloat(normalizedAmount);
+      } else {
+          if (selectedUnlimitedPlan) {
+              val = selectedUnlimitedPlan.price;
+              planLabel = `Compra: ${selectedUnlimitedPlan.label}`;
+          }
+      }
 
       if (!auth.currentUser || isNaN(val)) return;
 
       try {
           // Send real name
-          await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'Usuário Sem Nome', val);
+          await DatabaseService.createRechargeRequest(
+              auth.currentUser.uid, 
+              auth.currentUser.displayName || 'Usuário Sem Nome', 
+              val, 
+              'BRL', 
+              undefined, 
+              planLabel
+          );
+          
           handleCloseRecharge();
           // Delay notification slightly for effect
           setTimeout(() => {
@@ -209,6 +245,8 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
       setShowRecharge(false);
       setRechargeAmount('');
       setPixPayload(null);
+      setSelectedUnlimitedPlan(null);
+      setRechargeTab('credits');
   };
 
   return (
@@ -362,15 +400,15 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
 
           {/* BEAUTIFUL RECHARGE MODAL OVERLAY */}
           {showRecharge && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
-              <div className="bg-[#0f172a] border border-indigo-500/20 rounded-3xl p-8 w-full max-w-md shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300 p-4">
+              <div className="bg-[#0f172a] border border-indigo-500/20 rounded-3xl p-8 w-full max-w-2xl shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
                   {/* Decorative Glows */}
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
                   <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
                   <button 
                     onClick={handleCloseRecharge}
-                    className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors bg-white/5 p-2 rounded-full"
+                    className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors bg-white/5 p-2 rounded-full z-20"
                   >
                     <X size={20} />
                   </button>
@@ -380,38 +418,94 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                           <Wallet size={32} />
                       </div>
                       <h3 className="text-2xl font-bold text-white">Recarregar Saldo</h3>
-                      <p className="text-slate-400 text-sm">Adicione créditos para usar a IA.</p>
+                      <p className="text-slate-400 text-sm">Escolha como deseja adicionar créditos à IA.</p>
                   </div>
 
                   {!pixPayload ? (
-                    // Step 1: Input Amount
-                    <div className="space-y-6 relative z-10">
-                        <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl text-center hover:border-emerald-500/50 transition-colors">
-                            <label className="text-xs text-slate-400 font-bold uppercase mb-2 block tracking-widest">Valor da Recarga</label>
-                            <div className="flex items-center justify-center gap-1">
-                                <span className="text-2xl text-emerald-500 font-bold">R$</span>
-                                <input 
-                                    type="text" 
-                                    inputMode="decimal"
-                                    value={rechargeAmount}
-                                    onChange={e => setRechargeAmount(e.target.value)}
-                                    className="bg-transparent text-5xl font-bold text-white outline-none w-40 text-center placeholder:text-slate-700"
-                                    placeholder="20.00"
-                                />
-                            </div>
-                            <p className="text-[10px] text-slate-500 mt-2">Mínimo R$ 10,00</p>
+                    <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar px-2">
+                        {/* Tabs */}
+                        <div className="flex bg-slate-900 border border-white/10 rounded-xl p-1 mb-6 flex-shrink-0">
+                            <button 
+                                onClick={() => setRechargeTab('credits')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${rechargeTab === 'credits' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                Saldo Avulso
+                            </button>
+                            <button 
+                                onClick={() => setRechargeTab('unlimited')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${rechargeTab === 'unlimited' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                Acesso Ilimitado
+                            </button>
                         </div>
-                        <button 
-                            onClick={handleGeneratePix}
-                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] hover:-translate-y-1"
-                        >
-                            <QrCode size={20} /> Gerar PIX
-                        </button>
+
+                        {rechargeTab === 'credits' ? (
+                            // Credit Recharge Form
+                            <div className="space-y-6 relative z-10 flex-1 flex flex-col justify-center">
+                                <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl text-center hover:border-emerald-500/50 transition-colors">
+                                    <label className="text-xs text-slate-400 font-bold uppercase mb-2 block tracking-widest">Valor da Recarga</label>
+                                    <div className="flex items-center justify-center gap-1">
+                                        <span className="text-2xl text-emerald-500 font-bold">R$</span>
+                                        <input 
+                                            type="text" 
+                                            inputMode="decimal"
+                                            value={rechargeAmount}
+                                            onChange={e => setRechargeAmount(e.target.value)}
+                                            className="bg-transparent text-5xl font-bold text-white outline-none w-40 text-center placeholder:text-slate-700"
+                                            placeholder="20.00"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 mt-2">Mínimo R$ 10,00</p>
+                                </div>
+                                <button 
+                                    onClick={handleGeneratePix}
+                                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] hover:-translate-y-1"
+                                >
+                                    <QrCode size={20} /> Gerar PIX
+                                </button>
+                            </div>
+                        ) : (
+                            // Unlimited Plans Grid
+                            <div className="grid grid-cols-1 gap-4 relative z-10">
+                                {unlimitedPlans.map((plan, idx) => (
+                                    <div 
+                                        key={idx}
+                                        onClick={() => setSelectedUnlimitedPlan(plan)}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between group ${
+                                            selectedUnlimitedPlan?.label === plan.label 
+                                            ? 'border-emerald-500 bg-slate-800' 
+                                            : `border-transparent hover:border-white/10 ${plan.color}`
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${selectedUnlimitedPlan?.label === plan.label ? 'bg-emerald-500 text-white' : 'bg-black/20 text-white/50'}`}>
+                                                {selectedUnlimitedPlan?.label === plan.label ? <Check size={20}/> : <Infinity size={20}/>}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-white text-lg">{plan.label}</h4>
+                                                <p className="text-xs text-slate-300">Uso infinito da IA sem gastar saldo.</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="block text-2xl font-black text-white">R$ {plan.price}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                                <button 
+                                    onClick={handleGeneratePix}
+                                    disabled={!selectedUnlimitedPlan}
+                                    className="w-full mt-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all hover:scale-[1.02]"
+                                >
+                                    <QrCode size={20} /> 
+                                    {selectedUnlimitedPlan ? `Pagar R$ ${selectedUnlimitedPlan.price},00` : 'Selecione um Plano'}
+                                </button>
+                            </div>
+                        )}
                     </div>
                   ) : (
-                    // Step 2: Show QR Code
-                    <div className="space-y-6 text-center animate-in slide-in-from-bottom-4 relative z-10">
-                        <div className="bg-white p-4 rounded-xl inline-block shadow-xl border-4 border-white">
+                    // Step 2: Show QR Code (Same for both flows)
+                    <div className="space-y-6 text-center animate-in slide-in-from-bottom-4 relative z-10 flex-1 flex flex-col justify-center">
+                        <div className="bg-white p-4 rounded-xl inline-block shadow-xl border-4 border-white mx-auto">
                              <img 
                                 src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload)}`}
                                 alt="QR Code PIX"
