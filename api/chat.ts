@@ -70,21 +70,39 @@ export default async function handler(req: any, res: any) {
             return res.status(402).json({ error: 'Sem créditos de redação.' });
         }
 
+        // PROMPT AVANÇADO - Especialista ENEM
         const prompt = `
-            Você é um corretor especialista do ENEM.
+            ATUE COMO: Um Corretor Sênior da Banca do ENEM, extremamente técnico, exigente e detalhista.
             TEMA: ${message}
-            TAREFA: Analise a imagem da redação manuscrita.
-            
-            SAÍDA: Retorne ESTRITAMENTE um JSON com o seguinte formato exato (sem markdown):
+            TAREFA: Analise a imagem da redação manuscrita e forneça uma correção completa e rigorosa.
+
+            REGRAS DE PONTUAÇÃO (CRÍTICO):
+            1. As notas de C1 a C5 DEVEM ser MÚLTIPLOS DE 20 (ex: 0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200).
+            2. NÃO dê nota "média" (120) se o aluno for excelente (180/200) ou fraco (40/60). Seja justo e identifique os extremos.
+            3. Analise com rigor: Coesão, Coerência, Gramática, Repertório Sociocultural e Proposta de Intervenção.
+
+            FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):
             {
-                "c1": { "score": (0-200), "comment": "Explicação breve do erro ou acerto na C1" },
-                "c2": { "score": (0-200), "comment": "Explicação breve na C2" },
-                "c3": { "score": (0-200), "comment": "Explicação breve na C3" },
-                "c4": { "score": (0-200), "comment": "Explicação breve na C4" },
-                "c5": { "score": (0-200), "comment": "Explicação breve na C5" },
-                "total": (soma das notas),
-                "feedback": "Resumo geral curto de 2 frases sobre o texto todo",
-                "errors": ["erro gramatical 1", "erro de coesão 2", "ponto de melhoria"]
+                "c1": { 
+                    "score": number, 
+                    "analysis": "Texto técnico explicando o desempenho na norma culta.", 
+                    "positive_points": ["Item 1", "Item 2"], 
+                    "negative_points": ["Erro grave de crase na linha X", "Concordância"]
+                },
+                "c2": { 
+                    "score": number, 
+                    "analysis": "Texto sobre a compreensão do tema e estrutura dissertativa.",
+                    "positive_points": ["Uso produtivo de repertório", "Boa tese"], 
+                    "negative_points": ["Tangenciamento do tema"]
+                },
+                "c3": { "score": number, "analysis": "Texto sobre projeto de texto e argumentação.", "positive_points": [], "negative_points": [] },
+                "c4": { "score": number, "analysis": "Texto sobre mecanismos linguísticos e coesão.", "positive_points": [], "negative_points": [] },
+                "c5": { "score": number, "analysis": "Texto sobre proposta de intervenção (GOMIF).", "positive_points": [], "negative_points": [] },
+                "total": number,
+                "general_feedback": "Uma análise macroestrutural do texto. Fale sobre o estilo de escrita do aluno, a progressão textual e a maturidade dos argumentos.",
+                "strengths": ["Lista de 3 pontos fortes gerais do texto"],
+                "weaknesses": ["Lista de 3 pontos fracos gerais do texto"],
+                "structural_tips": "Dica prática de como melhorar a estrutura dos parágrafos ou a caligrafia/organização visual."
             }
         `;
 
@@ -111,7 +129,7 @@ export default async function handler(req: any, res: any) {
                             ]
                         }
                     ],
-                    max_tokens: 1500,
+                    max_tokens: 2500, // Aumentado para resposta rica
                     response_format: { type: "json_object" }
                 })
             });
@@ -133,7 +151,7 @@ export default async function handler(req: any, res: any) {
                 id: transRef.key,
                 type: 'debit',
                 amount: 1,
-                description: 'Correção de Redação',
+                description: 'Correção Detalhada ENEM',
                 timestamp: Date.now(),
                 currencyType: 'CREDIT'
             });

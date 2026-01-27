@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { auth } from '../services/firebaseConfig';
 import { EssayCorrection, UserProfile } from '../types';
-import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText } from 'lucide-react';
+import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight } from 'lucide-react';
 
 interface RedacaoProps {
     user: UserProfile;
@@ -30,8 +29,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [currentResult, setCurrentResult] = useState<EssayCorrection | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  // Competency Detail State
-  const [expandedCompetency, setExpandedCompetency] = useState<string | null>(null);
+  // Result Animation State
+  const [displayScore, setDisplayScore] = useState(0);
+  const [expandedCompetency, setExpandedCompetency] = useState<string | null>('c1');
 
   // Notification State
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -39,6 +39,27 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  // Score Animation Effect
+  useEffect(() => {
+      if (view === 'result' && currentResult) {
+          const target = currentResult.scoreTotal;
+          let start = 0;
+          const duration = 1500;
+          const increment = target / (duration / 16);
+          
+          const timer = setInterval(() => {
+              start += increment;
+              if (start >= target) {
+                  setDisplayScore(target);
+                  clearInterval(timer);
+              } else {
+                  setDisplayScore(Math.floor(start));
+              }
+          }, 16);
+          return () => clearInterval(timer);
+      }
+  }, [view, currentResult]);
 
   // Auto-dismiss notification
   useEffect(() => {
@@ -61,7 +82,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           if (imgUrl) item.imageUrl = imgUrl;
       }
       setCurrentResult(item);
-      setExpandedCompetency(null);
+      setExpandedCompetency('c1'); // Auto expand first
       setLoadingDetails(false);
       setView('result');
   };
@@ -145,20 +166,19 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           let cleanJson = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
 
-          // Parse new structure (Object with score & comment)
-          // Helper to safely extract number
+          // SAFE PARSING HELPERS
           const parseScore = (val: any) => {
             const num = Number(val?.score ?? val);
             return isNaN(num) ? 0 : num;
           };
 
-          const c1 = parseScore(parsed.c1);
-          const c2 = parseScore(parsed.c2);
-          const c3 = parseScore(parsed.c3);
-          const c4 = parseScore(parsed.c4);
-          const c5 = parseScore(parsed.c5);
+          const c1Score = parseScore(parsed.c1);
+          const c2Score = parseScore(parsed.c2);
+          const c3Score = parseScore(parsed.c3);
+          const c4Score = parseScore(parsed.c4);
+          const c5Score = parseScore(parsed.c5);
           
-          const calculatedTotal = c1 + c2 + c3 + c4 + c5;
+          const calculatedTotal = c1Score + c2Score + c3Score + c4Score + c5Score;
           const finalTotal = Number(parsed.total) || calculatedTotal;
 
           const result: EssayCorrection = {
@@ -166,21 +186,25 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               imageUrl: image,
               date: Date.now(),
               scoreTotal: finalTotal,
-              competencies: { c1, c2, c3, c4, c5 },
-              competencyFeedback: {
-                  c1: parsed.c1?.comment || "Sem comentário.",
-                  c2: parsed.c2?.comment || "Sem comentário.",
-                  c3: parsed.c3?.comment || "Sem comentário.",
-                  c4: parsed.c4?.comment || "Sem comentário.",
-                  c5: parsed.c5?.comment || "Sem comentário."
+              competencies: { c1: c1Score, c2: c2Score, c3: c3Score, c4: c4Score, c5: c5Score },
+              // Rich Data
+              detailedCompetencies: {
+                  c1: parsed.c1,
+                  c2: parsed.c2,
+                  c3: parsed.c3,
+                  c4: parsed.c4,
+                  c5: parsed.c5
               },
-              feedback: parsed.feedback,
-              errors: parsed.errors
+              feedback: parsed.general_feedback || parsed.feedback || "Análise concluída.",
+              errors: parsed.weaknesses || parsed.errors || [], // Map generic weaknesses to errors list for fallback
+              strengths: parsed.strengths || [],
+              weaknesses: parsed.weaknesses || [],
+              structuralTips: parsed.structural_tips || ""
           };
 
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
-          // Fix: Explicitly cast essayCredits to number to prevent arithmetic type error
+          // Fix: Explicitly cast essayCredits to number
           const currentCredits = Number(user.essayCredits || 0);
           onUpdateUser({
               ...user,
@@ -188,7 +212,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           });
 
           setCurrentResult(result);
-          setExpandedCompetency(null);
+          setExpandedCompetency('c1');
           setView('result');
           fetchHistory();
 
@@ -198,9 +222,25 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       }
   };
 
+  // --- COMPONENT MAP ---
+  const COMPETENCY_LABELS: Record<string, string> = {
+      c1: 'Norma Culta',
+      c2: 'Tema e Estrutura',
+      c3: 'Argumentação',
+      c4: 'Coesão',
+      c5: 'Proposta de Intervenção'
+  };
+
+  const COMPETENCY_ICONS: Record<string, any> = {
+      c1: PenTool,
+      c2: Layers,
+      c3: MessageSquareText,
+      c4: BookOpen,
+      c5: CheckCircle
+  };
+
   // --- RENDERERS ---
 
-  // NOTIFICATION TOAST
   const renderNotification = () => {
       if (!notification) return null;
       return (
@@ -220,14 +260,15 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       return (
           <div className="h-full flex flex-col items-center justify-center relative overflow-hidden">
               <div className="absolute inset-0 bg-slate-900/50 z-10 flex items-center justify-center flex-col">
-                  <div className="relative w-64 h-80 border-2 border-indigo-500 rounded-lg overflow-hidden bg-white/5">
+                  <div className="relative w-64 h-80 border-2 border-indigo-500 rounded-lg overflow-hidden bg-white/5 shadow-[0_0_50px_rgba(99,102,241,0.2)]">
                       {image && <img src={image} className="w-full h-full object-cover opacity-50" />}
                       <div className="absolute top-0 left-0 w-full h-1 bg-indigo-400 shadow-[0_0_15px_rgba(99,102,241,1)] animate-[scan_2s_ease-in-out_infinite]" />
                   </div>
-                  <div className="mt-8 flex items-center gap-3 text-indigo-400 font-bold animate-pulse">
-                      <Scan size={24} />
-                      Analisando Manuscrito...
+                  <div className="mt-8 flex items-center gap-3 text-indigo-400 font-bold animate-pulse text-xl">
+                      <Scan size={32} />
+                      <span className="tracking-widest">ANALISANDO</span>
                   </div>
+                  <p className="text-slate-400 text-sm mt-2">Identificando padrões de escrita e critérios ENEM...</p>
                   <style>{`
                     @keyframes scan {
                         0% { top: 0%; }
@@ -240,91 +281,185 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       );
   }
 
+  // --- RESULT VIEW: THE "WOW" FACTOR ---
   if (view === 'result' && currentResult) {
+      const getScoreColor = (score: number) => {
+          if (score >= 900) return 'text-emerald-400';
+          if (score >= 700) return 'text-indigo-400';
+          return 'text-yellow-400';
+      };
+
+      const getBarColor = (score: number) => {
+          if (score >= 160) return 'bg-emerald-500';
+          if (score >= 120) return 'bg-indigo-500';
+          if (score >= 80) return 'bg-yellow-500';
+          return 'bg-red-500';
+      };
+
       return (
-          <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 pb-20">
+          <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 pb-20">
               {renderNotification()}
-              <div className="flex items-center gap-4 mb-4">
-                  <button onClick={() => setView('home')} className="p-2 hover:bg-white/10 rounded-full"><X size={24}/></button>
-                  <h2 className="text-2xl font-bold text-white">Correção Finalizada</h2>
+              
+              {/* Header with Close */}
+              <div className="flex items-center justify-between">
+                  <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+                      <Sparkles size={28} className="text-indigo-400" />
+                      Análise da Redação
+                  </h2>
+                  <button onClick={() => setView('home')} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors text-white">
+                      <X size={24}/>
+                  </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Score Card */}
-                  <div className="glass-card p-6 rounded-2xl flex flex-col items-center justify-center text-center bg-indigo-900/20 border-indigo-500/30">
-                      <p className="text-slate-400 uppercase font-bold text-xs tracking-wider">Nota Total</p>
-                      <p className="text-6xl font-black text-white mt-2 mb-2">{currentResult.scoreTotal}</p>
-                      <div className={`px-3 py-1 rounded-full text-xs font-bold ${currentResult.scoreTotal >= 900 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
-                          {currentResult.scoreTotal >= 900 ? 'EXCELENTE' : 'BOM'}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Left Column: Score Hero & Quick Stats */}
+                  <div className="space-y-6">
+                      {/* Main Score Card */}
+                      <div className="glass-card p-10 rounded-3xl text-center relative overflow-hidden border border-indigo-500/20 shadow-[0_0_40px_rgba(99,102,241,0.1)]">
+                          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
+                          <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent" />
+                          
+                          <p className="text-slate-400 font-bold text-sm uppercase tracking-widest relative z-10">Nota Final</p>
+                          <div className={`text-8xl font-black mt-4 mb-2 tracking-tighter relative z-10 ${getScoreColor(currentResult.scoreTotal)}`}>
+                              {displayScore}
+                          </div>
+                          <div className={`inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase relative z-10 bg-slate-950/50 border border-white/10 ${currentResult.scoreTotal >= 900 ? 'text-emerald-300' : 'text-slate-300'}`}>
+                              {currentResult.scoreTotal >= 900 ? 'Excelente' : currentResult.scoreTotal >= 700 ? 'Muito Bom' : 'Em Evolução'}
+                          </div>
+                      </div>
+
+                      {/* Strengths & Weaknesses Summary Cards */}
+                      {currentResult.strengths && currentResult.strengths.length > 0 && (
+                          <div className="glass-card p-6 rounded-2xl border-l-4 border-l-emerald-500 bg-emerald-900/5">
+                              <h4 className="font-bold text-emerald-300 mb-3 flex items-center gap-2 text-sm uppercase"><ThumbsUp size={16}/> Pontos Fortes</h4>
+                              <ul className="space-y-2">
+                                  {currentResult.strengths.slice(0, 3).map((s, i) => (
+                                      <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
+                                          <Check size={14} className="text-emerald-500 mt-1 flex-shrink-0" />
+                                          {s}
+                                      </li>
+                                  ))}
+                              </ul>
+                          </div>
+                      )}
+
+                      {(currentResult.weaknesses && currentResult.weaknesses.length > 0) && (
+                          <div className="glass-card p-6 rounded-2xl border-l-4 border-l-red-500 bg-red-900/5">
+                              <h4 className="font-bold text-red-300 mb-3 flex items-center gap-2 text-sm uppercase"><TrendingDown size={16}/> Pontos de Atenção</h4>
+                              <ul className="space-y-2">
+                                  {currentResult.weaknesses.slice(0, 3).map((w, i) => (
+                                      <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
+                                          <AlertTriangle size={14} className="text-red-500 mt-1 flex-shrink-0" />
+                                          {w}
+                                      </li>
+                                  ))}
+                              </ul>
+                          </div>
+                      )}
+
+                      {/* Structural Tips */}
+                      {currentResult.structuralTips && (
+                          <div className="glass-card p-6 rounded-2xl border border-indigo-500/20 bg-indigo-900/5">
+                              <h4 className="font-bold text-indigo-300 mb-2 text-sm uppercase flex items-center gap-2"><Layers size={16}/> Dica Estrutural</h4>
+                              <p className="text-slate-300 text-sm leading-relaxed">{currentResult.structuralTips}</p>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* Middle & Right: Detailed Competency Breakdown */}
+                  <div className="lg:col-span-2 space-y-6">
+                      <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-xl font-bold text-white">Detalhamento por Competência</h3>
+                          <div className="h-px flex-1 bg-white/10" />
+                      </div>
+
+                      <div className="space-y-4">
+                          {['c1', 'c2', 'c3', 'c4', 'c5'].map((key) => {
+                              const score = currentResult.competencies[key as keyof typeof currentResult.competencies];
+                              const details = currentResult.detailedCompetencies ? currentResult.detailedCompetencies[key as keyof typeof currentResult.detailedCompetencies] : null;
+                              const isExpanded = expandedCompetency === key;
+                              const Icon = COMPETENCY_ICONS[key];
+
+                              return (
+                                  <div key={key} className={`glass-card rounded-2xl transition-all duration-300 border ${isExpanded ? 'border-indigo-500/40 bg-indigo-900/10' : 'border-white/5 hover:bg-white/5'}`}>
+                                      {/* Header / Summary Line */}
+                                      <div 
+                                        onClick={() => setExpandedCompetency(isExpanded ? null : key)}
+                                        className="p-5 flex items-center gap-4 cursor-pointer"
+                                      >
+                                          <div className={`p-3 rounded-xl ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                                              <Icon size={20} />
+                                          </div>
+                                          
+                                          <div className="flex-1">
+                                              <div className="flex justify-between items-center mb-1">
+                                                  <h4 className={`font-bold text-sm uppercase ${isExpanded ? 'text-white' : 'text-slate-300'}`}>{COMPETENCY_LABELS[key]}</h4>
+                                                  <span className={`font-mono font-bold text-lg ${score >= 160 ? 'text-emerald-400' : score >= 120 ? 'text-indigo-300' : 'text-yellow-400'}`}>{score} <span className="text-slate-600 text-xs">/ 200</span></span>
+                                              </div>
+                                              {/* Mini Bar */}
+                                              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden w-full">
+                                                  <div className={`h-full ${getBarColor(score)} transition-all duration-1000`} style={{width: `${(score/200)*100}%`}} />
+                                              </div>
+                                          </div>
+                                          
+                                          <ChevronRight size={20} className={`text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                      </div>
+
+                                      {/* Expanded Details */}
+                                      {isExpanded && (
+                                          <div className="px-5 pb-6 pt-0 border-t border-white/5 animate-in fade-in slide-in-from-top-1">
+                                              {/* Main Analysis */}
+                                              <div className="mt-4 mb-4">
+                                                  <p className="text-slate-200 leading-relaxed text-sm">
+                                                      {details?.analysis || (currentResult.competencyFeedback as any)?.[key] || "Sem análise detalhada disponível."}
+                                                  </p>
+                                              </div>
+
+                                              {/* Specific Positives/Negatives (New Structure) */}
+                                              {details && (
+                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                                      {details.positivePoints && details.positivePoints.length > 0 && (
+                                                          <div className="bg-emerald-900/10 p-3 rounded-xl border border-emerald-500/10">
+                                                              <p className="text-xs font-bold text-emerald-400 uppercase mb-2 flex items-center gap-1"><ThumbsUp size={12}/> Mandou Bem</p>
+                                                              <ul className="space-y-1">
+                                                                  {details.positivePoints.map((p, i) => (
+                                                                      <li key={i} className="text-xs text-emerald-100/70 flex items-start gap-1.5">
+                                                                          <span className="mt-1 w-1 h-1 bg-emerald-500 rounded-full flex-shrink-0" /> {p}
+                                                                      </li>
+                                                                  ))}
+                                                              </ul>
+                                                          </div>
+                                                      )}
+                                                      
+                                                      {details.negativePoints && details.negativePoints.length > 0 && (
+                                                          <div className="bg-red-900/10 p-3 rounded-xl border border-red-500/10">
+                                                              <p className="text-xs font-bold text-red-400 uppercase mb-2 flex items-center gap-1"><AlertCircle size={12}/> Atenção</p>
+                                                              <ul className="space-y-1">
+                                                                  {details.negativePoints.map((p, i) => (
+                                                                      <li key={i} className="text-xs text-red-100/70 flex items-start gap-1.5">
+                                                                          <span className="mt-1 w-1 h-1 bg-red-500 rounded-full flex-shrink-0" /> {p}
+                                                                      </li>
+                                                                  ))}
+                                                              </ul>
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                              )}
+                                          </div>
+                                      )}
+                                  </div>
+                              )
+                          })}
+                      </div>
+
+                      {/* General Feedback Card */}
+                      <div className="glass-card p-6 rounded-2xl bg-indigo-950/20 border border-indigo-500/10">
+                          <h3 className="font-bold text-white mb-3 text-lg">Parecer Geral</h3>
+                          <p className="text-slate-300 leading-relaxed text-sm italic">
+                              "{currentResult.feedback}"
+                          </p>
                       </div>
                   </div>
-
-                  {/* Competencies */}
-                  <div className="md:col-span-2 glass-card p-6 rounded-2xl space-y-4">
-                      <h3 className="font-bold text-white flex items-center gap-2"><FileText size={18} /> Competências ENEM</h3>
-                      {Object.entries(currentResult.competencies).map(([key, score]) => {
-                          const feedbackText = currentResult.competencyFeedback ? (currentResult.competencyFeedback as any)[key] : null;
-                          const isExpanded = expandedCompetency === key;
-
-                          return (
-                          <div key={key} className="flex flex-col">
-                              <div className="flex items-center gap-4">
-                                  <span className="text-xs font-bold text-slate-500 w-8 uppercase">{key}</span>
-                                  <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden">
-                                      <div className="h-full bg-indigo-500" style={{width: `${(score/200)*100}%`}} />
-                                  </div>
-                                  <span className="text-sm font-bold text-white w-8 text-right">{score}</span>
-                                  
-                                  {/* Info Icon Button */}
-                                  {feedbackText && (
-                                    <button 
-                                        onClick={() => setExpandedCompetency(isExpanded ? null : key)}
-                                        className={`p-1.5 rounded-lg transition-colors ${isExpanded ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:bg-white/10 hover:text-indigo-400'}`}
-                                        title="Ver explicação da nota"
-                                    >
-                                        <MessageSquareText size={16} />
-                                    </button>
-                                  )}
-                              </div>
-                              
-                              {/* Expandable Feedback */}
-                              {isExpanded && feedbackText && (
-                                  <div className="mt-3 ml-12 p-3 bg-indigo-900/20 border border-indigo-500/20 rounded-xl rounded-tl-none animate-in slide-in-from-top-2 fade-in duration-300">
-                                      <div className="flex items-start gap-2">
-                                          <Sparkles size={14} className="text-indigo-400 mt-1 flex-shrink-0" />
-                                          <p className="text-sm text-slate-300 italic">"{feedbackText}"</p>
-                                      </div>
-                                  </div>
-                              )}
-                          </div>
-                      )})}
-                  </div>
-              </div>
-
-              {/* Feedback */}
-              <div className="glass-card p-6 rounded-2xl">
-                  <h3 className="font-bold text-white mb-2">Comentário Geral</h3>
-                  <p className="text-slate-300 leading-relaxed">{currentResult.feedback}</p>
-              </div>
-
-              {/* Image Preview */}
-              {currentResult.imageUrl && (
-                  <div className="glass-card p-4 rounded-xl">
-                      <h3 className="font-bold text-white mb-4 text-sm">Imagem Enviada</h3>
-                      <img src={currentResult.imageUrl} className="w-full max-h-96 object-contain rounded-lg border border-white/5" />
-                  </div>
-              )}
-
-              {/* Errors */}
-              <div className="glass-card p-6 rounded-2xl border-red-500/20 bg-red-900/5">
-                  <h3 className="font-bold text-red-300 mb-4 flex items-center gap-2"><AlertTriangle size={18} /> Pontos de Atenção</h3>
-                  <ul className="space-y-2">
-                      {currentResult.errors.map((err, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
-                              <span className="text-red-500 mt-1">•</span> {err}
-                          </li>
-                      ))}
-                  </ul>
               </div>
           </div>
       );
@@ -351,13 +486,18 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                       />
                   </div>
 
-                  <div className="border-2 border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors cursor-pointer relative">
+                  <div className="border-2 border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-white/5 transition-colors cursor-pointer relative group">
                       <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
                       {image ? (
-                          <img src={image} className="max-h-64 rounded-lg shadow-lg" />
+                          <div className="relative">
+                              <img src={image} className="max-h-64 rounded-lg shadow-lg border border-white/10" />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition-opacity text-white font-bold">
+                                  Trocar Imagem
+                              </div>
+                          </div>
                       ) : (
                           <>
-                            <UploadCloud size={40} className="text-indigo-500 mb-2" />
+                            <UploadCloud size={40} className="text-indigo-500 mb-2 group-hover:scale-110 transition-transform" />
                             <p className="font-bold text-white">Clique para enviar foto</p>
                             <p className="text-xs text-slate-500">A imagem deve estar nítida e iluminada.</p>
                           </>
@@ -368,7 +508,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                       <label className="text-xs text-yellow-200 font-bold uppercase mb-1 block">Confirmação de Segurança</label>
                       <p className="text-xs text-yellow-500/80 mb-2">Ao confirmar, 1 crédito será descontado. Essa ação é irreversível.</p>
                       <input 
-                        className="w-full bg-slate-900 border border-yellow-500/30 p-2 rounded-lg text-white text-sm placeholder:text-slate-600" 
+                        className="w-full bg-slate-900 border border-yellow-500/30 p-2 rounded-lg text-white text-sm placeholder:text-slate-600 focus:border-yellow-500/60 focus:outline-none" 
                         placeholder="Digite CONFIRMAR"
                         value={confirmText}
                         onChange={e => setConfirmText(e.target.value)}
@@ -378,7 +518,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                   <button 
                     onClick={handleCorrectionSubmit}
                     disabled={!image || !theme || confirmText !== 'CONFIRMAR'}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition-all"
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
                   >
                       Confirmar Envio (1 Crédito)
                   </button>
@@ -583,17 +723,17 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           <h3 className="text-xl font-bold text-white mb-4">Histórico de Correções</h3>
           <div className="space-y-3">
               {history.map((item, idx) => (
-                  <div key={idx} onClick={() => handleSelectHistoryItem(item)} className="glass-card p-4 rounded-xl flex items-center justify-between hover:bg-slate-800/50 cursor-pointer transition-all border border-white/5 hover:border-indigo-500/30">
-                      <div>
-                          <p className="font-bold text-white truncate max-w-[200px] md:max-w-md">{item.theme}</p>
-                          <p className="text-xs text-slate-500">{new Date(item.date).toLocaleDateString()}</p>
-                      </div>
+                  <div key={idx} onClick={() => handleSelectHistoryItem(item)} className="glass-card p-4 rounded-xl flex items-center justify-between hover:bg-slate-800/50 cursor-pointer transition-all border border-white/5 hover:border-indigo-500/30 group">
                       <div className="flex items-center gap-4">
-                          <span className={`text-lg font-bold ${item.scoreTotal >= 900 ? 'text-emerald-400' : 'text-white'}`}>{item.scoreTotal}</span>
-                          <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
-                              <FileText size={18} />
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm border-2 ${item.scoreTotal >= 900 ? 'border-emerald-500 text-emerald-400' : 'border-slate-700 text-slate-400 group-hover:border-indigo-500 group-hover:text-indigo-300'}`}>
+                              {item.scoreTotal}
+                          </div>
+                          <div>
+                              <p className="font-bold text-white truncate max-w-[150px] md:max-w-md group-hover:text-indigo-200 transition-colors">{item.theme}</p>
+                              <p className="text-xs text-slate-500">{new Date(item.date).toLocaleDateString()}</p>
                           </div>
                       </div>
+                      <ChevronRight size={18} className="text-slate-600 group-hover:text-white transition-colors" />
                   </div>
               ))}
               {history.length === 0 && <p className="text-slate-500 text-center py-8">Nenhuma redação enviada.</p>}

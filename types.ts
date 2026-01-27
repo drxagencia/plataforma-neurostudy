@@ -158,12 +158,21 @@ export interface SimulationResult {
   topicPerformance?: Record<string, { correct: number; total: number }>; // Analysis data
 }
 
+// Enhanced Essay Correction Interface
+export interface CompetencyDetail {
+    score: number;
+    analysis: string; // Deep analysis of this specific competency
+    positivePoints?: string[];
+    negativePoints?: string[];
+}
+
 export interface EssayCorrection {
   id?: string;
   theme: string;
-  imageUrl: string; // Currently base64 for simplicity in MVP, ideally Storage URL
+  imageUrl: string; 
   date: number;
   scoreTotal: number;
+  // Legacy support maps simple scores, but new AI fills detailedCompetencies
   competencies: {
     c1: number;
     c2: number;
@@ -171,6 +180,15 @@ export interface EssayCorrection {
     c4: number;
     c5: number;
   };
+  // Detailed New Structure
+  detailedCompetencies?: {
+      c1: CompetencyDetail;
+      c2: CompetencyDetail;
+      c3: CompetencyDetail;
+      c4: CompetencyDetail;
+      c5: CompetencyDetail;
+  };
+  // Legacy feedback
   competencyFeedback?: {
     c1: string;
     c2: string;
@@ -178,6 +196,11 @@ export interface EssayCorrection {
     c4: string;
     c5: string;
   };
-  feedback: string;
-  errors: string[];
+  feedback: string; // General Analysis / Structural comments
+  errors: string[]; // Specific grammar/logic errors list
+  
+  // New Fields for Rich UI
+  strengths?: string[]; // "O que você dominou"
+  weaknesses?: string[]; // "Onde perdeu pontos"
+  structuralTips?: string; // Specific formatting/structure advice
 }
