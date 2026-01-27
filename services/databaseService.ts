@@ -27,7 +27,9 @@ export const DatabaseService = {
   // --- GENERIC HELPERS FOR ADMIN ---
   updatePath: async (path: string, data: any): Promise<void> => {
       try {
-          await update(ref(database, path), data);
+          // Remove undefined values from data
+          const cleanData = JSON.parse(JSON.stringify(data));
+          await update(ref(database, path), cleanData);
       } catch (e) {
           console.error(`Error updating path ${path}`, e);
           throw e;
@@ -752,9 +754,9 @@ export const DatabaseService = {
     try {
       const lessonsRef = ref(database, `lessons/${subjectId}/${topic}`);
       const newRef = push(lessonsRef);
-      // Ensure order is set if not present (simple append)
-      // Note: This relies on manual order setting or default 0.
-      await set(newRef, lesson);
+      // Ensure no undefined values
+      const cleanLesson = JSON.parse(JSON.stringify(lesson));
+      await set(newRef, cleanLesson);
     } catch (error) {
       console.error("Error creating lesson:", error);
       throw error;
@@ -766,44 +768,6 @@ export const DatabaseService = {
       try {
           const topicRef = ref(database, `lessons/${subjectId}/${topic}`);
           
-          await runTransaction(topicRef, (currentLessons) => {
-              // Convert object to array if needed
-              let lessonsArray: (Lesson & {key?: string})[] = [];
-              if (currentLessons) {
-                  if (Array.isArray(currentLessons)) {
-                      lessonsArray = currentLessons;
-                  } else {
-                      lessonsArray = Object.keys(currentLessons).map(k => ({...currentLessons[k], key: k}));
-                  }
-              }
-
-              // Sort current list by existing order
-              lessonsArray.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-              // If targetIndex is -1 or greater than length, append to end
-              const insertIdx = (targetIndex === -1 || targetIndex > lessonsArray.length) 
-                                ? lessonsArray.length 
-                                : targetIndex;
-
-              // Insert new lesson (we assign a temporary key or handle it after transaction, 
-              // but transaction needs the full object structure. 
-              // Simplest for Realtime DB is to manage order field on all items)
-              
-              // We need to shift order for items >= insertIdx
-              const updatedMap: Record<string, Lesson> = {};
-              
-              // Add existing items up to insertIdx
-              let currentOrder = 0;
-              
-              // This is a bit tricky inside transaction because we need to generate a key for the new item 
-              // but push() works outside. 
-              // Workaround: We fetch, modify locally, and set via update outside, OR use transaction purely on the list.
-              // Since RealtimeDB returns the value to be set...
-              
-              // Let's rely on `createLesson` + manual update logic which is safer than complex transaction here
-              return; // Abort transaction, we will do manual update below
-          });
-
           // MANUAL ORDER UPDATE APPROACH (Safer for large lists)
           const snapshot = await get(topicRef);
           let lessonsList: {id: string, data: Lesson}[] = [];
@@ -825,8 +789,12 @@ export const DatabaseService = {
           // 2. Prepare Updates
           const updates: Record<string, any> = {};
           
+          // Clean undefined values from lesson object to prevent Firebase "update failed: values argument contains undefined" error
+          // JSON.stringify/parse is a safe way to strip undefineds from nested objects
+          const cleanLesson = JSON.parse(JSON.stringify(lesson));
+
           // Add new lesson at determined order
-          updates[`${newId}`] = { ...lesson, order: insertIdx };
+          updates[`${newId}`] = { ...cleanLesson, order: insertIdx };
 
           // Shift subsequent lessons
           for (let i = insertIdx; i < lessonsList.length; i++) {
