@@ -153,10 +153,10 @@ const App: React.FC = () => {
                 : (
                     <>
                     {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} />}
-                    {currentView === 'aulas' && <Classes onNavigate={setCurrentView} />}
+                    {currentView === 'aulas' && <Classes onNavigate={setCurrentView} user={user} onUpdateUser={handleUpdateUser} />}
                     {currentView === 'militares' && <Militares />}
                     {currentView === 'redacao' && <Redacao user={user} onUpdateUser={handleUpdateUser} />}
-                    {currentView === 'questoes' && <QuestionBank />}
+                    {currentView === 'questoes' && <QuestionBank onUpdateUser={handleUpdateUser} />}
                     {currentView === 'comunidade' && <Community user={user} />}
                     {currentView === 'simulados' && <Simulations />}
                     {currentView === 'tutor' && <AiTutor user={user} onUpdateUser={handleUpdateUser} />}

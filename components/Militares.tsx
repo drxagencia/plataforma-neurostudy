@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { Subject, Lesson } from '../types';
-import { Loader2, Sword, ChevronRight, PlayCircle, BookOpen, Target } from 'lucide-react';
+import { Loader2, Skull, ChevronRight, PlayCircle, BookOpen, Target } from 'lucide-react';
 
 // Reuse Classes logic but filter by 'military' category
 const Militares: React.FC = () => {
@@ -78,7 +78,7 @@ const Militares: React.FC = () => {
     <div className="space-y-8 animate-slide-up">
         <div className="flex items-center gap-4 mb-8">
             <div className="p-3 bg-emerald-600 rounded-xl shadow-lg shadow-emerald-900/20 text-white">
-                <Sword size={32} />
+                <Skull size={32} />
             </div>
             <div>
                 <h2 className="text-3xl font-bold text-white">Carreiras Militares</h2>

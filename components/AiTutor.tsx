@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit } from 'lucide-react';
 import { AiService, ChatMessage } from '../services/aiService';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
@@ -17,7 +17,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
     {
       id: 'welcome',
       role: 'ai',
-      content: 'Olá! Sou o NeuroTutor. Posso te ajudar com dúvidas de matérias, criar resumos ou explicar questões difíceis. O que vamos estudar hoje?'
+      content: 'Olá! Sou a **NeuroAI**. Posso te ajudar com dúvidas de matérias, criar resumos ou explicar questões difíceis. O que vamos estudar hoje?'
     }
   ]);
   const [input, setInput] = useState('');
@@ -68,8 +68,12 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
 
   const updateBalanceLocally = async () => {
       if (!auth.currentUser) return;
+      // Fetch latest profile to get new balance calculated by backend
       const updatedUser = await DatabaseService.getUserProfile(auth.currentUser.uid);
-      if (updatedUser) onUpdateUser(updatedUser);
+      if (updatedUser) {
+          onUpdateUser(updatedUser);
+          fetchHistory(); // Refresh history to show new debit
+      }
   };
 
   const triggerNotification = (type: 'success' | 'error', message: string) => {
@@ -119,7 +123,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
       };
       
       setMessages(prev => [...prev, aiMsg]);
-      updateBalanceLocally();
+      await updateBalanceLocally();
     } catch (error: any) {
       if (error.message.includes('402')) {
           triggerNotification('error', 'Seu saldo acabou durante a requisição.');
@@ -227,9 +231,9 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 flex-shrink-0 gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white flex items-center gap-2">
-            <Bot className="text-indigo-400" /> NeuroTutor <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">BETA</span>
+            <BrainCircuit className="text-indigo-400" /> NeuroAI <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">BETA</span>
           </h2>
-          <p className="text-slate-400 text-sm">IA cobrada por uso.</p>
+          <p className="text-slate-400 text-sm">Inteligência Artificial por demanda.</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -237,7 +241,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                 <div className="flex flex-col items-end">
                     <span className="text-[10px] text-slate-400 uppercase font-bold">Seu Saldo</span>
                     <span className={`font-mono font-bold ${user.balance > 5 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        R$ {user.balance.toFixed(4)}
+                        R$ {user.balance.toFixed(2)}
                     </span>
                 </div>
                 <div className="h-8 w-[1px] bg-white/10 mx-1"></div>
@@ -306,6 +310,9 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
             </div>
 
             <form onSubmit={handleSend} className="relative flex-shrink-0">
+                <div className="absolute -top-6 right-0 text-[10px] uppercase tracking-wider font-bold text-indigo-400">
+                    Consumo estimado: ~R$ 0,05 / mensagem
+                </div>
                 <input
                 type="text"
                 value={input}

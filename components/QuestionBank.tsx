@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
-import { Subject, Question } from '../types';
+import { Subject, Question, UserProfile } from '../types';
 import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, Trophy, Bot, Sparkles, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { auth } from '../services/firebaseConfig';
 
@@ -32,9 +32,10 @@ interface QuestionCardProps {
     index: number;
     prevResult: { correct: boolean } | undefined;
     onAnswer: (qId: string, isCorrect: boolean) => void;
+    onUpdateUser: () => void;
 }
 
-const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, prevResult, onAnswer }) => {
+const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, prevResult, onAnswer, onUpdateUser }) => {
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
     const [isAnswered, setIsAnswered] = useState(!!prevResult);
     const [isExplaining, setIsExplaining] = useState(false);
@@ -54,14 +55,24 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, prevResult
 
     const handleExplain = async () => {
         if (selectedOption === null) return;
+        
+        // Optimistic check (frontend only) - Backend also checks
+        // We warn user about costs
+        const confirmMsg = "Esta ação consumirá aproximadamente R$ 0,05 do seu saldo de recarga. Deseja continuar?";
+        // Note: The prompt requested NO confirmation dialog, just warning. So we proceed directly.
+        // But we should check if they have balance roughly.
+        // Assuming we rely on backend 402 error for strict check.
+
         setIsExplaining(true);
         try {
             const wrongTxt = question.options[selectedOption];
             const correctTxt = question.options[question.correctAnswer];
             const text = await AiService.explainError(question.text, wrongTxt, correctTxt);
             setAiExplanation(text);
-        } catch (e) {
-            alert("Erro ao consultar tutor.");
+            onUpdateUser(); // Update balance
+        } catch (e: any) {
+            if (e.message.includes('402')) alert("Saldo insuficiente.");
+            else alert("Erro ao consultar tutor.");
         } finally {
             setIsExplaining(false);
         }
@@ -129,12 +140,15 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, prevResult
                     {!aiExplanation && !isExplaining ? (
                         <div className="flex items-center justify-between">
                             <span className="text-red-400 text-sm font-bold">Resposta Incorreta</span>
-                            <button 
-                                onClick={handleExplain}
-                                className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                                <Bot size={14} /> Explicar Erro (IA)
-                            </button>
+                            <div className="flex flex-col items-end">
+                                <button 
+                                    onClick={handleExplain}
+                                    className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-indigo-900/20"
+                                >
+                                    <Bot size={14} /> Explicar Erro (IA)
+                                </button>
+                                <span className="text-[9px] text-indigo-300/70 mt-1 font-bold uppercase tracking-wide">Custo: ~R$ 0,05</span>
+                            </div>
                         </div>
                     ) : (
                         <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl relative">
@@ -145,7 +159,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, prevResult
                             ) : (
                                 <div>
                                     <div className="flex items-center gap-2 mb-2 text-indigo-300 text-xs font-bold uppercase">
-                                        <Sparkles size={12} /> Explicação do Tutor
+                                        <Sparkles size={12} /> Explicação do NeuroAI
                                     </div>
                                     <div className="text-sm text-slate-200">
                                         <SimpleMarkdown text={aiExplanation || ''} />
@@ -167,7 +181,12 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, prevResult
 };
 
 // --- MAIN COMPONENT ---
-const QuestionBank: React.FC = () => {
+// Add Props to receive update function
+interface QuestionBankProps {
+    onUpdateUser?: (u: UserProfile) => void;
+}
+
+const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
   const [subtopics, setSubtopics] = useState<Record<string, string[]>>({});
@@ -254,6 +273,14 @@ const QuestionBank: React.FC = () => {
       if (isCorrect) {
           await DatabaseService.addXp(auth.currentUser.uid, 10);
           await DatabaseService.incrementQuestionsAnswered(auth.currentUser.uid, 1);
+      }
+  };
+
+  // Helper to refresh user balance locally
+  const handleUpdateBalance = async () => {
+      if (onUpdateUser && auth.currentUser) {
+          const u = await DatabaseService.getUserProfile(auth.currentUser.uid);
+          if (u) onUpdateUser(u);
       }
   };
 
@@ -384,6 +411,7 @@ const QuestionBank: React.FC = () => {
                         question={q} 
                         prevResult={q.id ? answeredMap[q.id] : undefined}
                         onAnswer={handleAnswerSubmit}
+                        onUpdateUser={handleUpdateBalance}
                      />
                  ))}
                  

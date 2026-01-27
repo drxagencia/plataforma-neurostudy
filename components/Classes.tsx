@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { DatabaseService } from '../services/databaseService';
-import { Subject, Lesson, View } from '../types';
+import { Subject, Lesson, View, UserProfile } from '../types';
 import * as Icons from 'lucide-react';
 import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, ExternalLink, Clock, MonitorPlay, GraduationCap, CheckCircle, BrainCircuit, X, MessageCircle, Target, ArrowRight } from 'lucide-react';
 import { AiService } from '../services/aiService';
@@ -37,9 +37,11 @@ const VideoPlayer = React.memo(({ videoId, title }: { videoId: string, title: st
 
 interface ClassesProps {
     onNavigate: (view: View) => void;
+    user: UserProfile;
+    onUpdateUser: (u: UserProfile) => void;
 }
 
-const Classes: React.FC<ClassesProps> = ({ onNavigate }) => {
+const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -114,6 +116,12 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate }) => {
   };
 
   // --- AI HANDLERS ---
+  const updateBalanceLocally = async () => {
+      if (!auth.currentUser) return;
+      const updatedUser = await DatabaseService.getUserProfile(auth.currentUser.uid);
+      if (updatedUser) onUpdateUser(updatedUser);
+  };
+
   const handleFinishLesson = () => {
       setShowAiModal(true);
       // Optional: Add XP here for finishing video
@@ -121,11 +129,17 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate }) => {
 
   const generateSummary = async () => {
       if (!selectedLesson) return;
+      if (user.balance < 0.05) {
+          alert("Saldo insuficiente para gerar resumo. Recarregue no menu do NeuroAI.");
+          return;
+      }
+
       setAiLoading(true);
       try {
           const prompt = `O aluno acabou de assistir à aula "${selectedLesson.title}" do tópico "${selectedTopic}". Gere um resumo conciso de 3 tópicos principais que ele deve ter aprendido.`;
           const text = await AiService.sendMessage(prompt, []);
           setAiSummary(text);
+          await updateBalanceLocally();
       } catch (e) {
           setAiSummary("Não foi possível gerar o resumo. Verifique seus créditos.");
       } finally {
@@ -135,12 +149,18 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate }) => {
 
   const handleContextualHelp = async () => {
       if (!chatInput.trim() || !selectedLesson) return;
+      if (user.balance < 0.03) {
+          alert("Saldo insuficiente para consultar o tutor.");
+          return;
+      }
+
       setChatLoading(true);
       try {
           // Provide context about the current lesson
           const fullPrompt = `[Contexto: Aula ${selectedLesson.title} de ${selectedTopic}] Aluno pergunta: ${chatInput}`;
           const text = await AiService.sendMessage(fullPrompt, []);
           setChatResponse(text);
+          await updateBalanceLocally();
       } catch (e) {
           setChatResponse("Erro ao consultar o tutor.");
       } finally {
@@ -178,18 +198,23 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate }) => {
                           </div>
 
                           {!aiSummary ? (
-                              <div className="grid grid-cols-2 gap-4">
-                                  <button onClick={() => setShowAiModal(false)} className="p-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-colors">
-                                      Sim, entendi!
-                                  </button>
-                                  <button onClick={generateSummary} disabled={aiLoading} className="p-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors flex flex-col items-center justify-center gap-1">
-                                      {aiLoading ? <Loader2 className="animate-spin" size={20}/> : <BrainCircuit size={24} />}
-                                      <span className="text-xs">Preciso de um Resumo</span>
-                                  </button>
+                              <div className="space-y-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                      <button onClick={() => setShowAiModal(false)} className="p-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-colors">
+                                          Sim, entendi!
+                                      </button>
+                                      <button onClick={generateSummary} disabled={aiLoading} className="p-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors flex flex-col items-center justify-center gap-1 relative overflow-hidden">
+                                          {aiLoading ? <Loader2 className="animate-spin" size={20}/> : <BrainCircuit size={24} />}
+                                          <span className="text-xs">Gerar Resumo IA</span>
+                                      </button>
+                                  </div>
+                                  <p className="text-center text-[10px] uppercase tracking-wider font-bold text-indigo-400/80 animate-pulse">
+                                      Custo Estimado: ~R$ 0,05
+                                  </p>
                               </div>
                           ) : (
                               <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 animate-in slide-in-from-bottom-2">
-                                  <h4 className="text-indigo-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit size={16}/> Resumo do NeuroTutor</h4>
+                                  <h4 className="text-indigo-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit size={16}/> Resumo do NeuroAI</h4>
                                   <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
                                   <button onClick={() => setShowAiModal(false)} className="mt-4 w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold">
                                       Fechar
@@ -239,6 +264,9 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate }) => {
                           <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2">
                               <div className="flex justify-between items-start mb-2">
                                   <h4 className="font-bold text-white flex items-center gap-2"><BrainCircuit size={18} className="text-indigo-400"/> Tutor da Aula</h4>
+                                  <span className="text-[10px] uppercase tracking-wider font-bold text-indigo-400/80">
+                                      Custo: ~R$ 0,05 / envio
+                                  </span>
                               </div>
                               
                               {chatResponse && (
