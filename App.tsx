@@ -136,18 +136,15 @@ const App: React.FC = () => {
         }`}
         style={{ height: '100vh' }}
       >
-        {/* Background Glows */}
-        <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-           {/* Dark Mode Glows */}
-           <div className="absolute top-[-10%] left-[20%] w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-[120px] dark:block hidden" />
-           <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[100px] dark:block hidden" />
-           
-           {/* Light Mode Glows (More subtle, different colors) */}
-           <div className="absolute top-[-10%] left-[20%] w-[600px] h-[600px] bg-indigo-200/40 rounded-full blur-[120px] dark:hidden block" />
-           <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-purple-200/40 rounded-full blur-[100px] dark:hidden block" />
+        {/* === PROFESSIONAL ANIMATED BACKGROUND === */}
+        <div className="stars-container">
+            <div className="stars stars-1"></div>
+            <div className="stars stars-2"></div>
+            <div className="stars stars-3"></div>
+            <div className="nebula-glow"></div>
         </div>
 
-        <div className="max-w-7xl mx-auto h-full">
+        <div className="max-w-7xl mx-auto h-full relative z-10">
             {/* View Rendering Logic */}
             {!checkAccess(currentView) 
                 ? <AccessDenied currentPlan={user.plan} requiredPlan={user.plan === 'basic' ? 'intermediate' : 'advanced'} />
