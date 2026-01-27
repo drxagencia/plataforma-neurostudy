@@ -49,17 +49,19 @@
     <style>
       :root {
         --bg-body: #020617;
-        --text-main: #f8fafc;
-        --glass-bg: rgba(15, 23, 42, 0.6);
-        --glass-border: rgba(255, 255, 255, 0.08);
       }
 
-      /* Dark Mode (Default) - Universe Background */
+      /* Dark Mode (Default) - Deep Universe Background */
       html.dark body {
         background-color: #020617;
-        background-image: radial-gradient(circle at 50% 100%, #1e1b4b, #020617 50%);
+        /* Richer gradient for depth */
+        background-image: 
+          radial-gradient(circle at 50% 0%, #172033, transparent 80%),
+          radial-gradient(circle at 0% 100%, #1e1b4b, transparent 60%),
+          radial-gradient(circle at 100% 100%, #312e81, transparent 60%);
         background-attachment: fixed;
         color: #f8fafc;
+        overflow-x: hidden; /* Prevent horizontal scroll from effects */
       }
 
       html.light body {
@@ -74,7 +76,7 @@
       html.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
       ::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
 
-      /* --- RISING STARS ANIMATION --- */
+      /* --- INFINITE RISING STARS ANIMATION --- */
       .stars-container {
         position: fixed;
         top: 0;
@@ -82,84 +84,98 @@
         width: 100%;
         height: 100%;
         pointer-events: none;
-        z-index: 0; /* Behind content, but on top of body bg */
+        z-index: 0;
         overflow: hidden;
       }
-      
-      .stars {
+
+      /* Base star layer logic */
+      .star-layer {
         position: absolute;
         top: 0;
         left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        height: 200%; /* Double height for scrolling loop */
-        display: block;
+        background: transparent;
       }
 
-      /* Small Stars */
+      /* The duplicate stars for the infinite loop */
+      .star-layer::after {
+        content: " ";
+        position: absolute;
+        top: 100vh; /* Exactly one viewport height down */
+        left: 0;
+        width: inherit;
+        height: inherit;
+        background: transparent;
+        box-shadow: inherit; /* Inherit the star map */
+      }
+
+      /* Layer 1: Small stars, slower (background) */
       .stars-1 {
+        width: 1px;
+        height: 1px;
         background: transparent;
+        /* Dense field of small stars */
         box-shadow: 
-          10vw 10vh #fff, 20vw 80vh #fff, 30vw 20vh #fff, 
-          40vw 40vh #fff, 50vw 90vh #fff, 60vw 10vh #fff, 
-          70vw 60vh #fff, 80vw 30vh #fff, 90vw 80vh #fff,
-          15vw 50vh #fff, 35vw 70vh #fff, 85vw 10vh #fff;
-        width: 2px;
-        height: 2px;
-        animation: floatUp 50s linear infinite;
-        opacity: 0.6;
-      }
-      /* Add pseudo-element to duplicate content for seamless loop */
-      .stars-1::after {
-        content: " ";
-        position: absolute;
-        top: 100%;
-        width: 2px;
-        height: 2px;
-        box-shadow: inherit;
+          10vw 10vh #FFF, 80vw 5vh #FFF, 5vw 85vh #FFF, 30vw 15vh #FFF, 90vw 60vh #FFF,
+          15vw 40vh #FFF, 55vw 25vh #FFF, 70vw 90vh #FFF, 45vw 55vh #FFF, 25vw 75vh #FFF,
+          60vw 10vh #FFF, 85vw 35vh #FFF, 35vw 95vh #FFF, 10vw 65vh #FFF, 95vw 20vh #FFF,
+          50vw 50vh #FFF, 20vw 30vh #FFF, 75vw 80vh #FFF, 40vw 10vh #FFF, 65vw 45vh #FFF,
+          5vw 20vh #FFF, 85vw 85vh #FFF, 15vw 95vh #FFF, 35vw 35vh #FFF, 95vw 55vh #FFF,
+          25vw 5vh #FFF, 75vw 15vh #FFF, 45vw 70vh #FFF, 65vw 90vh #FFF, 55vw 40vh #FFF,
+          12vw 12vh #FFF, 88vw 88vh #FFF, 22vw 78vh #FFF, 68vw 22vh #FFF, 38vw 48vh #FFF,
+          42vw 82vh #FFF, 92vw 32vh #FFF, 52vw 62vh #FFF, 08vw 58vh #FFF, 78vw 08vh #FFF;
+        animation: animStar 100s linear infinite;
+        opacity: 0.5;
       }
 
-      /* Medium Stars */
+      /* Layer 2: Medium stars, medium speed */
       .stars-2 {
+        width: 2px;
+        height: 2px;
         background: transparent;
         box-shadow: 
-          5vw 5vh #cbd5e1, 25vw 25vh #cbd5e1, 45vw 45vh #cbd5e1, 
-          65vw 65vh #cbd5e1, 85vw 85vh #cbd5e1, 15vw 75vh #cbd5e1;
-        width: 3px;
-        height: 3px;
-        animation: floatUp 100s linear infinite;
-        opacity: 0.4;
+          20vw 20vh #e2e8f0, 60vw 80vh #e2e8f0, 10vw 60vh #e2e8f0, 90vw 10vh #e2e8f0,
+          40vw 40vh #e2e8f0, 80vw 30vh #e2e8f0, 30vw 90vh #e2e8f0, 70vw 50vh #e2e8f0,
+          50vw 10vh #e2e8f0, 15vw 85vh #e2e8f0, 85vw 55vh #e2e8f0, 35vw 25vh #e2e8f0,
+          05vw 05vh #e2e8f0, 95vw 95vh #e2e8f0, 25vw 45vh #e2e8f0, 75vw 75vh #e2e8f0;
+        animation: animStar 60s linear infinite;
+        opacity: 0.7;
       }
-      .stars-2::after {
-        content: " ";
-        position: absolute;
-        top: 100%;
+      .stars-2::after { width: 2px; height: 2px; }
+
+      /* Layer 3: Large stars, faster (foreground) */
+      .stars-3 {
         width: 3px;
         height: 3px;
-        box-shadow: inherit;
+        background: transparent;
+        box-shadow: 
+          50vw 30vh #a5b4fc, 10vw 80vh #a5b4fc, 85vw 15vh #a5b4fc, 25vw 60vh #a5b4fc,
+          70vw 90vh #a5b4fc, 90vw 40vh #a5b4fc, 35vw 10vh #a5b4fc;
+        animation: animStar 40s linear infinite;
+        opacity: 0.9;
+        filter: drop-shadow(0 0 3px #6366f1); /* Glow effect */
+      }
+      .stars-3::after { width: 3px; height: 3px; }
+
+      @keyframes animStar {
+        from { transform: translateY(0); }
+        to { transform: translateY(-100vh); }
       }
 
-      /* Nebula Glows */
+      /* Nebula Glows - Ambient Pulse */
       .nebula-glow {
         position: fixed;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         z-index: -1;
         background: 
-          radial-gradient(circle at 20% 60%, rgba(99, 102, 241, 0.05), transparent 40%),
-          radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.05), transparent 40%);
-        animation: pulseGlow 8s ease-in-out infinite alternate;
-      }
-
-      @keyframes floatUp {
-        from { transform: translateY(0); }
-        to { transform: translateY(-100%); }
+          radial-gradient(circle at 15% 55%, rgba(99, 102, 241, 0.1), transparent 40%),
+          radial-gradient(circle at 85% 25%, rgba(168, 85, 247, 0.1), transparent 40%);
+        animation: pulseGlow 15s ease-in-out infinite alternate;
       }
 
       @keyframes pulseGlow {
-        0% { opacity: 0.4; }
-        100% { opacity: 0.8; }
+        0% { opacity: 0.4; transform: scale(1); }
+        100% { opacity: 0.7; transform: scale(1.1); }
       }
 
       /* Disable in light mode */
@@ -183,8 +199,7 @@
         border-color: #cbd5e1;
       }
 
-      /* Ensure content sits above stars */
-      #root { position: relative; z-index: 1; height: 100%; }
+      #root { position: relative; z-index: 1; min-height: 100vh; }
     </style>
   <script type="importmap">
 {

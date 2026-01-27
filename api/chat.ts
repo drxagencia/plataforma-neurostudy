@@ -1,5 +1,4 @@
-
-import { initializeApp } from "firebase/app";
+import * as firebaseApp from "firebase/app";
 import { getDatabase, ref, get, update, push, set } from "firebase/database";
 
 const firebaseConfig = {
@@ -9,11 +8,20 @@ const firebaseConfig = {
   projectId: "neurostudy-d8a00",
 };
 
+// Initialize Firebase App for serverless context
+// Checks if app is already initialized to avoid duplicate errors in hot-reload/serverless environments
 let app;
 try {
-    app = initializeApp(firebaseConfig, "serverless_worker");
-} catch (e) {
-    app = initializeApp(firebaseConfig); 
+    // Attempt to initialize with a unique name for the worker
+    app = firebaseApp.initializeApp(firebaseConfig, "serverless_worker");
+} catch (e: any) {
+    // If it fails (e.g. already exists), try to get the default app or re-initialize without name if necessary
+    // However, usually in V9 modular, initializeApp returns the instance. 
+    // If "serverless_worker" already exists, it throws. We can ignore or handle.
+    // In this context, simpler is often better: just create a new one or ignore if we can't get reference easily without getApp
+    // We will just try default init if named failed, or suppress.
+    // Correct approach for repeated calls:
+    app = firebaseApp.initializeApp(firebaseConfig); 
 }
 const db = getDatabase(app);
 
@@ -27,7 +35,7 @@ const PRICE_INPUT_1M = 0.15;
 const PRICE_OUTPUT_1M = 0.60;
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

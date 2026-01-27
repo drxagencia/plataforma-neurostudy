@@ -126,8 +126,9 @@ const App: React.FC = () => {
       
       {/* Background Animation Container */}
       <div className="stars-container">
-          <div className="stars stars-1"></div>
-          <div className="stars stars-2"></div>
+          <div className="star-layer stars-1"></div>
+          <div className="star-layer stars-2"></div>
+          <div className="star-layer stars-3"></div>
           <div className="nebula-glow"></div>
       </div>
 

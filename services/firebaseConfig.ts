@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import * as firebaseApp from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 
@@ -13,6 +13,7 @@ const firebaseConfig = {
   measurementId: "G-CFYSRSFF0V"
 };
 
-const app = initializeApp(firebaseConfig);
+// Use firebaseApp.initializeApp to handle potential type definition mismatches
+const app = firebaseApp.initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const database = getDatabase(app);
