@@ -76,42 +76,42 @@ export default async function handler(req: any, res: any) {
         // If essayCount is 2, the current one being processed will be the 3rd.
         const isThirdOrMore = essayCount >= 2;
 
-        // PROMPT AVANÇADO - Especialista ENEM
+        // PROMPT CALIBRADO - PADRÃO INEP/ENEM OFICIAL
         const prompt = `
-            ATUE COMO: Um Corretor Sênior da Banca do ENEM, extremamente técnico, exigente e detalhista.
+            ATUE COMO: Um Corretor Oficial do ENEM (Banca Vunesp/Cebraspe/FGV).
             TEMA: ${message}
-            TAREFA: Analise a imagem da redação MANUSCRITA e forneça uma correção completa e rigorosa.
-            
-            ATENÇÃO: A imagem contém texto escrito à mão. Considere possíveis ambiguidades de caligrafia típicas de estudantes. Se uma palavra parecer errada mas for apenas má caligrafia, seja ponderado, mas penalize ilegibilidade se afetar a compreensão.
+            TAREFA: Analisar a imagem da redação MANUSCRITA e atribuir nota seguindo ESTRITAMENTE a Matriz de Referência do ENEM.
 
-            REGRAS DE PONTUAÇÃO (CRÍTICO):
-            1. As notas de C1 a C5 DEVEM ser MÚLTIPLOS DE 20 (ex: 0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200).
-            2. NÃO dê nota "média" (120) se o aluno for excelente (180/200) ou fraco (40/60). Seja justo e identifique os extremos.
-            3. Analise com rigor: Coesão, Coerência, Gramática, Repertório Sociocultural e Proposta de Intervenção.
-            4. SOMA: O campo "total" DEVE SER EXATAMENTE a soma de c1+c2+c3+c4+c5.
+            DIRETRIZES DE CALIBRAGEM (CRÍTICO - LEIA COM ATENÇÃO):
+            1. NÃO SEJA EXCESSIVAMENTE PUNITIVO. O objetivo é simular a nota real. Se o texto for excelente, DÊ NOTA 1000.
+            2. CALIGRAFIA & OCR: A imagem é manuscrita. Se o texto parece "estranho" ou com erro ortográfico, verifique o CONTEXTO. Se fizer sentido no contexto, considere que a IA leu errado e NÃO TIRE PONTOS. A dúvida sempre favorece o aluno (in dubio pro reo).
+            3. NOTAS MÁXIMAS (200): Não tenha medo de dar 200 na competência se o aluno cumprir os requisitos, mesmo que não seja "perfeito". O ENEM tolera pequenos desvios para nota máxima na C1, por exemplo.
+            4. ESCALA: Use APENAS múltiplos de 20 (0, 40, ..., 120, 160, 200).
+
+            CRITÉRIOS PARA NOTA 200 (MÁXIMA) POR COMPETÊNCIA:
+            - C1 (Norma Culta): Estrutura sintática excelente (no máximo uma falha) e raros desvios gramaticais. (Se o texto é bom, dê 200 ou 160, evite notas baixas por erro de leitura de imagem).
+            - C2 (Tema/Estrutura): Texto dissertativo-argumentativo completo (Intro, Desenv, Concl) + Repertório Sociocultural Legitimado, Pertinente e PRODUTIVO.
+            - C3 (Projeto de Texto): Autoria, progressão textual fluida, sem contradições. Argumentos bem desenvolvidos.
+            - C4 (Coesão): Presença expressiva de elementos coesivos inter e intraparágrafos. Pouca ou nenhuma repetição.
+            - C5 (Proposta): Apresenta 5 elementos: Agente, Ação, Meio/Modo, Efeito e Detalhamento.
 
             FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):
             {
                 "c1": { 
                     "score": number, 
-                    "analysis": "Texto técnico explicando o desempenho na norma culta.", 
-                    "positive_points": ["Item 1", "Item 2"], 
-                    "negative_points": ["Erro grave de crase na linha X", "Concordância"]
+                    "analysis": "Breve justificativa técnica.", 
+                    "positive_points": ["Ponto positivo 1"], 
+                    "negative_points": ["Se houver erro real, cite. Se não, deixe vazio."]
                 },
-                "c2": { 
-                    "score": number, 
-                    "analysis": "Texto sobre a compreensão do tema e estrutura dissertativa.",
-                    "positive_points": ["Uso produtivo de repertório", "Boa tese"], 
-                    "negative_points": ["Tangenciamento do tema"]
-                },
-                "c3": { "score": number, "analysis": "Texto sobre projeto de texto e argumentação.", "positive_points": [], "negative_points": [] },
-                "c4": { "score": number, "analysis": "Texto sobre mecanismos linguísticos e coesão.", "positive_points": [], "negative_points": [] },
-                "c5": { "score": number, "analysis": "Texto sobre proposta de intervenção (GOMIF).", "positive_points": [], "negative_points": [] },
+                "c2": { "score": number, "analysis": "Justificativa C2.", "positive_points": [], "negative_points": [] },
+                "c3": { "score": number, "analysis": "Justificativa C3.", "positive_points": [], "negative_points": [] },
+                "c4": { "score": number, "analysis": "Justificativa C4.", "positive_points": [], "negative_points": [] },
+                "c5": { "score": number, "analysis": "Justificativa C5.", "positive_points": [], "negative_points": [] },
                 "total": number,
-                "general_feedback": "Uma análise macroestrutural do texto. Fale sobre o estilo de escrita do aluno, a progressão textual e a maturidade dos argumentos.",
-                "strengths": ["Lista de 3 pontos fortes gerais do texto"],
-                "weaknesses": ["Lista de 3 pontos fracos gerais do texto"],
-                "structural_tips": "Dica prática de como melhorar a estrutura dos parágrafos ou a caligrafia/organização visual."
+                "general_feedback": "Feedback construtivo e motivador (tom de professor experiente). Reconheça se o texto é de alto nível.",
+                "strengths": ["3 pontos fortes do texto"],
+                "weaknesses": ["3 pontos de melhoria"],
+                "structural_tips": "Dica prática para alcançar o 1000 ou manter o nível."
             }
         `;
 
