@@ -1,3 +1,4 @@
+
 import * as firebaseApp from "firebase/app";
 import { getDatabase, ref, get, update, push, set } from "firebase/database";
 
@@ -9,18 +10,10 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase App for serverless context
-// Checks if app is already initialized to avoid duplicate errors in hot-reload/serverless environments
 let app;
 try {
-    // Attempt to initialize with a unique name for the worker
     app = firebaseApp.initializeApp(firebaseConfig, "serverless_worker");
 } catch (e: any) {
-    // If it fails (e.g. already exists), try to get the default app or re-initialize without name if necessary
-    // However, usually in V9 modular, initializeApp returns the instance. 
-    // If "serverless_worker" already exists, it throws. We can ignore or handle.
-    // In this context, simpler is often better: just create a new one or ignore if we can't get reference easily without getApp
-    // We will just try default init if named failed, or suppress.
-    // Correct approach for repeated calls:
     app = firebaseApp.initializeApp(firebaseConfig); 
 }
 const db = getDatabase(app);
@@ -30,9 +23,13 @@ const AI_MODEL = "gpt-4o-mini";
 const USD_TO_BRL = 6.0; // Fixed exchange rate assumption
 const PROFIT_MARGIN = 1.5; // 1.5x markup
 
-// Updated Pricing per 1 Million Tokens (USD)
+// Pricing per 1 Million Tokens (USD)
 const PRICE_INPUT_1M = 0.15;
 const PRICE_OUTPUT_1M = 0.60;
+
+// AGGRESSIVE TOKEN MULTIPLIER (60x)
+// "A cada 1 token gasto, nós iremos computar 60"
+const TOKEN_COMPUTE_MULTIPLIER = 60; 
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -52,7 +49,7 @@ export default async function handler(req: any, res: any) {
   if (!apiKey) return res.status(500).json({ error: 'Server Config Error: Missing OpenAI API Key' });
 
   try {
-    const { message, history, mode, uid, image } = req.body;
+    const { message, history, mode, uid, image, systemOverride } = req.body;
 
     if (!uid) return res.status(401).json({ error: 'User ID required' });
 
@@ -171,7 +168,9 @@ export default async function handler(req: any, res: any) {
     }
 
     let systemInstruction = "";
-    if (mode === 'explanation') {
+    if (systemOverride) {
+        systemInstruction = systemOverride;
+    } else if (mode === 'explanation') {
       systemInstruction = `
       Atue como Tutor Sênior.
       OBJETIVO: Explicar o erro do aluno de forma DIDÁTICA e MUITO BREVE.
@@ -190,7 +189,6 @@ export default async function handler(req: any, res: any) {
     ];
 
     if (history && Array.isArray(history)) {
-        // OpenAI expects 'assistant' instead of 'ai' for role
         history.slice(-3).forEach((msg: any) => {
             messagesPayload.push({
                 role: msg.role === 'ai' ? 'assistant' : 'user',
@@ -223,9 +221,13 @@ export default async function handler(req: any, res: any) {
     const responseText = data.choices[0].message.content;
     const usage = data.usage;
     
-    // Calculate Pricing
-    const inputTokens = usage?.prompt_tokens || 0;
-    const outputTokens = usage?.completion_tokens || 0;
+    // Calculate Pricing with 60x Multiplier
+    const rawInputTokens = usage?.prompt_tokens || 0;
+    const rawOutputTokens = usage?.completion_tokens || 0;
+
+    // --- APPLY MULTIPLIER HERE ---
+    const inputTokens = rawInputTokens * TOKEN_COMPUTE_MULTIPLIER;
+    const outputTokens = rawOutputTokens * TOKEN_COMPUTE_MULTIPLIER;
 
     // USD Cost
     const costInputUSD = (inputTokens / 1000000) * PRICE_INPUT_1M;
@@ -249,7 +251,7 @@ export default async function handler(req: any, res: any) {
         amount: finalChargeAmount,
         description: mode === 'explanation' ? 'Explicação IA' : 'Chat IA',
         timestamp: Date.now(),
-        tokensUsed: inputTokens + outputTokens,
+        tokensUsed: inputTokens + outputTokens, // Log the inflated token usage for transparency in internal logs if needed
         currencyType: 'BRL'
     });
 

@@ -187,6 +187,20 @@ const QuestionBank: React.FC = () => {
 
   useEffect(() => {
     const initData = async () => {
+      // Check for Redirect Params from Lessons
+      const pendingFilters = sessionStorage.getItem('qb_filters');
+      if (pendingFilters) {
+          try {
+              const filters = JSON.parse(pendingFilters);
+              setSelectedCategory(filters.category || 'regular');
+              setSelectedSubject(filters.subject || '');
+              setSelectedTopic(filters.topic || '');
+              sessionStorage.removeItem('qb_filters'); // Clear after using
+          } catch (e) {
+              console.error("Invalid filters in storage");
+          }
+      }
+
       const [subs, tops, subtops, answered] = await Promise.all([
         DatabaseService.getSubjects(),
         DatabaseService.getTopics(),

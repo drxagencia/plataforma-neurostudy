@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config'>('leads');
@@ -89,9 +89,17 @@ const AdminPanel: React.FC = () => {
       qCorrect: 0,
       qDifficulty: 'medium',
       qExplanation: '',
+      
+      // Lesson Specific
+      lType: 'video', // 'video' | 'exercise_block'
       lTitle: '',
       lUrl: '',
       lDuration: '',
+      // Exercise Block Filters
+      lExCategory: 'regular',
+      lExSubject: '',
+      lExTopic: '',
+
       // Subject Form
       sName: '',
       sIcon: 'BookOpen',
@@ -330,13 +338,18 @@ const AdminPanel: React.FC = () => {
           });
           setEditingPath(item.path);
       } else if (type === 'lesson') {
+          const isBlock = item.type === 'exercise_block';
           setContentForm({
               ...contentForm,
               subjectId: manageLessonSubject, 
               topicName: manageLessonTopic,
               lTitle: item.title,
-              lUrl: item.videoUrl,
-              lDuration: item.duration
+              lUrl: item.videoUrl || '',
+              lDuration: item.duration || '',
+              lType: item.type || 'video',
+              lExCategory: item.exerciseFilters?.category || 'regular',
+              lExSubject: item.exerciseFilters?.subject || '',
+              lExTopic: item.exerciseFilters?.topic || ''
           });
           setMaterials(item.materials || []);
           setEditingPath(`lessons/${manageLessonSubject}/${manageLessonTopic}/${item.id}`);
@@ -393,9 +406,16 @@ const AdminPanel: React.FC = () => {
              } else if (contentTab === 'lesson') {
                 updateData = {
                     title: contentForm.lTitle,
-                    videoUrl: contentForm.lUrl,
-                    duration: contentForm.lDuration,
-                    materials: materials
+                    type: contentForm.lType,
+                    // Conditional fields based on type
+                    videoUrl: contentForm.lType === 'video' ? contentForm.lUrl : null,
+                    duration: contentForm.lType === 'video' ? contentForm.lDuration : null,
+                    materials: contentForm.lType === 'video' ? materials : null,
+                    exerciseFilters: contentForm.lType === 'exercise_block' ? {
+                        category: contentForm.lExCategory,
+                        subject: contentForm.lExSubject,
+                        topic: contentForm.lExTopic
+                    } : null
                 };
              } else if (contentTab === 'simulation') {
                 updateData = {
@@ -484,11 +504,18 @@ const AdminPanel: React.FC = () => {
               alert("Questão criada com sucesso e estrutura atualizada!");
           } else {
               if (!contentForm.lTitle) return;
+              
               const newLesson: Lesson = {
                   title: contentForm.lTitle,
-                  videoUrl: contentForm.lUrl,
-                  duration: contentForm.lDuration,
-                  materials: materials 
+                  type: contentForm.lType as 'video' | 'exercise_block',
+                  videoUrl: contentForm.lType === 'video' ? contentForm.lUrl : undefined,
+                  duration: contentForm.lType === 'video' ? contentForm.lDuration : undefined,
+                  materials: contentForm.lType === 'video' ? materials : undefined,
+                  exerciseFilters: contentForm.lType === 'exercise_block' ? {
+                      category: contentForm.lExCategory,
+                      subject: contentForm.lExSubject,
+                      topic: contentForm.lExTopic
+                  } : undefined
               };
               await DatabaseService.createLesson(contentForm.subjectId, contentForm.topicName, newLesson);
               alert("Aula criada com sucesso!");
@@ -503,7 +530,7 @@ const AdminPanel: React.FC = () => {
 
   const resetForms = () => {
       setSimForm({ title: '', description: '', duration: 60, type: 'official', status: 'open', subjects: [], selectedQuestionIds: [] });
-      setContentForm(prev => ({...prev, qText: '', qImageUrl: '', lTitle: '', lUrl: '', lDuration: '', qOptions: ['', '', '', ''], qExplanation: ''}));
+      setContentForm(prev => ({...prev, qText: '', qImageUrl: '', lTitle: '', lUrl: '', lDuration: '', qOptions: ['', '', '', ''], qExplanation: '', lType: 'video'}));
       setMaterials([]);
   };
 
@@ -523,24 +550,42 @@ const AdminPanel: React.FC = () => {
           return { ...prev, selectedQuestionIds: [...prev.selectedQuestionIds, qId] };
       });
   };
-  const handleSaveUser = async (uid: string | null) => {
-    if (!uid && newUserMode) {
-        const newUid = `user_${Date.now()}`;
-        await DatabaseService.createUserProfile(newUid, {
-            displayName: userDataForm.displayName,
-            email: userDataForm.email,
-            isAdmin: userDataForm.isAdmin,
-            plan: userDataForm.plan as UserPlan,
-            subscriptionExpiry: userDataForm.expiry,
-            xp: 0,
-            photoURL: ''
-        });
-        setNewUserMode(false);
-    } else if (uid) {
-        await DatabaseService.updateUserPlan(uid, userDataForm.plan as UserPlan, userDataForm.expiry);
+
+  // User Management
+  const handleEditUser = (user: UserProfile) => {
+      setEditingUserId(user.uid);
+      setNewUserMode(false);
+      setUserDataForm({
+          displayName: user.displayName,
+          email: user.email,
+          plan: user.plan,
+          expiry: user.subscriptionExpiry,
+          isAdmin: user.isAdmin || false
+      });
+  };
+
+  const handleSaveUser = async () => {
+    try {
+        if (editingUserId) {
+            await DatabaseService.updateUserPlan(editingUserId, userDataForm.plan as UserPlan, userDataForm.expiry);
+            alert("Usuário atualizado!");
+        } else if (newUserMode) {
+            // New user creation logic is handled via "Approve Lead" mostly, 
+            // but if manual creation is needed we would use authService.registerStudent here.
+            // For now, this just updates DB profile if UID existed, or creates a mock one.
+            // Real manual creation requires email/password which are not in this form.
+            alert("Use a aba 'Novos Alunos' para criar contas com senha.");
+        }
         setEditingUserId(null);
+        setNewUserMode(false);
+        // Refresh users
+        const u = await DatabaseService.getUsersPaginated(50);
+        setUsers(u);
+    } catch(e) {
+        alert("Erro ao salvar.");
     }
   };
+
   const handleProcessRecharge = async (id: string, status: 'approved' | 'rejected') => {
       if (!confirm(`Tem certeza que deseja marcar como ${status}?`)) return;
       await DatabaseService.processRecharge(id, status);
@@ -606,6 +651,38 @@ const AdminPanel: React.FC = () => {
                       >
                           {loading ? <Loader2 className="animate-spin mx-auto"/> : 'Criar Acesso'}
                       </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* --- EDIT USER MODAL --- */}
+      {(editingUserId || newUserMode) && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-indigo-500/30 p-8 rounded-2xl w-full max-w-lg shadow-2xl">
+                  <h3 className="text-2xl font-bold text-white mb-4">{newUserMode ? 'Criar Usuário' : 'Editar Usuário'}</h3>
+                  <div className="space-y-4">
+                      <div>
+                          <label className="text-xs text-slate-400 font-bold uppercase">Nome</label>
+                          <input className="w-full glass-input p-3 rounded-xl mt-1" value={userDataForm.displayName} onChange={e => setUserDataForm({...userDataForm, displayName: e.target.value})} />
+                      </div>
+                      <div>
+                          <label className="text-xs text-slate-400 font-bold uppercase">Plano</label>
+                          <select className="w-full glass-input p-3 rounded-xl mt-1" value={userDataForm.plan} onChange={e => setUserDataForm({...userDataForm, plan: e.target.value as any})}>
+                              <option value="basic">Básico (Gratuito)</option>
+                              <option value="intermediate">Intermediário</option>
+                              <option value="advanced">Avançado (Pro)</option>
+                              <option value="admin">Administrador</option>
+                          </select>
+                      </div>
+                      <div>
+                          <label className="text-xs text-slate-400 font-bold uppercase">Vencimento Assinatura</label>
+                          <input type="date" className="w-full glass-input p-3 rounded-xl mt-1" value={userDataForm.expiry} onChange={e => setUserDataForm({...userDataForm, expiry: e.target.value})} />
+                      </div>
+                  </div>
+                  <div className="flex gap-3 mt-6">
+                      <button onClick={() => {setEditingUserId(null); setNewUserMode(false);}} className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-slate-400 font-bold">Cancelar</button>
+                      <button onClick={handleSaveUser} className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Salvar</button>
                   </div>
               </div>
           </div>
@@ -690,6 +767,73 @@ const AdminPanel: React.FC = () => {
                           {leads.length === 0 && (
                               <tr>
                                   <td colSpan={6} className="p-8 text-center text-slate-500">Nenhum novo aluno encontrado.</td>
+                              </tr>
+                          )}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      )}
+
+      {/* --- USERS TAB --- */}
+      {activeTab === 'users' && (
+          <div className="space-y-6 animate-fade-in">
+              <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Users className="text-indigo-400" /> Base de Usuários
+                  </h3>
+                  {/* Note: Manual creation is usually done via Leads, but we keep this just in case logic is expanded */}
+                  {/* <button onClick={() => setNewUserMode(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-bold text-sm">Criar Manualmente</button> */}
+              </div>
+
+              <div className="glass-card rounded-2xl overflow-hidden">
+                  <table className="w-full text-left">
+                      <thead className="bg-slate-900/50">
+                          <tr>
+                              <th className="p-4 text-slate-400">Usuário</th>
+                              <th className="p-4 text-slate-400">Email</th>
+                              <th className="p-4 text-slate-400">Plano Atual</th>
+                              <th className="p-4 text-slate-400">Vencimento</th>
+                              <th className="p-4 text-slate-400 text-right">Ações</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                          {users.map(u => (
+                              <tr key={u.uid} className="hover:bg-white/5 transition-colors">
+                                  <td className="p-4 flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
+                                          {u.displayName?.charAt(0) || 'U'}
+                                      </div>
+                                      <span className="text-white font-medium">{u.displayName}</span>
+                                  </td>
+                                  <td className="p-4 text-slate-400 text-sm">{u.email}</td>
+                                  <td className="p-4">
+                                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                          u.plan === 'admin' ? 'bg-red-500/20 text-red-400' :
+                                          u.plan === 'advanced' ? 'bg-emerald-500/20 text-emerald-400' :
+                                          u.plan === 'intermediate' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-700 text-slate-400'
+                                      }`}>
+                                          {u.plan}
+                                      </span>
+                                  </td>
+                                  <td className="p-4 text-slate-400 text-sm flex items-center gap-2">
+                                      <Calendar size={14} />
+                                      {u.subscriptionExpiry ? new Date(u.subscriptionExpiry).toLocaleDateString() : 'N/A'}
+                                  </td>
+                                  <td className="p-4 text-right">
+                                      <button 
+                                        onClick={() => handleEditUser(u)}
+                                        className="p-2 hover:bg-white/10 rounded-lg text-indigo-400 transition-colors"
+                                        title="Editar Assinatura"
+                                      >
+                                          <Pencil size={16} />
+                                      </button>
+                                  </td>
+                              </tr>
+                          ))}
+                          {users.length === 0 && (
+                              <tr>
+                                  <td colSpan={5} className="p-8 text-center text-slate-500">Nenhum usuário encontrado na base.</td>
                               </tr>
                           )}
                       </tbody>
@@ -885,9 +1029,53 @@ const AdminPanel: React.FC = () => {
                                                 </select>
                                                 <input className="w-full glass-input p-3 rounded-lg" placeholder="Tópico" value={contentForm.topicName} onChange={e => setContentForm({...contentForm, topicName: e.target.value})} list="topics-list" />
                                              </div>
+                                             
                                              <input className="w-full glass-input p-3 rounded-lg" placeholder="Título Aula" value={contentForm.lTitle} onChange={e => setContentForm({...contentForm, lTitle: e.target.value})} />
-                                             <input className="w-full glass-input p-3 rounded-lg" placeholder="URL YouTube" value={contentForm.lUrl} onChange={e => setContentForm({...contentForm, lUrl: e.target.value})} />
-                                             <input className="w-full glass-input p-3 rounded-lg" placeholder="Duração" value={contentForm.lDuration} onChange={e => setContentForm({...contentForm, lDuration: e.target.value})} />
+                                             
+                                             {/* Type Switcher */}
+                                             <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                                                 <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Tipo de Conteúdo</label>
+                                                 <div className="flex gap-2">
+                                                     <button 
+                                                        onClick={() => setContentForm({...contentForm, lType: 'video'})}
+                                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${contentForm.lType !== 'exercise_block' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                                                     >
+                                                         Vídeo Aula
+                                                     </button>
+                                                     <button 
+                                                        onClick={() => setContentForm({...contentForm, lType: 'exercise_block'})}
+                                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${contentForm.lType === 'exercise_block' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                                                     >
+                                                         Bloco de Exercícios
+                                                     </button>
+                                                 </div>
+                                             </div>
+
+                                             {contentForm.lType !== 'exercise_block' ? (
+                                                 <>
+                                                     <input className="w-full glass-input p-3 rounded-lg" placeholder="URL YouTube" value={contentForm.lUrl} onChange={e => setContentForm({...contentForm, lUrl: e.target.value})} />
+                                                     <input className="w-full glass-input p-3 rounded-lg" placeholder="Duração" value={contentForm.lDuration} onChange={e => setContentForm({...contentForm, lDuration: e.target.value})} />
+                                                 </>
+                                             ) : (
+                                                 <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5 space-y-3">
+                                                     <p className="text-xs text-indigo-300">Este bloco redirecionará o aluno para o Banco de Questões com os filtros abaixo aplicados.</p>
+                                                     
+                                                     <select className="w-full glass-input p-3 rounded-lg" value={contentForm.lExCategory} onChange={e => setContentForm({...contentForm, lExCategory: e.target.value})}>
+                                                        <option value="regular">Regular</option>
+                                                        <option value="military">Militar</option>
+                                                     </select>
+
+                                                     <select className="w-full glass-input p-3 rounded-lg" value={contentForm.lExSubject} onChange={e => setContentForm({...contentForm, lExSubject: e.target.value})}>
+                                                         <option value="">Matéria dos Exercícios</option>
+                                                         {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                     </select>
+
+                                                     <select className="w-full glass-input p-3 rounded-lg" value={contentForm.lExTopic} onChange={e => setContentForm({...contentForm, lExTopic: e.target.value})}>
+                                                         <option value="">Tópico dos Exercícios</option>
+                                                         {contentForm.lExSubject && topics[contentForm.lExSubject]?.map(t => <option key={t} value={t}>{t}</option>)}
+                                                     </select>
+                                                 </div>
+                                             )}
                                          </div>
                                      )}
                                   </div>

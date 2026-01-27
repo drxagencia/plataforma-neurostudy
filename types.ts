@@ -103,11 +103,18 @@ export interface LessonMaterial {
 export interface Lesson {
   id?: string;
   title: string;
-  videoUrl: string;
-  duration: string;
+  type?: 'video' | 'exercise_block'; // New field to distinguish content type
+  videoUrl?: string; // Optional if type is exercise_block
+  duration?: string;
   subjectId?: string; 
   topic?: string;
   materials?: LessonMaterial[];
+  // Filters for exercise blocks
+  exerciseFilters?: {
+      category: string;
+      subject: string;
+      topic: string;
+  }
 }
 
 export interface Reply {

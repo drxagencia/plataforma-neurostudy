@@ -1,16 +1,16 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { DatabaseService } from '../services/databaseService';
-import { Subject, Lesson } from '../types';
+import { Subject, Lesson, View } from '../types';
 import * as Icons from 'lucide-react';
-import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, ExternalLink, Clock, MonitorPlay, GraduationCap } from 'lucide-react';
+import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, ExternalLink, Clock, MonitorPlay, GraduationCap, CheckCircle, BrainCircuit, X, MessageCircle, Target, ArrowRight } from 'lucide-react';
+import { AiService } from '../services/aiService';
+import { auth } from '../services/firebaseConfig';
 
 // --- OPTIMIZED VIDEO PLAYER COMPONENT ---
-// This component is memoized to prevent re-renders of the iframe when parent state changes
 const VideoPlayer = React.memo(({ videoId, title }: { videoId: string, title: string }) => {
     const [isLoading, setIsLoading] = useState(true);
 
-    // Reset loading state when video changes
     useEffect(() => {
         setIsLoading(true);
     }, [videoId]);
@@ -35,7 +35,11 @@ const VideoPlayer = React.memo(({ videoId, title }: { videoId: string, title: st
     );
 });
 
-const Classes: React.FC = () => {
+interface ClassesProps {
+    onNavigate: (view: View) => void;
+}
+
+const Classes: React.FC<ClassesProps> = ({ onNavigate }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -47,6 +51,17 @@ const Classes: React.FC = () => {
   // Data State
   const [topicsWithLessons, setTopicsWithLessons] = useState<Record<string, Lesson[]>>({});
   const [loadingContent, setLoadingContent] = useState(false);
+
+  // AI Summary Modal State
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // Chat Bubble State (Contextual Help)
+  const [showChat, setShowChat] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatResponse, setChatResponse] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
 
   useEffect(() => {
     const fetchAndFilterSubjects = async () => {
@@ -76,9 +91,19 @@ const Classes: React.FC = () => {
   };
 
   const handleLessonClick = (lesson: Lesson) => {
-      setSelectedLesson(lesson);
-      // Scroll to top when selecting a lesson
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (lesson.type === 'exercise_block' && lesson.exerciseFilters) {
+          // It's a Block, Redirect to Question Bank
+          sessionStorage.setItem('qb_filters', JSON.stringify(lesson.exerciseFilters));
+          onNavigate('questoes');
+      } else {
+          setSelectedLesson(lesson);
+          setShowAiModal(false);
+          setAiSummary(null);
+          setShowChat(false);
+          setChatResponse(null);
+          // Scroll to top when selecting a lesson
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
   };
 
   const getYouTubeId = (url: string) => {
@@ -86,6 +111,41 @@ const Classes: React.FC = () => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  // --- AI HANDLERS ---
+  const handleFinishLesson = () => {
+      setShowAiModal(true);
+      // Optional: Add XP here for finishing video
+  };
+
+  const generateSummary = async () => {
+      if (!selectedLesson) return;
+      setAiLoading(true);
+      try {
+          const prompt = `O aluno acabou de assistir à aula "${selectedLesson.title}" do tópico "${selectedTopic}". Gere um resumo conciso de 3 tópicos principais que ele deve ter aprendido.`;
+          const text = await AiService.sendMessage(prompt, []);
+          setAiSummary(text);
+      } catch (e) {
+          setAiSummary("Não foi possível gerar o resumo. Verifique seus créditos.");
+      } finally {
+          setAiLoading(false);
+      }
+  };
+
+  const handleContextualHelp = async () => {
+      if (!chatInput.trim() || !selectedLesson) return;
+      setChatLoading(true);
+      try {
+          // Provide context about the current lesson
+          const fullPrompt = `[Contexto: Aula ${selectedLesson.title} de ${selectedTopic}] Aluno pergunta: ${chatInput}`;
+          const text = await AiService.sendMessage(fullPrompt, []);
+          setChatResponse(text);
+      } catch (e) {
+          setChatResponse("Erro ao consultar o tutor.");
+      } finally {
+          setChatLoading(false);
+      }
   };
 
   if (loading) {
@@ -98,11 +158,48 @@ const Classes: React.FC = () => {
 
   // --- VIDEO PLAYER VIEW ---
   if (selectedLesson && selectedSubject) {
-      const videoId = getYouTubeId(selectedLesson.videoUrl);
+      const videoId = getYouTubeId(selectedLesson.videoUrl || '');
       const topicLessons = selectedTopic ? topicsWithLessons[selectedTopic] : [];
 
       return (
-          <div className="space-y-6 animate-in slide-in-from-right max-w-[1600px] mx-auto">
+          <div className="space-y-6 animate-in slide-in-from-right max-w-[1600px] mx-auto relative">
+              {/* AI Summary Modal */}
+              {showAiModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+                      <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-8 max-w-lg w-full relative shadow-2xl">
+                          <button onClick={() => setShowAiModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X size={20}/></button>
+                          
+                          <div className="text-center mb-6">
+                              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-400">
+                                  <CheckCircle size={32} />
+                              </div>
+                              <h3 className="text-2xl font-bold text-white">Aula Concluída!</h3>
+                              <p className="text-slate-400">Você entendeu bem o conteúdo?</p>
+                          </div>
+
+                          {!aiSummary ? (
+                              <div className="grid grid-cols-2 gap-4">
+                                  <button onClick={() => setShowAiModal(false)} className="p-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-colors">
+                                      Sim, entendi!
+                                  </button>
+                                  <button onClick={generateSummary} disabled={aiLoading} className="p-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors flex flex-col items-center justify-center gap-1">
+                                      {aiLoading ? <Loader2 className="animate-spin" size={20}/> : <BrainCircuit size={24} />}
+                                      <span className="text-xs">Preciso de um Resumo</span>
+                                  </button>
+                              </div>
+                          ) : (
+                              <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 animate-in slide-in-from-bottom-2">
+                                  <h4 className="text-indigo-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit size={16}/> Resumo do NeuroTutor</h4>
+                                  <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
+                                  <button onClick={() => setShowAiModal(false)} className="mt-4 w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold">
+                                      Fechar
+                                  </button>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+              )}
+
               <button onClick={() => setSelectedLesson(null)} className="flex items-center gap-2 text-slate-400 hover:text-white mb-2 transition-colors group">
                   <div className="p-2 rounded-full bg-slate-800 group-hover:bg-slate-700 transition-colors">
                     <ArrowLeft size={18} />
@@ -114,17 +211,61 @@ const Classes: React.FC = () => {
                   {/* Left Column: Video & Details */}
                   <div className="xl:col-span-2 space-y-6">
                       
-                      {/* Optimized Player Component */}
-                      {videoId ? (
-                          <VideoPlayer videoId={videoId} title={selectedLesson.title} />
-                      ) : (
-                          <div className="relative aspect-video w-full bg-black rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-slate-800 flex flex-col items-center justify-center text-slate-500">
-                              <Video size={64} className="mb-4 opacity-20" />
-                              <p className="text-lg font-medium">Vídeo indisponível ou link inválido.</p>
+                      {/* Video Container with Contextual Help Button */}
+                      <div className="relative">
+                        {videoId ? (
+                            <VideoPlayer videoId={videoId} title={selectedLesson.title} />
+                        ) : (
+                            <div className="relative aspect-video w-full bg-black rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border border-slate-800 flex flex-col items-center justify-center text-slate-500">
+                                <Video size={64} className="mb-4 opacity-20" />
+                                <p className="text-lg font-medium">Vídeo indisponível ou link inválido.</p>
+                            </div>
+                        )}
+                        
+                        {/* Contextual AI Help FAB */}
+                        <div className="absolute -bottom-6 right-6 z-20">
+                            <button 
+                                onClick={() => setShowChat(!showChat)}
+                                className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-900/40 transition-all hover:scale-105 font-bold"
+                            >
+                                <MessageCircle size={20} />
+                                {showChat ? 'Fechar Tutor' : 'Dúvida na Aula?'}
+                            </button>
+                        </div>
+                      </div>
+                      
+                      {/* Contextual Chat Box */}
+                      {showChat && (
+                          <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2">
+                              <div className="flex justify-between items-start mb-2">
+                                  <h4 className="font-bold text-white flex items-center gap-2"><BrainCircuit size={18} className="text-indigo-400"/> Tutor da Aula</h4>
+                              </div>
+                              
+                              {chatResponse && (
+                                  <div className="bg-slate-800/50 p-3 rounded-xl mb-3 text-sm text-slate-300 border border-white/5">
+                                      {chatResponse}
+                                  </div>
+                              )}
+
+                              <div className="flex gap-2">
+                                  <input 
+                                    className="flex-1 glass-input p-2 rounded-lg text-sm"
+                                    placeholder="O que você não entendeu nesta aula?"
+                                    value={chatInput}
+                                    onChange={e => setChatInput(e.target.value)}
+                                  />
+                                  <button 
+                                    onClick={handleContextualHelp}
+                                    disabled={chatLoading || !chatInput}
+                                    className="p-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white disabled:opacity-50"
+                                  >
+                                      {chatLoading ? <Loader2 className="animate-spin" size={18}/> : <ArrowRight size={18}/>}
+                                  </button>
+                              </div>
                           </div>
                       )}
-                      
-                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-white/5">
+
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-white/5 mt-8">
                         <div className="space-y-2">
                             <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">{selectedLesson.title}</h2>
                             <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -138,6 +279,12 @@ const Classes: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                        <button 
+                            onClick={handleFinishLesson}
+                            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2"
+                        >
+                            <CheckCircle size={20} /> Concluir Aula
+                        </button>
                       </div>
 
                       {/* Materials Section */}
@@ -189,12 +336,14 @@ const Classes: React.FC = () => {
                                   <Layers size={18} className="text-indigo-400"/> 
                                   Conteúdo do Módulo
                               </h3>
-                              <p className="text-xs text-slate-400 mt-1">{topicLessons.length} aulas disponíveis</p>
+                              <p className="text-xs text-slate-400 mt-1">{topicLessons.length} itens disponíveis</p>
                           </div>
                           
                           <div className="overflow-y-auto custom-scrollbar p-2 space-y-1">
                               {topicLessons.map((l, idx) => {
                                   const isActive = selectedLesson.title === l.title;
+                                  const isBlock = l.type === 'exercise_block';
+
                                   return (
                                     <button 
                                         key={idx}
@@ -202,28 +351,32 @@ const Classes: React.FC = () => {
                                         className={`w-full p-3 rounded-xl flex items-start gap-3 text-left transition-all duration-200 group relative overflow-hidden ${
                                             isActive 
                                             ? 'bg-indigo-600/10 border border-indigo-500/20' 
-                                            : 'hover:bg-white/5 border border-transparent'
+                                            : isBlock ? 'bg-indigo-500/5 border border-indigo-500/10 hover:bg-indigo-500/10' : 'hover:bg-white/5 border border-transparent'
                                         }`}
                                     >
                                         {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-l-xl" />}
                                         
                                         <div className="relative mt-1">
                                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border ${
-                                                isActive ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 group-hover:border-slate-500'
+                                                isActive ? 'bg-indigo-500 border-indigo-500 text-white' : 
+                                                isBlock ? 'bg-emerald-500 border-emerald-500 text-white' :
+                                                'bg-slate-800 border-slate-700 text-slate-400 group-hover:border-slate-500'
                                             }`}>
-                                                {isActive ? <Play size={10} fill="currentColor"/> : idx + 1}
+                                                {isActive ? <Play size={10} fill="currentColor"/> : isBlock ? <FileText size={10}/> : idx + 1}
                                             </div>
                                         </div>
                                         
                                         <div className="flex-1 min-w-0">
-                                            <p className={`font-medium text-sm leading-snug ${isActive ? 'text-indigo-200' : 'text-slate-300 group-hover:text-white'}`}>
+                                            <p className={`font-medium text-sm leading-snug ${isActive ? 'text-indigo-200' : isBlock ? 'text-emerald-200' : 'text-slate-300 group-hover:text-white'}`}>
                                                 {l.title}
                                             </p>
-                                            <div className="flex items-center gap-2 mt-1.5">
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${isActive ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500'}`}>
-                                                    <Clock size={10} /> {l.duration}
-                                                </span>
-                                            </div>
+                                            {!isBlock && (
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${isActive ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500'}`}>
+                                                        <Clock size={10} /> {l.duration}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </button>
                                   );
@@ -256,63 +409,81 @@ const Classes: React.FC = () => {
                     </div>
                   </div>
                   <div className="bg-slate-900/50 px-4 py-2 rounded-xl border border-white/5 text-sm text-slate-400 font-medium">
-                      {lessons.length} aulas encontradas
+                      {lessons.length} itens encontrados
                   </div>
               </div>
 
               {/* List of Lessons */}
               <div className="grid grid-cols-1 gap-4">
-                  {lessons.map((lesson, idx) => (
+                  {lessons.map((lesson, idx) => {
+                      const isBlock = lesson.type === 'exercise_block';
+                      return (
                       <div 
                         key={idx} 
                         onClick={() => handleLessonClick(lesson)}
-                        className="group glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center gap-6 hover:bg-slate-900/80 transition-all cursor-pointer border border-white/5 hover:border-indigo-500/40 relative overflow-hidden"
+                        className={`group glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center gap-6 transition-all cursor-pointer border relative overflow-hidden ${
+                            isBlock 
+                            ? 'bg-emerald-900/10 border-emerald-500/20 hover:border-emerald-500/40' 
+                            : 'border-white/5 hover:border-indigo-500/40 hover:bg-slate-900/80'
+                        }`}
                       >
                           {/* Hover Glow */}
-                          <div className="absolute inset-0 bg-gradient-to-r from-indigo-900/0 via-indigo-900/0 to-indigo-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                          <div className={`absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isBlock ? 'from-emerald-900/0 to-emerald-900/10' : 'from-indigo-900/0 to-indigo-900/10'}`} />
 
                           {/* Fake Thumbnail / Icon Area */}
-                          <div className="w-full md:w-48 h-32 md:h-28 flex-shrink-0 bg-slate-950 rounded-xl relative overflow-hidden border border-white/5 group-hover:border-indigo-500/30 transition-colors">
+                          <div className={`w-full md:w-48 h-32 md:h-28 flex-shrink-0 rounded-xl relative overflow-hidden border transition-colors ${isBlock ? 'bg-emerald-950 border-emerald-500/20' : 'bg-slate-950 border-white/5 group-hover:border-indigo-500/30'}`}>
                                {/* Abstract Pattern */}
                                <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/40 via-slate-950 to-slate-950" />
                                
                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-12 h-12 rounded-full bg-slate-900/80 backdrop-blur-sm flex items-center justify-center text-indigo-400 group-hover:scale-110 group-hover:text-white transition-all shadow-xl">
-                                        <Play size={20} fill="currentColor" className="ml-1" />
+                                    <div className={`w-12 h-12 rounded-full backdrop-blur-sm flex items-center justify-center transition-all shadow-xl group-hover:scale-110 ${isBlock ? 'bg-emerald-900/80 text-emerald-400 group-hover:text-white' : 'bg-slate-900/80 text-indigo-400 group-hover:text-white'}`}>
+                                        {isBlock ? <FileText size={20}/> : <Play size={20} fill="currentColor" className="ml-1" />}
                                     </div>
                                </div>
                                
                                {/* Duration Badge on Thumbnail */}
-                               <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-white flex items-center gap-1 border border-white/10">
-                                   <Clock size={10} /> {lesson.duration || '00:00'}
-                               </div>
+                               {!isBlock && (
+                                   <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-white flex items-center gap-1 border border-white/10">
+                                       <Clock size={10} /> {lesson.duration || '00:00'}
+                                   </div>
+                               )}
                           </div>
 
                           {/* Content */}
                           <div className="flex-1 w-full md:w-auto z-10">
-                              <h4 className="font-bold text-white text-lg mb-2 group-hover:text-indigo-300 transition-colors line-clamp-2">{lesson.title}</h4>
+                              <h4 className={`font-bold text-lg mb-2 transition-colors line-clamp-2 ${isBlock ? 'text-emerald-200 group-hover:text-emerald-100' : 'text-white group-hover:text-indigo-300'}`}>
+                                  {lesson.title}
+                              </h4>
                               <p className="text-slate-400 text-sm line-clamp-2">
-                                  Nesta aula, abordaremos os conceitos fundamentais de {selectedTopic.toLowerCase()}, com exercícios práticos e exemplos.
+                                  {isBlock ? 'Pratique o conteúdo com questões selecionadas do Banco de Questões.' : `Nesta aula, abordaremos os conceitos fundamentais de ${selectedTopic.toLowerCase()}.`}
                               </p>
                               
                               <div className="flex items-center gap-4 mt-4">
-                                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-900 px-2 py-1 rounded-md">
-                                      <Video size={12} /> Aula Gravada
-                                  </div>
-                                  {lesson.materials && lesson.materials.length > 0 && (
-                                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-900 px-2 py-1 rounded-md">
-                                        <FileText size={12} /> {lesson.materials.length} Materiais
-                                    </div>
+                                  {isBlock ? (
+                                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded-md border border-emerald-500/20">
+                                          <Target size={12} /> Exercícios Práticos
+                                      </div>
+                                  ) : (
+                                      <>
+                                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-900 px-2 py-1 rounded-md">
+                                            <Video size={12} /> Aula Gravada
+                                        </div>
+                                        {lesson.materials && lesson.materials.length > 0 && (
+                                            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-900 px-2 py-1 rounded-md">
+                                                <FileText size={12} /> {lesson.materials.length} Materiais
+                                            </div>
+                                        )}
+                                      </>
                                   )}
                               </div>
                           </div>
 
                           {/* Action Arrow */}
-                          <div className="hidden md:flex p-4 rounded-full bg-slate-900/50 text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:translate-x-2">
+                          <div className={`hidden md:flex p-4 rounded-full transition-all transform group-hover:translate-x-2 ${isBlock ? 'bg-emerald-900/20 text-emerald-500 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-slate-900/50 text-slate-500 group-hover:bg-indigo-600 group-hover:text-white'}`}>
                               <ChevronRight size={24} />
                           </div>
                       </div>
-                  ))}
+                  )})}
               </div>
           </div>
       );
