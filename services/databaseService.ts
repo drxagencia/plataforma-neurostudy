@@ -278,6 +278,27 @@ export const DatabaseService = {
       }
   },
 
+  // --- LESSON COMPLETION ---
+  getCompletedLessons: async (uid: string): Promise<string[]> => {
+      try {
+          const snap = await get(ref(database, `users/${uid}/completedLessons`));
+          return snap.exists() ? Object.keys(snap.val()) : [];
+      } catch (e) {
+          console.error("Error fetching completed lessons", e);
+          return [];
+      }
+  },
+
+  markLessonComplete: async (uid: string, lessonId: string): Promise<void> => {
+      try {
+          await update(ref(database, `users/${uid}/completedLessons`), {
+              [lessonId]: Date.now()
+          });
+      } catch (e) {
+          console.error("Error marking lesson complete", e);
+      }
+  },
+
   // OPTIMIZED: Fetch from 'leaderboard' node instead of 'users'
   getLeaderboard: async (): Promise<UserProfile[]> => {
     try {

@@ -91,6 +91,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
   // Data State
   const [topicsWithLessons, setTopicsWithLessons] = useState<Record<string, Lesson[]>>({});
   const [loadingContent, setLoadingContent] = useState(false);
+  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
 
   // AI Summary Modal State (Legacy - kept for "Concluir Aula" flow)
   const [showAiModal, setShowAiModal] = useState(false);
@@ -113,10 +114,17 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
       
       const filtered = allSubjects.filter(s => activeSubjectIds.includes(s.id));
       setSubjects(filtered);
+      
+      // Load completed lessons state
+      if (user.uid) {
+          const completed = await DatabaseService.getCompletedLessons(user.uid);
+          setCompletedLessons(new Set(completed));
+      }
+
       setLoading(false);
     };
     fetchAndFilterSubjects();
-  }, []);
+  }, [user.uid]);
 
   const handleSubjectClick = async (subject: Subject) => {
       setSelectedSubject(subject);
@@ -159,11 +167,22 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
       if (updatedUser) onUpdateUser(updatedUser);
   };
 
-  const handleFinishLesson = () => {
-      setShowAiModal(true);
-      if (auth.currentUser) {
+  const handleFinishLesson = async () => {
+      if (!selectedLesson?.id || !auth.currentUser) return;
+
+      // 1. Mark as completed in DB
+      await DatabaseService.markLessonComplete(auth.currentUser.uid, selectedLesson.id);
+      
+      // 2. Award XP ONLY if not previously completed
+      if (!completedLessons.has(selectedLesson.id)) {
           DatabaseService.processXpAction(auth.currentUser.uid, 'LESSON_WATCHED');
       }
+
+      // 3. Update local state
+      setCompletedLessons(prev => new Set(prev).add(selectedLesson.id!));
+
+      // 4. Show Modal
+      setShowAiModal(true);
   };
 
   const generateSummary = async () => {
@@ -261,6 +280,8 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
       const videoId = getYouTubeId(selectedLesson.videoUrl || '');
       const topicLessons = selectedTopic ? topicsWithLessons[selectedTopic] : [];
       // Note: topicLessons is already sorted by DatabaseService.getLessonsByTopic
+      
+      const isCompleted = selectedLesson.id && completedLessons.has(selectedLesson.id);
 
       return (
           <div className="space-y-6 animate-in slide-in-from-right max-w-[1600px] mx-auto relative pb-20">
@@ -419,7 +440,10 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                       {/* ACTION BAR: Title + Actions */}
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5 mt-4">
                         <div className="space-y-2 flex-1">
-                            <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">{selectedLesson.title}</h2>
+                            <h2 className="text-3xl font-bold text-white tracking-tight leading-tight flex items-center gap-3">
+                                {selectedLesson.title}
+                                {isCompleted && <CheckCircle size={24} className="text-emerald-500" />}
+                            </h2>
                             <div className="flex flex-wrap items-center gap-3 text-sm">
                                 <span className="text-indigo-400 font-bold bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">{selectedSubject.name}</span>
                                 <span className="text-slate-500">•</span>
@@ -442,9 +466,9 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                             </button>
                             <button 
                                 onClick={handleFinishLesson}
-                                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 hover:scale-105"
+                                className={`px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 hover:scale-105 ${isCompleted ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 cursor-default' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'}`}
                             >
-                                <CheckCircle size={20} /> Concluir Aula
+                                <CheckCircle size={20} /> {isCompleted ? 'Aula Concluída' : 'Concluir Aula'}
                             </button>
                         </div>
                       </div>
@@ -505,6 +529,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                               {topicLessons.map((l, idx) => {
                                   const isActive = selectedLesson.title === l.title;
                                   const isBlock = l.type === 'exercise_block';
+                                  const isDone = l.id && completedLessons.has(l.id);
 
                                   return (
                                     <button 
@@ -520,16 +545,17 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                         
                                         <div className="relative mt-1">
                                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border ${
+                                                isDone ? 'bg-emerald-500 border-emerald-500 text-white' :
                                                 isActive ? 'bg-indigo-500 border-indigo-500 text-white' : 
                                                 isBlock ? 'bg-emerald-500 border-emerald-500 text-white' :
                                                 'bg-slate-800 border-slate-700 text-slate-400 group-hover:border-slate-500'
                                             }`}>
-                                                {isActive ? <Play size={10} fill="currentColor"/> : isBlock ? <FileText size={10}/> : idx + 1}
+                                                {isDone ? <CheckCircle size={12} fill="currentColor" /> : isActive ? <Play size={10} fill="currentColor"/> : isBlock ? <FileText size={10}/> : idx + 1}
                                             </div>
                                         </div>
                                         
                                         <div className="flex-1 min-w-0">
-                                            <p className={`font-medium text-sm leading-snug ${isActive ? 'text-indigo-200' : isBlock ? 'text-emerald-200' : 'text-slate-300 group-hover:text-white'}`}>
+                                            <p className={`font-medium text-sm leading-snug ${isActive ? 'text-indigo-200' : isBlock ? 'text-emerald-200' : isDone ? 'text-emerald-400 line-through decoration-emerald-500/50' : 'text-slate-300 group-hover:text-white'}`}>
                                                 {l.title}
                                             </p>
                                             {!isBlock && (
@@ -571,7 +597,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                     </div>
                   </div>
                   <div className="bg-slate-900/50 px-4 py-2 rounded-xl border border-white/5 text-sm text-slate-400 font-medium">
-                      {lessons.length} itens encontrados
+                      {lessons.length} itens disponíveis
                   </div>
               </div>
 
@@ -579,6 +605,8 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
               <div className="grid grid-cols-1 gap-4">
                   {lessons.map((lesson, idx) => {
                       const isBlock = lesson.type === 'exercise_block';
+                      const isDone = lesson.id && completedLessons.has(lesson.id);
+
                       return (
                       <div 
                         key={idx} 
@@ -586,11 +614,20 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                         className={`group glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center gap-6 transition-all cursor-pointer border relative overflow-hidden ${
                             isBlock 
                             ? 'bg-emerald-900/10 border-emerald-500/20 hover:border-emerald-500/40' 
-                            : 'border-white/5 hover:border-indigo-500/40 hover:bg-slate-900/80'
+                            : isDone
+                                ? 'bg-slate-900/40 border-emerald-500/20 hover:bg-slate-800/60'
+                                : 'border-white/5 hover:border-indigo-500/40 hover:bg-slate-900/80'
                         }`}
                       >
                           {/* Hover Glow */}
                           <div className={`absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isBlock ? 'from-emerald-900/0 to-emerald-900/10' : 'from-indigo-900/0 to-indigo-900/10'}`} />
+
+                          {/* Completed Badge */}
+                          {isDone && (
+                              <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-lg z-10">
+                                  <CheckCircle size={10} /> Concluída
+                              </div>
+                          )}
 
                           {/* Fake Thumbnail / Icon Area */}
                           <div className={`w-full md:w-48 h-32 md:h-28 flex-shrink-0 rounded-xl relative overflow-hidden border transition-colors ${isBlock ? 'bg-emerald-950 border-emerald-500/20' : 'bg-slate-950 border-white/5 group-hover:border-indigo-500/30'}`}>
@@ -599,7 +636,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                
                                <div className="absolute inset-0 flex items-center justify-center">
                                     <div className={`w-12 h-12 rounded-full backdrop-blur-sm flex items-center justify-center transition-all shadow-xl group-hover:scale-110 ${isBlock ? 'bg-emerald-900/80 text-emerald-400 group-hover:text-white' : 'bg-slate-900/80 text-indigo-400 group-hover:text-white'}`}>
-                                        {isBlock ? <FileText size={20}/> : <Play size={20} fill="currentColor" className="ml-1" />}
+                                        {isDone ? <CheckCircle size={24} className="text-emerald-500" /> : isBlock ? <FileText size={20}/> : <Play size={20} fill="currentColor" className="ml-1" />}
                                     </div>
                                </div>
                                
@@ -613,7 +650,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
 
                           {/* Content */}
                           <div className="flex-1 w-full md:w-auto z-10">
-                              <h4 className={`font-bold text-lg mb-2 transition-colors line-clamp-2 ${isBlock ? 'text-emerald-200 group-hover:text-emerald-100' : 'text-white group-hover:text-indigo-300'}`}>
+                              <h4 className={`font-bold text-lg mb-2 transition-colors line-clamp-2 ${isBlock ? 'text-emerald-200 group-hover:text-emerald-100' : isDone ? 'text-emerald-100 group-hover:text-emerald-50' : 'text-white group-hover:text-indigo-300'}`}>
                                   {lesson.title}
                               </h4>
                               <p className="text-slate-400 text-sm line-clamp-2">
