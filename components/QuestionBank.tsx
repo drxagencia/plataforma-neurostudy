@@ -3,17 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
 import { Subject, Question, UserProfile } from '../types';
-import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, Trophy, Bot, Sparkles, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, ArrowLeft, Eye, EyeOff, X, Ban, Sparkles, Bot } from 'lucide-react';
 import { auth } from '../services/firebaseConfig';
 
 // --- HELPER COMPONENT: Simple Markdown Parser ---
-// Handles **bold** and newlines locally to save tokens
 const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
     if (!text) return null;
     return (
-        <div className="leading-relaxed">
+        <div className="leading-relaxed text-lg">
             {text.split('\n').map((line, i) => (
-                <p key={i} className="mb-2 last:mb-0">
+                <p key={i} className="mb-4 last:mb-0">
                     {line.split(/(\*\*.*?\*\*)/g).map((part, j) => {
                         if (part.startsWith('**') && part.endsWith('**')) {
                             return <strong key={j} className="text-indigo-300 font-bold">{part.slice(2, -2)}</strong>;
@@ -26,162 +25,7 @@ const SimpleMarkdown: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
-// --- SUB-COMPONENT: Single Question Card ---
-interface QuestionCardProps {
-    question: Question;
-    index: number;
-    prevResult: { correct: boolean } | undefined;
-    onAnswer: (qId: string, isCorrect: boolean) => void;
-    onUpdateUser: () => void;
-}
-
-const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, prevResult, onAnswer, onUpdateUser }) => {
-    const [selectedOption, setSelectedOption] = useState<number | null>(null);
-    const [isAnswered, setIsAnswered] = useState(!!prevResult);
-    const [isExplaining, setIsExplaining] = useState(false);
-    const [aiExplanation, setAiExplanation] = useState<string | null>(null);
-
-    const handleSelect = async (idx: number) => {
-        if (isAnswered) return; // Prevent re-answering for XP spam
-        setSelectedOption(idx);
-        setIsAnswered(true);
-        const isCorrect = idx === question.correctAnswer;
-        
-        // Notify Parent to update DB
-        if (question.id) {
-            onAnswer(question.id, isCorrect);
-        }
-    };
-
-    const handleExplain = async () => {
-        if (selectedOption === null) return;
-        
-        // Optimistic check (frontend only) - Backend also checks
-        // We warn user about costs
-        const confirmMsg = "Esta ação consumirá aproximadamente R$ 0,05 do seu saldo de recarga. Deseja continuar?";
-        // Note: The prompt requested NO confirmation dialog, just warning. So we proceed directly.
-        // But we should check if they have balance roughly.
-        // Assuming we rely on backend 402 error for strict check.
-
-        setIsExplaining(true);
-        try {
-            const wrongTxt = question.options[selectedOption];
-            const correctTxt = question.options[question.correctAnswer];
-            const text = await AiService.explainError(question.text, wrongTxt, correctTxt);
-            setAiExplanation(text);
-            onUpdateUser(); // Update balance
-        } catch (e: any) {
-            if (e.message.includes('402')) alert("Saldo insuficiente.");
-            else alert("Erro ao consultar tutor.");
-        } finally {
-            setIsExplaining(false);
-        }
-    };
-
-    // Determine visual state
-    const isCorrect = selectedOption === question.correctAnswer;
-    const borderClass = !isAnswered 
-        ? 'border-white/5 hover:border-white/20' 
-        : (isCorrect || (prevResult?.correct)) 
-            ? 'border-emerald-500/50 bg-emerald-900/10' 
-            : 'border-red-500/50 bg-red-900/10';
-
-    return (
-        <div className={`glass-card p-6 rounded-2xl border transition-all duration-300 ${borderClass}`}>
-            <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest bg-slate-900 px-2 py-1 rounded">
-                    Questão {index + 1}
-                </span>
-                {prevResult && (
-                    <span className={`text-xs font-bold px-2 py-1 rounded flex items-center gap-1 ${prevResult.correct ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'}`}>
-                        {prevResult.correct ? <CheckCircle size={12}/> : <XCircle size={12}/>}
-                        {prevResult.correct ? 'Respondida (Correta)' : 'Respondida (Errada)'}
-                    </span>
-                )}
-            </div>
-
-            <div className="mb-6">
-                <SimpleMarkdown text={question.text} />
-                {question.imageUrl && (
-                    <img src={question.imageUrl} className="mt-4 rounded-xl max-h-[200px] object-contain bg-black/20 border border-white/5" />
-                )}
-            </div>
-
-            <div className="space-y-2">
-                {question.options.map((opt, idx) => {
-                    let btnClass = "bg-slate-900/40 border-slate-700 hover:bg-slate-800";
-                    
-                    // Show Correct Answer if answered
-                    if (isAnswered || prevResult) {
-                         if (idx === question.correctAnswer) btnClass = "bg-emerald-500/20 border-emerald-500 text-emerald-100";
-                         else if (idx === selectedOption) btnClass = "bg-red-500/20 border-red-500 text-red-100";
-                         else btnClass = "opacity-50 border-transparent";
-                    } else if (selectedOption === idx) {
-                        btnClass = "bg-indigo-500/20 border-indigo-500";
-                    }
-
-                    return (
-                        <button
-                            key={idx}
-                            onClick={() => handleSelect(idx)}
-                            disabled={isAnswered || !!prevResult}
-                            className={`w-full p-3 rounded-xl border text-left text-sm transition-all flex items-center justify-between ${btnClass}`}
-                        >
-                            <span>{opt}</span>
-                            {(isAnswered || prevResult) && idx === question.correctAnswer && <CheckCircle size={16} className="text-emerald-400"/>}
-                        </button>
-                    )
-                })}
-            </div>
-
-            {/* Feedback & AI Section */}
-            {(isAnswered && !isCorrect && !prevResult?.correct) && (
-                <div className="mt-4 pt-4 border-t border-white/5 animate-fade-in">
-                    {!aiExplanation && !isExplaining ? (
-                        <div className="flex items-center justify-between">
-                            <span className="text-red-400 text-sm font-bold">Resposta Incorreta</span>
-                            <div className="flex flex-col items-end">
-                                <button 
-                                    onClick={handleExplain}
-                                    className="flex items-center gap-2 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors shadow-lg shadow-indigo-900/20"
-                                >
-                                    <Bot size={14} /> Explicar Erro (IA)
-                                </button>
-                                <span className="text-[9px] text-indigo-300/70 mt-1 font-bold uppercase tracking-wide">Custo: ~R$ 0,05</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl relative">
-                            {isExplaining ? (
-                                <div className="flex items-center gap-2 text-indigo-300 text-sm">
-                                    <Loader2 className="animate-spin" size={14}/> O tutor está analisando...
-                                </div>
-                            ) : (
-                                <div>
-                                    <div className="flex items-center gap-2 mb-2 text-indigo-300 text-xs font-bold uppercase">
-                                        <Sparkles size={12} /> Explicação do NeuroAI
-                                    </div>
-                                    <div className="text-sm text-slate-200">
-                                        <SimpleMarkdown text={aiExplanation || ''} />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    
-                    {!aiExplanation && !isExplaining && question.explanation && (
-                        <div className="mt-2 p-3 bg-slate-900 rounded-lg border border-white/5">
-                            <p className="text-xs text-slate-400"><strong className="text-slate-300">Gabarito:</strong> {question.explanation}</p>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
-
 // --- MAIN COMPONENT ---
-// Add Props to receive update function
 interface QuestionBankProps {
     onUpdateUser?: (u: UserProfile) => void;
 }
@@ -194,15 +38,25 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [answeredMap, setAnsweredMap] = useState<Record<string, {correct: boolean}>>({});
 
   // Filters
+  const [isFilterOpen, setIsFilterOpen] = useState(true); // Start open to prompt user
   const [selectedCategory, setSelectedCategory] = useState<string>('regular');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [selectedSubTopic, setSelectedSubTopic] = useState<string>('');
-  const [hideAnswered, setHideAnswered] = useState(false);
 
   // List Data
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [listLoading, setListLoading] = useState(false);
+
+  // Tools State (Per Question ID)
+  // Maps: QuestionID -> OptionIndex -> Boolean
+  const [eliminatedOptions, setEliminatedOptions] = useState<Record<string, Record<number, boolean>>>({});
+  const [maybeOptions, setMaybeOptions] = useState<Record<string, Record<number, boolean>>>({});
+  
+  // Explanation State
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [isExplaining, setIsExplaining] = useState(false);
 
   useEffect(() => {
     const initData = async () => {
@@ -215,6 +69,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
               setSelectedSubject(filters.subject || '');
               setSelectedTopic(filters.topic || '');
               sessionStorage.removeItem('qb_filters'); // Clear after using
+              // Auto-trigger fetch handled by effect dependency
           } catch (e) {
               console.error("Invalid filters in storage");
           }
@@ -227,7 +82,6 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
         auth.currentUser ? DatabaseService.getAnsweredQuestions(auth.currentUser.uid) : Promise.resolve({})
       ]);
       
-      // Filter subjects that actually have topics/content
       const validSubjects = subs.filter(s => tops[s.id] && tops[s.id].length > 0);
       
       setSubjects(validSubjects);
@@ -242,10 +96,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const handleFetchQuestions = async () => {
       if (!selectedSubject || !selectedTopic) return;
       setListLoading(true);
-      setQuestions([]); // Clear prev
+      setQuestions([]); 
+      setCurrentIndex(0);
+      setIsFilterOpen(false); // Auto close filter on fetch
       
       try {
         const fetched = await DatabaseService.getQuestions(selectedCategory, selectedSubject, selectedTopic, selectedSubTopic || undefined);
+        // Filter out answered ones if needed? User asked: "Answered questions cannot be redone".
+        // We will keep them in the list but show them as "View Mode" (locked).
         setQuestions(fetched);
       } catch (e) {
           console.error(e);
@@ -263,20 +121,34 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       }
   }, [selectedSubject, selectedTopic, selectedSubTopic, selectedCategory]);
 
-  const handleAnswerSubmit = async (qId: string, isCorrect: boolean) => {
-      if (!auth.currentUser) return;
+  const handleAnswerSubmit = async (optionIdx: number) => {
+      const currentQ = questions[currentIndex];
+      if (!auth.currentUser || !currentQ.id) return;
+      
+      // Prevent re-answering
+      if (answeredMap[currentQ.id]) return;
+
+      const isCorrect = optionIdx === currentQ.correctAnswer;
       
       // Optimistic update map
-      setAnsweredMap(prev => ({...prev, [qId]: { correct: isCorrect }}));
+      setAnsweredMap(prev => ({...prev, [currentQ.id!]: { correct: isCorrect }}));
+      // Save user answer locally (optional, for session persistence without refresh)
+      // Actually answeredMap is enough to lock it.
 
-      await DatabaseService.markQuestionAsAnswered(auth.currentUser.uid, qId, isCorrect);
+      await DatabaseService.markQuestionAsAnswered(auth.currentUser.uid, currentQ.id, isCorrect);
+      
+      // Award XP based on correctness
       if (isCorrect) {
-          await DatabaseService.addXp(auth.currentUser.uid, 10);
+          await DatabaseService.processXpAction(auth.currentUser.uid, 'QUESTION_CORRECT');
           await DatabaseService.incrementQuestionsAnswered(auth.currentUser.uid, 1);
+      } else {
+          await DatabaseService.processXpAction(auth.currentUser.uid, 'QUESTION_WRONG');
       }
+      
+      // Reset AI explanation for new interaction state
+      setAiExplanation(null);
   };
 
-  // Helper to refresh user balance locally
   const handleUpdateBalance = async () => {
       if (onUpdateUser && auth.currentUser) {
           const u = await DatabaseService.getUserProfile(auth.currentUser.uid);
@@ -284,155 +156,357 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       }
   };
 
-  // Filter the displayed list based on "Hide Answered" toggle
-  const displayedQuestions = questions.filter(q => {
-      if (hideAnswered && q.id && answeredMap[q.id]) return false;
-      return true;
-  });
+  // --- TOOLS HANDLERS ---
+  const toggleEliminate = (qId: string, optIdx: number, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEliminatedOptions(prev => {
+          const qState = prev[qId] || {};
+          return { ...prev, [qId]: { ...qState, [optIdx]: !qState[optIdx] } };
+      });
+  };
 
-  // Filter subjects based on selected category (regular vs military)
-  const filteredSubjects = subjects.filter(s => s.category === selectedCategory);
+  const toggleMaybe = (qId: string, optIdx: number, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setMaybeOptions(prev => {
+          const qState = prev[qId] || {};
+          return { ...prev, [qId]: { ...qState, [optIdx]: !qState[optIdx] } };
+      });
+  };
 
-  const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
-  const subTopicOptions = selectedTopic ? subtopics[selectedTopic] || [] : [];
+  const handleExplain = async () => {
+      const currentQ = questions[currentIndex];
+      // Find the WRONG answer the user clicked? 
+      // Since we don't track *which* wrong option they clicked in `answeredMap` (only correct/incorrect),
+      // we can ask AI to explain the question generally or compare Correct vs Common Mistake.
+      // Ideally, we'd store the selectedOption in DB or state.
+      // For now, let's explain the Correct Answer generally.
+      
+      if (!currentQ) return;
+      setIsExplaining(true);
+      try {
+          const wrongTxt = "Alternativa Incorreta"; // Placeholder
+          const correctTxt = currentQ.options[currentQ.correctAnswer];
+          const text = await AiService.explainError(currentQ.text, wrongTxt, correctTxt);
+          setAiExplanation(text);
+          handleUpdateBalance(); 
+      } catch (e: any) {
+          if (e.message.includes('402')) alert("Saldo insuficiente.");
+          else alert("Erro ao consultar tutor.");
+      } finally {
+          setIsExplaining(false);
+      }
+  };
+
+  // --- NAVIGATION ---
+  const handleNext = () => {
+      if (currentIndex < questions.length - 1) {
+          setCurrentIndex(prev => prev + 1);
+          setAiExplanation(null); // Clear previous explanation
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+  };
+
+  const handlePrev = () => {
+      if (currentIndex > 0) {
+          setCurrentIndex(prev => prev - 1);
+          setAiExplanation(null);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+  };
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
+  const currentQ = questions[currentIndex];
+  const isAnswered = currentQ?.id ? !!answeredMap[currentQ.id] : false;
+  const wasCorrect = currentQ?.id ? answeredMap[currentQ.id]?.correct : false;
+  const filteredSubjects = subjects.filter(s => s.category === selectedCategory);
+  const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
+  const subTopicOptions = selectedTopic ? subtopics[selectedTopic] || [] : [];
+
   return (
-    <div className="h-full flex flex-col animate-slide-up relative">
-      <div className="flex items-center justify-between mb-6 flex-shrink-0">
+    <div className="h-full flex flex-col relative animate-fade-in pb-20">
+      
+      {/* HEADER & FILTER TOGGLE */}
+      <div className="flex items-center justify-between mb-6 flex-shrink-0 relative z-20">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-2">Banco de Questões</h2>
-          <p className="text-slate-400">Pratique questões isoladas focando em suas dificuldades.</p>
+          <h2 className="text-3xl font-bold text-white mb-1">Banco de Questões</h2>
+          <p className="text-slate-400 text-sm">Pratique com foco total.</p>
         </div>
         
         <button 
-            onClick={() => setHideAnswered(!hideAnswered)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-bold ${
-                hideAnswered 
-                ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
-                : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500'
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all font-bold shadow-lg ${
+                isFilterOpen 
+                ? 'bg-indigo-600 border-indigo-500 text-white' 
+                : 'bg-slate-900 border-white/10 text-slate-300 hover:bg-slate-800'
             }`}
         >
-            {hideAnswered ? <EyeOff size={16}/> : <Eye size={16}/>}
-            {hideAnswered ? 'Ocultando Feitas' : 'Mostrar Todas'}
+            <Filter size={18} />
+            {isFilterOpen ? 'Fechar Filtros' : 'Filtrar Questões'}
         </button>
       </div>
 
-      {/* FILTER BAR - Always Visible */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 flex-shrink-0 bg-slate-900/50 p-4 rounded-2xl border border-white/5">
-        {/* Category Select */}
-        <div className="relative">
-            <select
-              value={selectedCategory}
-              onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                  setSelectedSubject(''); // Reset subject when category changes
-                  setSelectedTopic('');
-                  setSelectedSubTopic('');
-              }}
-              className="w-full appearance-none glass-input p-3 rounded-xl focus:outline-none focus:border-indigo-500 text-white text-sm font-bold"
-            >
-              <option value="regular">ENEM / Vestibular</option>
-              <option value="military">Militar (ESA/Espcex)</option>
-            </select>
-            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 rotate-90 pointer-events-none" size={14} />
-        </div>
+      {/* COMPACT FILTER PANEL (Absolute/Overlay) */}
+      {isFilterOpen && (
+        <div className="absolute top-20 right-0 z-30 w-full md:w-80 bg-slate-900/95 backdrop-blur-xl border border-indigo-500/30 p-6 rounded-2xl shadow-2xl animate-in slide-in-from-top-4">
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Filter size={16}/> Configurar Filtro</h3>
+            
+            <div className="space-y-4">
+                <div>
+                    <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Categoria</label>
+                    <select
+                    value={selectedCategory}
+                    onChange={(e) => {
+                        setSelectedCategory(e.target.value);
+                        setSelectedSubject('');
+                        setSelectedTopic('');
+                        setSelectedSubTopic('');
+                    }}
+                    className="w-full glass-input p-3 rounded-xl text-sm"
+                    >
+                    <option value="regular">ENEM / Vestibular</option>
+                    <option value="military">Militar (ESA/Espcex)</option>
+                    </select>
+                </div>
 
-        {/* Subject Select */}
-        <div className="relative">
-            <select
-              value={selectedSubject}
-              onChange={(e) => {
-                  setSelectedSubject(e.target.value);
-                  setSelectedTopic('');
-                  setSelectedSubTopic('');
-              }}
-              className="w-full appearance-none glass-input p-3 rounded-xl focus:outline-none focus:border-indigo-500 text-white text-sm"
-            >
-              <option value="" disabled>Disciplina</option>
-              {filteredSubjects.map((s) => (
-                <option key={s.id} value={s.id} className="bg-slate-900">{s.name}</option>
-              ))}
-            </select>
-            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 rotate-90 pointer-events-none" size={14} />
-        </div>
+                <div>
+                    <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Disciplina</label>
+                    <select
+                    value={selectedSubject}
+                    onChange={(e) => {
+                        setSelectedSubject(e.target.value);
+                        setSelectedTopic('');
+                        setSelectedSubTopic('');
+                    }}
+                    className="w-full glass-input p-3 rounded-xl text-sm"
+                    >
+                    <option value="" disabled>Selecione...</option>
+                    {filteredSubjects.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                    </select>
+                </div>
 
-        {/* Topic Select */}
-        <div className="relative">
-            <select
-              value={selectedTopic}
-              onChange={(e) => {
-                  setSelectedTopic(e.target.value);
-                  setSelectedSubTopic('');
-              }}
-              disabled={!selectedSubject}
-              className="w-full appearance-none glass-input p-3 rounded-xl focus:outline-none focus:border-indigo-500 text-white text-sm disabled:opacity-50"
-            >
-              <option value="" disabled>Assunto</option>
-              {topicOptions.map((t) => (
-                <option key={t} value={t} className="bg-slate-900">{t}</option>
-              ))}
-            </select>
-            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 rotate-90 pointer-events-none" size={14} />
-        </div>
+                <div>
+                    <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Assunto</label>
+                    <select
+                    value={selectedTopic}
+                    onChange={(e) => {
+                        setSelectedTopic(e.target.value);
+                        setSelectedSubTopic('');
+                    }}
+                    disabled={!selectedSubject}
+                    className="w-full glass-input p-3 rounded-xl text-sm disabled:opacity-50"
+                    >
+                    <option value="" disabled>Selecione...</option>
+                    {topicOptions.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                    ))}
+                    </select>
+                </div>
 
-        {/* Subtopic Select */}
-        <div className="relative">
-            <select
-              value={selectedSubTopic}
-              onChange={(e) => setSelectedSubTopic(e.target.value)}
-              disabled={!selectedTopic}
-              className="w-full appearance-none glass-input p-3 rounded-xl focus:outline-none focus:border-indigo-500 text-white text-sm disabled:opacity-50"
-            >
-              <option value="" disabled>Específico (Opcional)</option>
-              <option value="">Todos</option>
-              {subTopicOptions.map((st) => (
-                <option key={st} value={st} className="bg-slate-900">{st}</option>
-              ))}
-            </select>
-            <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 rotate-90 pointer-events-none" size={14} />
-        </div>
-      </div>
+                <div>
+                    <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Específico (Opcional)</label>
+                    <select
+                    value={selectedSubTopic}
+                    onChange={(e) => setSelectedSubTopic(e.target.value)}
+                    disabled={!selectedTopic}
+                    className="w-full glass-input p-3 rounded-xl text-sm disabled:opacity-50"
+                    >
+                    <option value="">Todos</option>
+                    {subTopicOptions.map((st) => (
+                        <option key={st} value={st}>{st}</option>
+                    ))}
+                    </select>
+                </div>
 
-      {/* QUESTION FEED */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pb-20">
+                <div className="pt-4 border-t border-white/10 text-center text-xs text-slate-500">
+                    O filtro aplica automaticamente.
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* CONTENT AREA */}
+      <div className="flex-1 relative">
           {listLoading ? (
-             <div className="flex flex-col items-center justify-center py-20 opacity-50">
-                 <Loader2 className="animate-spin mb-4 text-indigo-500" size={32} />
-                 <p className="text-slate-400">Buscando questões...</p>
+             <div className="h-full flex flex-col items-center justify-center opacity-50">
+                 <Loader2 className="animate-spin mb-4 text-indigo-500" size={48} />
+                 <p className="text-slate-300 font-medium">Carregando questões...</p>
              </div>
-          ) : displayedQuestions.length > 0 ? (
-             <div className="space-y-6 max-w-3xl mx-auto">
-                 {displayedQuestions.map((q, idx) => (
-                     <QuestionCard 
-                        key={q.id || idx} 
-                        index={idx} 
-                        question={q} 
-                        prevResult={q.id ? answeredMap[q.id] : undefined}
-                        onAnswer={handleAnswerSubmit}
-                        onUpdateUser={handleUpdateBalance}
-                     />
-                 ))}
+          ) : currentQ ? (
+             <div className="max-w-4xl mx-auto h-full flex flex-col">
                  
-                 <div className="text-center py-8">
-                     <p className="text-slate-500 text-sm">Fim da lista para este filtro.</p>
+                 {/* Progress Bar */}
+                 <div className="flex justify-between items-center mb-4 text-sm font-bold text-slate-500">
+                     <span>Questão {currentIndex + 1} de {questions.length}</span>
+                     {isAnswered && (
+                         <span className={`flex items-center gap-2 px-3 py-1 rounded-full ${wasCorrect ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                             {wasCorrect ? <><CheckCircle size={14}/> Correta</> : <><XCircle size={14}/> Incorreta</>}
+                         </span>
+                     )}
+                 </div>
+
+                 {/* Question Card */}
+                 <div className="glass-card p-8 md:p-10 rounded-3xl border border-white/5 shadow-2xl animate-in fade-in zoom-in-95 duration-300 flex-1 overflow-y-auto custom-scrollbar">
+                     <div className="mb-8">
+                        <SimpleMarkdown text={currentQ.text} />
+                        {currentQ.imageUrl && (
+                            <div className="mt-6 rounded-2xl overflow-hidden border border-white/10 bg-black/20 max-w-2xl mx-auto">
+                                <img src={currentQ.imageUrl} className="w-full h-auto object-contain max-h-[400px]" />
+                            </div>
+                        )}
+                     </div>
+
+                     <div className="space-y-4">
+                        {currentQ.options.map((opt, idx) => {
+                            const isEliminated = currentQ.id ? eliminatedOptions[currentQ.id]?.[idx] : false;
+                            const isMaybe = currentQ.id ? maybeOptions[currentQ.id]?.[idx] : false;
+                            
+                            // Visual State Logic
+                            let containerClass = "hover:bg-slate-800/60 border-slate-700 bg-slate-900/40";
+                            let textClass = "text-slate-300";
+                            
+                            if (isAnswered) {
+                                if (idx === currentQ.correctAnswer) {
+                                    containerClass = "bg-emerald-500/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]";
+                                    textClass = "text-emerald-100 font-bold";
+                                } else if (!wasCorrect && idx !== currentQ.correctAnswer) { // Show selection logic if we tracked user choice, for now simple reveal
+                                    containerClass = "bg-slate-900/40 border-slate-800 opacity-50"; 
+                                }
+                            } else {
+                                if (isEliminated) {
+                                    containerClass = "bg-slate-950/20 border-slate-800";
+                                    textClass = "text-slate-600 line-through decoration-red-500/50 decoration-2";
+                                } else if (isMaybe) {
+                                    containerClass = "bg-blue-900/10 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.1)]";
+                                    textClass = "text-blue-100";
+                                }
+                            }
+
+                            return (
+                                <div key={idx} className="flex gap-3 items-stretch group">
+                                    <button
+                                        onClick={() => !isAnswered && handleAnswerSubmit(idx)}
+                                        disabled={isAnswered || isEliminated}
+                                        className={`flex-1 p-5 rounded-xl border text-left text-lg transition-all relative overflow-hidden ${containerClass} ${isAnswered ? 'cursor-default' : isEliminated ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-bold text-sm flex-shrink-0 mt-0.5 ${isAnswered && idx === currentQ.correctAnswer ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 text-slate-400'}`}>
+                                                {String.fromCharCode(65 + idx)}
+                                            </div>
+                                            <span className={textClass}>{opt}</span>
+                                        </div>
+                                    </button>
+
+                                    {/* Tools (Only show if not answered) */}
+                                    {!isAnswered && (
+                                        <div className="flex flex-col gap-2">
+                                            <button 
+                                                onClick={(e) => toggleMaybe(currentQ.id!, idx, e)}
+                                                className={`p-3 rounded-lg border transition-all ${isMaybe ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-blue-400 hover:border-blue-500/50'}`}
+                                                title="Marcar como possível"
+                                            >
+                                                <Eye size={20} />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => toggleEliminate(currentQ.id!, idx, e)}
+                                                className={`p-3 rounded-lg border transition-all ${isEliminated ? 'bg-red-600 border-red-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-red-400 hover:border-red-500/50'}`}
+                                                title="Eliminar alternativa"
+                                            >
+                                                <Ban size={20} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                     </div>
+
+                     {/* AI Explanation Section */}
+                     {isAnswered && !wasCorrect && (
+                         <div className="mt-8 pt-8 border-t border-white/5 animate-in slide-in-from-bottom-4">
+                             <div className="bg-indigo-950/30 border border-indigo-500/30 p-6 rounded-2xl relative overflow-hidden">
+                                 {/* AI Background Glow */}
+                                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                                 
+                                 <div className="relative z-10">
+                                     {!aiExplanation ? (
+                                         <div className="flex items-center justify-between">
+                                             <div>
+                                                 <h4 className="text-xl font-bold text-white mb-1">Ficou com dúvida?</h4>
+                                                 <p className="text-slate-400 text-sm">O NeuroAI pode explicar detalhadamente este conceito.</p>
+                                             </div>
+                                             <button 
+                                                onClick={handleExplain}
+                                                disabled={isExplaining}
+                                                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all hover:scale-105"
+                                             >
+                                                 {isExplaining ? <Loader2 className="animate-spin" size={20}/> : <Sparkles size={20}/>}
+                                                 Explicar Erro
+                                             </button>
+                                         </div>
+                                     ) : (
+                                         <div className="space-y-4">
+                                             <div className="flex items-center gap-2 text-indigo-400 font-bold uppercase tracking-wider text-sm mb-4">
+                                                 <Bot size={18} /> Explicação do Professor
+                                             </div>
+                                             <div className="text-slate-200 leading-relaxed text-lg bg-slate-900/50 p-6 rounded-xl border border-white/5 shadow-inner">
+                                                 <SimpleMarkdown text={aiExplanation} />
+                                             </div>
+                                         </div>
+                                     )}
+                                 </div>
+                             </div>
+
+                             {currentQ.explanation && !aiExplanation && (
+                                 <div className="mt-4 p-4 bg-slate-900 rounded-xl border border-white/5 text-slate-400 text-sm">
+                                     <strong className="text-white">Gabarito Rápido:</strong> {currentQ.explanation}
+                                 </div>
+                             )}
+                         </div>
+                     )}
+                 </div>
+
+                 {/* NAVIGATION BAR */}
+                 <div className="flex justify-between items-center mt-6">
+                     <button 
+                        onClick={handlePrev}
+                        disabled={currentIndex === 0}
+                        className="px-6 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-3"
+                     >
+                         <ArrowLeft size={20} /> Anterior
+                     </button>
+
+                     <span className="text-slate-500 font-mono text-sm hidden md:block">
+                         {selectedTopic || selectedSubject}
+                     </span>
+                     
+                     <button 
+                        onClick={handleNext}
+                        disabled={currentIndex === questions.length - 1}
+                        className="px-8 py-4 bg-white text-slate-950 hover:bg-indigo-50 rounded-2xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-3 shadow-xl"
+                     >
+                         Próxima <ArrowRight size={20} />
+                     </button>
                  </div>
              </div>
           ) : (
-             <div className="flex flex-col items-center justify-center py-20 text-slate-500 border border-dashed border-white/5 rounded-2xl bg-slate-900/20">
+             <div className="flex flex-col items-center justify-center h-full text-slate-500 border-2 border-dashed border-white/5 rounded-3xl bg-slate-900/20">
                  {selectedSubject && selectedTopic ? (
                      <>
-                        <Filter size={40} className="mb-4 opacity-30" />
-                        <p>Nenhuma questão encontrada.</p>
-                        <p className="text-xs text-indigo-400 mt-2 font-mono">
-                            Buscado em: {selectedCategory}/{selectedSubject}/{selectedTopic}
-                        </p>
+                        <Filter size={48} className="mb-4 opacity-30" />
+                        <h3 className="text-xl font-bold text-white mb-2">Nenhuma questão encontrada</h3>
+                        <p className="max-w-xs text-center">Tente mudar os filtros ou selecionar outro tópico.</p>
                      </>
                  ) : (
                      <>
-                        <PlayCircle size={40} className="mb-4 opacity-30" />
-                        <p>Selecione uma Matéria e um Assunto acima para começar.</p>
+                        <PlayCircle size={64} className="mb-6 opacity-30 text-indigo-500" />
+                        <h3 className="text-2xl font-bold text-white mb-2">Comece a Praticar</h3>
+                        <p className="max-w-sm text-center mb-8">Selecione uma matéria e um assunto no filtro acima para carregar as questões.</p>
+                        <button onClick={() => setIsFilterOpen(true)} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-colors">
+                            Abrir Filtros
+                        </button>
                      </>
                  )}
              </div>

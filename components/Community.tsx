@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { CommunityPost, UserProfile } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { auth } from '../services/firebaseConfig';
-import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle, Clock, CornerDownRight } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle, Clock, CornerDownRight, ShieldCheck, Zap } from 'lucide-react';
+import { getRank } from '../constants';
 
 interface CommunityProps {
     user: UserProfile;
@@ -74,7 +75,8 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
         authorAvatar: user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`,
         content: newPost,
         timestamp: Date.now(),
-        likes: 0
+        likes: 0,
+        authorXp: user.xp // Pass current XP
       }, user.uid);
       
       setNewPost('');
@@ -142,13 +144,32 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
       }
   };
 
+  // Helper to render Rank Badge
+  const RankBadge = ({ xp }: { xp?: number }) => {
+      const rank = getRank(xp || 0);
+      const isHighRank = xp && xp > 16000; // Diamante+
+
+      return (
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${rank.colorClass} ${rank.bgClass} ${rank.borderClass} ${rank.effect === 'glow' ? 'shadow-[0_0_10px_currentColor] animate-pulse' : ''}`}>
+              {isHighRank && <ShieldCheck size={10} />}
+              {rank.name}
+          </span>
+      );
+  };
+
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto h-full flex flex-col">
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold text-white mb-2">Comunidade</h2>
-        <p className="text-slate-400">Troque conhecimentos. Mostrando as últimas 50 mensagens.</p>
+      <div className="mb-6 flex justify-between items-end">
+        <div>
+            <h2 className="text-3xl font-bold text-white mb-2">Comunidade</h2>
+            <p className="text-slate-400">Troque conhecimentos. Ganhe XP curtindo posts.</p>
+        </div>
+        <div className="text-right hidden md:block">
+            <p className="text-[10px] uppercase font-bold text-slate-500">Seu Rank Atual</p>
+            <RankBadge xp={user.xp} />
+        </div>
       </div>
 
       {/* New Post Input */}
@@ -190,16 +211,23 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
       <div className="space-y-4 flex-1 overflow-y-auto pr-2 pb-20 custom-scrollbar">
         {posts.map((post) => {
           const isLikedByMe = auth.currentUser && post.likedBy && post.likedBy[auth.currentUser.uid];
+          const rank = getRank(post.authorXp || 0);
           
           return (
           <div key={post.id} className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 hover:bg-slate-900/60 transition-colors animate-in slide-in-from-bottom-2">
              <div className="flex items-start gap-4">
-               <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full border border-white/10 object-cover" />
+               <div className={`rounded-full p-[2px] ${rank.effect === 'rainbow' ? 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 animate-spin-slow' : 'bg-transparent'}`}>
+                   <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full border border-white/10 object-cover" />
+               </div>
+               
                <div className="flex-1">
                  <div className="flex justify-between items-start">
-                   <div>
-                     <h4 className="font-bold text-slate-200">{post.authorName}</h4>
-                     <span className="text-xs text-slate-500">
+                   <div className="flex flex-col gap-1">
+                     <div className="flex items-center gap-2">
+                         <h4 className={`font-bold ${rank.colorClass}`}>{post.authorName}</h4>
+                         <RankBadge xp={post.authorXp} />
+                     </div>
+                     <span className="text-[10px] text-slate-500">
                        {new Date(post.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(post.timestamp).toLocaleDateString()}
                      </span>
                    </div>

@@ -64,7 +64,12 @@ export interface UserProfile extends User {
   lastPostedAt?: number;
   questionsAnswered?: number;
   hoursStudied?: number;
-  theme?: 'dark' | 'light'; // Removed Midnight
+  theme?: 'dark' | 'light';
+  // Gamification Fields
+  lastLoginDate?: string; // YYYY-MM-DD
+  loginStreak?: number;
+  dailyLikesGiven?: number;
+  lastLikeDate?: string; // YYYY-MM-DD to reset daily likes
 }
 
 export interface Announcement {
@@ -123,12 +128,14 @@ export interface Reply {
   author: string;
   content: string;
   timestamp: number;
+  authorXp?: number; // Snapshot of XP to render rank correctly
 }
 
 export interface CommunityPost {
   id: string;
   authorName: string;
   authorAvatar: string;
+  authorXp?: number; // Snapshot of XP to render rank correctly
   content: string;
   timestamp: number;
   likes: number;

@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, View } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight } from 'lucide-react';
+import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap } from 'lucide-react';
+import { getRank, getNextRank } from '../constants';
 
 interface DashboardProps {
   user: UserProfile; 
@@ -11,25 +12,29 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const [loading, setLoading] = useState(true);
-  const [level, setLevel] = useState(1);
   const [progress, setProgress] = useState(0);
+  const [currentRank, setCurrentRank] = useState(getRank(0));
+  const [nextRank, setNextRank] = useState(getNextRank(0));
 
   useEffect(() => {
     const fetchData = async () => {
-        // 1. Calculate Level
+        // 1. Calculate Rank Progress
         const xp = user.xp || 0;
-        const calcLevel = Math.floor(Math.sqrt(xp / 100)) + 1;
-        const nextLevelXp = Math.pow(calcLevel, 2) * 100;
-        const currentLevelBaseXp = Math.pow(calcLevel - 1, 2) * 100;
+        const cRank = getRank(xp);
+        const nRank = getNextRank(xp);
         
-        // Progress to next level
-        const progressPercent = ((xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100;
-        
-        setLevel(calcLevel);
-        setProgress(Math.min(Math.max(progressPercent, 0), 100));
+        setCurrentRank(cRank);
+        setNextRank(nRank);
 
-        // Note: Real-time ranking calculation removed for performance.
-        // It requires downloading the entire user database which is not scalable.
+        if (nRank) {
+            const prevThreshold = cRank.minXp;
+            const nextThreshold = nRank.minXp;
+            const progressPercent = ((xp - prevThreshold) / (nextThreshold - prevThreshold)) * 100;
+            setProgress(Math.min(Math.max(progressPercent, 0), 100));
+        } else {
+            setProgress(100); // Max level
+        }
+
         setLoading(false);
     };
 
@@ -52,7 +57,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
           <h2 className="text-4xl font-bold text-white mb-2 tracking-tight font-display">
             Olá, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">{user.displayName.split(' ')[0]}</span>
           </h2>
-          <p className="text-slate-400 font-medium font-sans">Vamos elevar seu nível hoje?</p>
+          <p className="text-slate-400 font-medium font-sans">Continue sua jornada para o topo.</p>
         </div>
         <div className="hidden md:block text-right">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-indigo-300 uppercase tracking-wider font-sans">
@@ -61,7 +66,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
         </div>
       </div>
 
-      {/* Hero Card - Dynamic Content */}
+      {/* Hero Card - Rank Progress */}
       <div className="relative w-full rounded-3xl overflow-hidden glass-card p-8 md:p-10 group transition-all duration-500 hover:shadow-[0_0_50px_rgba(79,70,229,0.15)]">
         {/* Abstract Background */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 animate-pulse-slow" />
@@ -70,17 +75,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
             <div className="max-w-xl">
                 <div className="flex items-center gap-2 mb-4">
-                    <span className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300">
-                        <Sparkles size={18} />
+                    <span className={`p-2 rounded-lg bg-indigo-500/20 border border-indigo-500/50 ${currentRank.colorClass}`}>
+                        <Trophy size={18} />
                     </span>
-                    <span className="text-indigo-300 font-semibold tracking-wide text-sm font-sans">FOCO DIÁRIO</span>
+                    <span className={`font-bold tracking-wide text-sm font-sans uppercase ${currentRank.colorClass}`}>
+                        Rank Atual: {currentRank.name}
+                    </span>
                 </div>
                 
-                <h3 className="text-3xl font-bold text-white mb-4 leading-tight font-display">
-                    Pronto para começar?
+                <h3 className="text-3xl font-bold text-white mb-2 leading-tight font-display">
+                    {nextRank ? `Próximo: ${nextRank.name}` : 'Nível Máximo Alcançado!'}
                 </h3>
-                <p className="text-slate-300 mb-8 text-lg leading-relaxed font-sans">
-                    Acesse o banco de questões ou inicie uma nova aula para começar a ganhar XP.
+                <p className="text-slate-300 mb-6 text-lg leading-relaxed font-sans">
+                    {nextRank 
+                        ? `Faltam ${nextRank.minXp - (user.xp || 0)} XP para subir de ranking. Continue estudando!`
+                        : 'Você é uma lenda entre os estudantes.'}
                 </p>
                 
                 <div className="flex gap-4">
@@ -88,7 +97,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                         onClick={() => onNavigate('questoes')}
                         className="px-8 py-4 bg-white text-slate-950 font-bold rounded-2xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer font-sans"
                     >
-                        Explorar Conteúdos
+                        Ganhar XP Agora
                         <ArrowRight size={20} />
                     </button>
                 </div>
@@ -99,16 +108,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" strokeWidth="8" />
                     <circle 
-                        cx="50" cy="50" r="45" fill="none" stroke="#6366f1" strokeWidth="8"
+                        cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8"
+                        className={currentRank.colorClass}
                         strokeDasharray="283"
                         strokeDashoffset={283 - (283 * progress / 100)}
                         strokeLinecap="round"
-                        className="transition-all duration-1000 ease-out"
                     />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider font-sans">Nível</span>
-                    <span className="text-4xl font-black font-display">{level}</span>
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider font-sans">XP Total</span>
+                    <span className="text-2xl font-black font-display">{user.xp || 0}</span>
                 </div>
             </div>
         </div>
@@ -130,16 +139,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
               sub: 'Exercícios resolvidos'
           },
           { 
-              icon: <TrendingUp className="text-purple-400" />, 
-              label: 'XP Total', 
-              value: user.xp || 0,
-              sub: 'Pontos de experiência'
+              icon: <Zap className="text-purple-400" />, 
+              label: 'Login Streak', 
+              value: `${user.loginStreak || 0} Dias`,
+              sub: 'Sequência atual'
           },
           { 
-              icon: <Trophy className="text-yellow-400" />, 
-              label: 'Sua Classificação', 
-              value: 'TOP 10%',
-              sub: 'Estimativa'
+              icon: <TrendingUp className="text-yellow-400" />, 
+              label: 'Likes Dados Hoje', 
+              value: `${user.dailyLikesGiven || 0}/5`,
+              sub: 'Apoio à comunidade'
           },
         ].map((stat, i) => (
           <div key={i} className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 hover:-translate-y-1 group">

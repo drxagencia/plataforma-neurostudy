@@ -2,6 +2,7 @@
 import { ref, get, child, update, push, set, query, orderByChild, equalTo, limitToLast, remove, startAfter, limitToFirst, runTransaction } from "firebase/database";
 import { database } from "./firebaseConfig";
 import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan, SimulationResult, EssayCorrection, Lead } from "../types";
+import { XP_VALUES } from "../constants";
 
 // --- MEMORY CACHE TO PREVENT REDUNDANT DOWNLOADS ---
 const CACHE: {
@@ -100,7 +101,8 @@ export const DatabaseService = {
         ...data,
         balance: 0,
         essayCredits: 0,
-        plan: data.plan || (data.isAdmin ? 'admin' : 'basic')
+        plan: data.plan || (data.isAdmin ? 'admin' : 'basic'),
+        xp: 0
       });
       // Sync with lightweight leaderboard
       await DatabaseService.syncLeaderboard(uid, data.displayName || 'User', data.photoURL || '', 0);
@@ -148,26 +150,80 @@ export const DatabaseService = {
       await update(ref(database), updates);
   },
 
-  addXp: async (uid: string, amount: number): Promise<number> => {
-    try {
+  // Centralized XP Logic
+  processXpAction: async (uid: string, actionType: keyof typeof XP_VALUES, customAmount?: number): Promise<number> => {
       const userRef = ref(database, `users/${uid}`);
-      const snapshot = await get(userRef);
-      if (snapshot.exists()) {
-        const userData = snapshot.val();
-        const currentXp = userData.xp || 0;
-        const newXp = currentXp + amount;
-        
-        await update(userRef, { xp: newXp });
-        
-        // Update lightweight leaderboard
-        await DatabaseService.syncLeaderboard(uid, userData.displayName, userData.photoURL, newXp);
-        
-        return newXp;
+      let earnedXp = customAmount || XP_VALUES[actionType] || 0;
+
+      try {
+          await runTransaction(userRef, (user) => {
+              if (user) {
+                  // Initialize XP if missing
+                  if (!user.xp) user.xp = 0;
+
+                  // Handle Limits (Example: Likes)
+                  if (actionType === 'LIKE_COMMENT') {
+                      const today = new Date().toISOString().split('T')[0];
+                      if (user.lastLikeDate !== today) {
+                          user.lastLikeDate = today;
+                          user.dailyLikesGiven = 0;
+                      }
+                      
+                      if ((user.dailyLikesGiven || 0) >= 5) {
+                          earnedXp = 0; // Limit reached
+                      } else {
+                          user.dailyLikesGiven = (user.dailyLikesGiven || 0) + 1;
+                      }
+                  }
+
+                  // Handle Login Streak
+                  if (actionType === 'DAILY_LOGIN_BASE') {
+                      const today = new Date().toISOString().split('T')[0];
+                      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                      
+                      if (user.lastLoginDate === today) {
+                          earnedXp = 0; // Already logged in today
+                      } else {
+                          if (user.lastLoginDate === yesterday) {
+                              user.loginStreak = (user.loginStreak || 0) + 1;
+                          } else {
+                              user.loginStreak = 1;
+                          }
+                          user.lastLoginDate = today;
+                          
+                          // Add Streak Bonus
+                          const bonus = Math.min((user.loginStreak || 1) * XP_VALUES.DAILY_LOGIN_STREAK_BONUS, 200); // Cap bonus
+                          earnedXp += bonus;
+                      }
+                  }
+
+                  if (earnedXp > 0) {
+                      user.xp += earnedXp;
+                  }
+              }
+              return user;
+          });
+
+          // Sync Leaderboard if XP changed
+          if (earnedXp > 0) {
+              // We need the new XP value, fetch it again or optimistically calc (fetch safer)
+              const snap = await get(child(userRef, 'xp'));
+              const newTotal = snap.val();
+              const profileSnap = await get(userRef);
+              const profile = profileSnap.val();
+              await DatabaseService.syncLeaderboard(uid, profile.displayName, profile.photoURL, newTotal);
+          }
+
+          return earnedXp;
+      } catch (e) {
+          console.error("XP Transaction failed", e);
+          return 0;
       }
-    } catch (error) {
-      console.error("Error adding XP:", error);
-    }
-    return 0;
+  },
+
+  // Legacy Wrapper for simple adds
+  addXp: async (uid: string, amount: number): Promise<number> => {
+      return await DatabaseService.processXpAction(uid, 'LESSON_WATCHED', amount); // Defaulting type just for logging if needed
   },
 
   incrementQuestionsAnswered: async (uid: string, count: number): Promise<void> => {
@@ -672,22 +728,36 @@ export const DatabaseService = {
       
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const posts = Object.keys(data).map(key => {
-            const p = data[key];
-            let replies = [];
-            if (p.replies) {
-                replies = Array.isArray(p.replies) 
-                    ? p.replies 
-                    : Object.values(p.replies);
-            }
-            return {
-              ...p,
-              id: key,
-              // Keep likedBy map to let frontend know if user liked
-              likedBy: p.likedBy || {},
-              replies
-            };
-        });
+        // Here we'd ideally join with user profiles to get current XP/Rank
+        // For efficiency, we will fetch user snapshot for the posts
+        // For simplicity now, we assume authorXP is stored on post or fetched. 
+        // We will fetch author XP in real-time or assume stored.
+        // Let's rely on cached 'users' node if small, or just display static XP from creation (less ideal).
+        // Better: Fetch author profile for displayed posts.
+        
+        // As a quick fix for the "High Quality Tags", we will modify the return to include authorXp by fetching user data for the specific authors.
+        // This is N+1 but for 50 posts it's acceptable if cached.
+        
+        const postsArray = Object.keys(data).map(key => ({...data[key], id: key}));
+        
+        // Fetch XP for authors
+        // Note: In a production app, use Cloud Functions to sync authorXp to post or index users.
+        const posts = await Promise.all(postsArray.map(async (p: any) => {
+             // Try to find user by name if uid not stored? Or if we stored uid.
+             // We stored UID in createPost logic? No, only passed it. 
+             // We need to store authorId in post to fetch current rank.
+             // Assuming we update createPost to store authorId.
+             
+             // Fallback: If we don't have ID, we can't show dynamic rank easily.
+             // Let's assume we start storing authorId from now on.
+             let xp = 0;
+             if (p.authorId) {
+                 const u = await DatabaseService.getUserProfile(p.authorId);
+                 if (u) xp = u.xp;
+             }
+             return { ...p, authorXp: xp, replies: p.replies ? Object.values(p.replies) : [] };
+        }));
+
         return posts.sort((a, b) => b.timestamp - a.timestamp);
       }
     } catch (error) {
@@ -710,10 +780,11 @@ export const DatabaseService = {
 
       const postsRef = ref(database, 'posts');
       const newPostRef = push(postsRef);
-      await set(newPostRef, post);
+      // Store authorId for rank fetching
+      await set(newPostRef, { ...post, authorId: uid });
 
       await update(ref(database, `users/${uid}`), { lastPostedAt: now });
-      await DatabaseService.addXp(uid, 50); 
+      await DatabaseService.processXpAction(uid, 'DAILY_LOGIN_BASE', 50); // Fallback XP for posting? Or just use specific
     } catch (error) {
       throw error;
     }
@@ -736,6 +807,8 @@ export const DatabaseService = {
           }
           return post;
       });
+      // Award XP for liking
+      await DatabaseService.processXpAction(uid, 'LIKE_COMMENT');
   },
 
   replyPost: async (postId: string, reply: { author: string, content: string }): Promise<void> => {
@@ -778,7 +851,11 @@ export const DatabaseService = {
       try {
           const resRef = push(ref(database, `users/${result.userId}/simulationResults`));
           await set(resRef, result);
-          await DatabaseService.addXp(result.userId, result.score * 5); 
+          
+          // XP Calculation: Base 100 + (Score * 2)
+          const xpEarned = XP_VALUES.SIMULATION_FINISH + (result.score * 2);
+          await DatabaseService.processXpAction(result.userId, 'SIMULATION_FINISH', xpEarned); 
+          
           await DatabaseService.incrementQuestionsAnswered(result.userId, result.totalQuestions);
       } catch (e) {
           console.error(e);

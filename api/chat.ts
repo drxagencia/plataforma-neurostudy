@@ -70,6 +70,12 @@ export default async function handler(req: any, res: any) {
             return res.status(402).json({ error: 'Sem créditos de redação.' });
         }
 
+        // Count existing essays to determine if this is 3rd or more
+        // user.essays is an object map of ID -> Essay.
+        const essayCount = user.essays ? Object.keys(user.essays).length : 0;
+        // If essayCount is 2, the current one being processed will be the 3rd.
+        const isThirdOrMore = essayCount >= 2;
+
         // PROMPT AVANÇADO - Especialista ENEM
         const prompt = `
             ATUE COMO: Um Corretor Sênior da Banca do ENEM, extremamente técnico, exigente e detalhista.
@@ -82,7 +88,7 @@ export default async function handler(req: any, res: any) {
             1. As notas de C1 a C5 DEVEM ser MÚLTIPLOS DE 20 (ex: 0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200).
             2. NÃO dê nota "média" (120) se o aluno for excelente (180/200) ou fraco (40/60). Seja justo e identifique os extremos.
             3. Analise com rigor: Coesão, Coerência, Gramática, Repertório Sociocultural e Proposta de Intervenção.
-            4. SOMA: O campo "total" DEVE SER EXATAMENTE a soma de c1+c2+c3+c4+c5. Verifique sua matemática.
+            4. SOMA: O campo "total" DEVE SER EXATAMENTE a soma de c1+c2+c3+c4+c5.
 
             FORMATO DE RESPOSTA (JSON OBRIGATÓRIO):
             {
@@ -143,7 +149,64 @@ export default async function handler(req: any, res: any) {
                 throw new Error(data.error?.message || 'OpenAI API Error');
             }
 
-            const responseText = data.choices[0].message.content;
+            let responseText = data.choices[0].message.content;
+
+            // --- SCORE ADJUSTMENT LOGIC (Backend Post-Processing) ---
+            // If user has >= 3 essays (including this one), and score < 720, add 100 points
+            if (isThirdOrMore) {
+                try {
+                    const parsed = JSON.parse(responseText);
+                    const currentTotal = 
+                        (parsed.c1?.score || 0) + 
+                        (parsed.c2?.score || 0) + 
+                        (parsed.c3?.score || 0) + 
+                        (parsed.c4?.score || 0) + 
+                        (parsed.c5?.score || 0);
+
+                    if (currentTotal < 720) {
+                        // Need to distribute 100 points.
+                        // Strategy: Add 20 to each competency until 100 is distributed.
+                        // Constraint: Max 200 per competency.
+                        const competencies = ['c1', 'c2', 'c3', 'c4', 'c5'];
+                        let pointsToAdd = 100;
+                        
+                        // First pass: try to add 20 to each
+                        for (const comp of competencies) {
+                            if (pointsToAdd <= 0) break;
+                            
+                            let currentScore = parsed[comp].score || 0;
+                            if (currentScore + 20 <= 200) {
+                                parsed[comp].score = currentScore + 20;
+                                pointsToAdd -= 20;
+                            }
+                        }
+
+                        // Second pass: if points remain (because some were capped at 200), dump remaining into whatever has space
+                        if (pointsToAdd > 0) {
+                            for (const comp of competencies) {
+                                if (pointsToAdd <= 0) break;
+                                let currentScore = parsed[comp].score || 0;
+                                const space = 200 - currentScore;
+                                const add = Math.min(space, pointsToAdd); // Add whatever fits or whatever is left
+                                if (add > 0) {
+                                    parsed[comp].score += add;
+                                    pointsToAdd -= add;
+                                }
+                            }
+                        }
+
+                        // Recalculate total for consistency in JSON
+                        parsed.total = 
+                            parsed.c1.score + parsed.c2.score + parsed.c3.score + parsed.c4.score + parsed.c5.score;
+                        
+                        // Update response text
+                        responseText = JSON.stringify(parsed);
+                    }
+                } catch (parseError) {
+                    console.error("Error adjusting score:", parseError);
+                    // If parsing fails, we return original text, no bonus applied to avoid corruption
+                }
+            }
 
             // Deduct 1 credit
             await update(userRef, { essayCredits: credits - 1 });
@@ -193,12 +256,15 @@ export default async function handler(req: any, res: any) {
         systemInstruction = systemOverride;
     } else if (mode === 'explanation') {
       systemInstruction = `
-      Atue como Tutor Sênior.
-      OBJETIVO: Explicar o erro do aluno de forma DIDÁTICA e MUITO BREVE.
-      REGRAS:
-      1. Use estritamente **negrito** para palavras-chave.
-      2. Máximo 40 palavras.
-      3. Vá direto ao ponto. Sem saudações.
+      ATUE COMO: Um Professor Especialista e Didático.
+      OBJETIVO: Explicar detalhadamente a questão, cobrindo todos os pontos necessários para o aluno dominar o assunto.
+      
+      INSTRUÇÕES:
+      1. Explique por que a alternativa escolhida pelo aluno está errada (se for o caso), detalhando a pegadinha ou o erro conceitual.
+      2. Explique a alternativa correta com profundidade, trazendo o contexto teórico completo.
+      3. Não tenha medo de escrever textos longos se o conceito exigir. O foco é a COMPREENSÃO TOTAL.
+      4. Use formatação Markdown (negrito, listas) para facilitar a leitura.
+      5. Seja encorajador, mas tecnicamente rigoroso.
       `;
     } else {
       systemInstruction = "Tutor Sênior. Responda de forma curta, direta e didática. Max 30 palavras por resposta. Use **negrito** nos conceitos.";
@@ -229,7 +295,7 @@ export default async function handler(req: any, res: any) {
         body: JSON.stringify({
             model: AI_MODEL,
             messages: messagesPayload,
-            max_tokens: 300
+            max_tokens: 2000 // Increased for detailed explanation
         })
     });
 
@@ -270,9 +336,9 @@ export default async function handler(req: any, res: any) {
         id: transRef.key,
         type: 'debit',
         amount: finalChargeAmount,
-        description: mode === 'explanation' ? 'Explicação IA' : 'Chat IA',
+        description: mode === 'explanation' ? 'Explicação Detalhada IA' : 'Chat IA',
         timestamp: Date.now(),
-        tokensUsed: inputTokens + outputTokens, // Log the inflated token usage for transparency in internal logs if needed
+        tokensUsed: inputTokens + outputTokens, 
         currencyType: 'BRL'
     });
 

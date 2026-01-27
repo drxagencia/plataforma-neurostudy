@@ -14,6 +14,7 @@ import AiTutor from './components/AiTutor';
 import Redacao from './components/Redacao';
 import Militares from './components/Militares';
 import AccessDenied from './components/AccessDenied'; 
+import FullScreenPrompt from './components/FullScreenPrompt'; // Imported
 import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
@@ -72,6 +73,10 @@ const App: React.FC = () => {
             plan: dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic'), 
             theme: safeTheme
         });
+
+        // Check Login Streak automatically
+        await DatabaseService.processXpAction(firebaseUser.uid, 'DAILY_LOGIN_BASE');
+
       } else {
         setUser(null);
       }
@@ -124,6 +129,8 @@ const App: React.FC = () => {
     // REMOVED bg-slate-950 here to allow body background to show
     <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       
+      <FullScreenPrompt /> {/* New Full Screen Suggestion */}
+
       {/* Background Animation Container */}
       <div className="stars-container">
           <div className="star-layer stars-1"></div>
