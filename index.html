@@ -83,48 +83,82 @@
       /* LIGHT MODE OVERHAUL */
       html.light {
         --glass-bg: rgba(255, 255, 255, 0.85); /* Frosted White */
-        --glass-border: rgba(0, 0, 0, 0.05);
-        --star-color: #cbd5e1; /* Subtle Grey Stars/Clouds */
+        --glass-border: rgba(0, 0, 0, 0.08);
+        --star-color: #6366f1; /* Indigo-500 for visible stars in day mode */
       }
 
       html.light body {
-        background-color: #f0f9ff;
+        background-color: #f8fafc; /* Slate-50 */
         background-image: 
-          radial-gradient(circle at 50% 0%, #e0f2fe, transparent 70%),
+          radial-gradient(circle at 50% 0%, #eff6ff, transparent 70%),
           radial-gradient(circle at 0% 100%, #f0f9ff, transparent 60%),
-          radial-gradient(circle at 100% 100%, #e0e7ff, transparent 60%);
+          radial-gradient(circle at 100% 100%, #eef2ff, transparent 60%);
         color: #0f172a; /* Slate 900 */
         background-attachment: fixed;
         overflow-x: hidden;
       }
 
-      /* FIX: Global Contrast Fix for Light Mode */
-      /* Invert text-white to dark slate in light mode, EXCEPT inside buttons/badges that have colored backgrounds */
-      html.light .text-white { color: #1e293b !important; } /* Default swap to Slate-800 */
+      /* 
+         GLOBAL CONTRAST FIX FOR LIGHT MODE 
+         This forces elements hardcoded with dark classes to invert colors in light mode.
+      */
       
-      /* Preserve white text on colored components */
+      /* Invert Texts */
+      html.light .text-white { color: #1e293b !important; } /* Default swap to Slate-800 */
+      html.light .text-slate-200 { color: #334155 !important; }
+      html.light .text-slate-300 { color: #475569 !important; }
+      html.light .text-slate-400 { color: #64748b !important; }
+      
+      /* Invert Backgrounds (Crucial for cards hardcoded as bg-slate-900) */
+      html.light .bg-slate-950, 
+      html.light .bg-black { 
+          background-color: #f8fafc !important; /* White/Slate-50 */
+          border-color: #e2e8f0 !important;
+      }
+      
+      html.light .bg-slate-900 { 
+          background-color: #ffffff !important; 
+          border-color: #e2e8f0 !important; 
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      }
+      
+      html.light .bg-slate-800 { 
+          background-color: #f1f5f9 !important; /* Slate-100 */
+          border-color: #cbd5e1 !important;
+      }
+
+      html.light .bg-black\/20 {
+          background-color: rgba(255, 255, 255, 0.6) !important;
+      }
+
+      html.light .border-white\/5, 
+      html.light .border-white\/10 { 
+          border-color: rgba(0,0,0,0.08) !important; 
+      }
+
+      /* EXCEPTIONS: Preserve white text on colored components (Buttons, Badges) */
       html.light .bg-indigo-600 .text-white,
       html.light .bg-emerald-600 .text-white,
       html.light .bg-red-600 .text-white,
-      html.light .bg-slate-800 .text-white,
-      html.light .bg-slate-900 .text-white,
-      html.light .bg-slate-950 .text-white,
-      html.light button.text-white, 
+      html.light .bg-yellow-600 .text-white,
+      html.light .bg-slate-800 .text-white, /* Sometimes buttons use slate-800, keep white text there? No, inverted above. */
+      html.light button[class*="bg-indigo-"] .text-white,
+      html.light button[class*="bg-emerald-"] .text-white,
+      html.light button[class*="bg-red-"] .text-white,
+      html.light div[class*="bg-indigo-600"] .text-white,
+      html.light div[class*="bg-red-500"] .text-white,
+      html.light div[class*="bg-emerald-500"] .text-white,
+      html.light div[class*="bg-yellow-400"] .text-yellow-900,
       html.light [class*='bg-gradient'] .text-white {
           color: #ffffff !important;
       }
-      
-      /* Make slate-400 slightly darker in light mode for readability */
-      html.light .text-slate-400 { color: #64748b !important; }
-      html.light .text-slate-300 { color: #334155 !important; }
-      html.light .text-slate-500 { color: #475569 !important; }
 
       /* Fix Glass Inputs in Light Mode */
       html.light .glass-input {
         background: #ffffff;
-        border: 1px solid #e2e8f0;
+        border: 1px solid #cbd5e1;
         color: #0f172a;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
       }
       html.light .glass-input::placeholder { color: #94a3b8; }
 
@@ -210,7 +244,10 @@
         /* Only apply glow filter in Dark Mode */
         filter: drop-shadow(0 0 2px #6366f1);
       }
-      html.light .stars-3 { filter: none; }
+      html.light .stars-3 { 
+          filter: none; 
+          opacity: 0.6; /* Slightly less intense in light mode */
+      }
       .stars-3::after { width: 2px; height: 2px; }
 
       @keyframes animStar {
@@ -232,8 +269,8 @@
       
       html.light .nebula-glow {
           background: 
-          radial-gradient(circle at 15% 55%, rgba(56, 189, 248, 0.1), transparent 40%),
-          radial-gradient(circle at 85% 25%, rgba(99, 102, 241, 0.05), transparent 40%);
+          radial-gradient(circle at 15% 55%, rgba(14, 165, 233, 0.08), transparent 40%),
+          radial-gradient(circle at 85% 25%, rgba(99, 102, 241, 0.08), transparent 40%);
       }
 
       @keyframes pulseGlow {
