@@ -76,6 +76,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [selectedSubTopic, setSelectedSubTopic] = useState<string>('');
+  
+  // New: Multiple subtopics filter (internal logic, not exposed in manual UI yet to keep it simple, but used by lesson redirect)
+  const [multiSubtopicsFilter, setMultiSubtopicsFilter] = useState<string[]>([]);
 
   // List Data
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -104,6 +107,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
               setSelectedCategory(filters.category || 'regular');
               setSelectedSubject(filters.subject || '');
               setSelectedTopic(filters.topic || '');
+              
+              if (filters.subtopics && Array.isArray(filters.subtopics) && filters.subtopics.length > 0) {
+                  setMultiSubtopicsFilter(filters.subtopics);
+              } else {
+                  setMultiSubtopicsFilter([]);
+              }
+
               sessionStorage.removeItem('qb_filters'); // Clear after using
               // Auto-trigger fetch handled by effect dependency
           } catch (e) {
@@ -139,10 +149,18 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       setAiExplanation(null);
       
       try {
-        const fetched = await DatabaseService.getQuestions(selectedCategory, selectedSubject, selectedTopic, selectedSubTopic || undefined);
-        // Filter out answered ones if needed? User asked: "Answered questions cannot be redone".
-        // We will keep them in the list but show them as "View Mode" (locked).
+        let fetched: Question[] = [];
+        
+        // Priority: Multi Subtopic -> Single Subtopic -> All
+        if (multiSubtopicsFilter.length > 0) {
+            fetched = await DatabaseService.getQuestionsFromSubtopics(selectedCategory, selectedSubject, selectedTopic, multiSubtopicsFilter);
+        } else {
+            fetched = await DatabaseService.getQuestions(selectedCategory, selectedSubject, selectedTopic, selectedSubTopic || undefined);
+        }
+        
         setQuestions(fetched);
+        // Clear multi filter after fetch to allow manual override later if needed? 
+        // Keeping it for now so if they refresh or change topic it resets via other logic.
       } catch (e) {
           console.error(e);
       } finally {
@@ -157,7 +175,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       } else {
           setQuestions([]);
       }
-  }, [selectedSubject, selectedTopic, selectedSubTopic, selectedCategory]);
+  }, [selectedSubject, selectedTopic, selectedSubTopic, selectedCategory, multiSubtopicsFilter]);
 
   const handleAnswerSubmit = async (optionIdx: number) => {
       const currentQ = questions[currentIndex];
@@ -302,6 +320,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                         setSelectedSubject('');
                         setSelectedTopic('');
                         setSelectedSubTopic('');
+                        setMultiSubtopicsFilter([]); // Reset multi on manual change
                     }}
                     className="w-full glass-input p-3 rounded-xl text-sm"
                     >
@@ -318,6 +337,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                         setSelectedSubject(e.target.value);
                         setSelectedTopic('');
                         setSelectedSubTopic('');
+                        setMultiSubtopicsFilter([]);
                     }}
                     className="w-full glass-input p-3 rounded-xl text-sm"
                     >
@@ -335,6 +355,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                     onChange={(e) => {
                         setSelectedTopic(e.target.value);
                         setSelectedSubTopic('');
+                        setMultiSubtopicsFilter([]);
                     }}
                     disabled={!selectedSubject}
                     className="w-full glass-input p-3 rounded-xl text-sm disabled:opacity-50"
@@ -346,20 +367,32 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                     </select>
                 </div>
 
-                <div>
-                    <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Específico (Opcional)</label>
-                    <select
-                    value={selectedSubTopic}
-                    onChange={(e) => setSelectedSubTopic(e.target.value)}
-                    disabled={!selectedTopic}
-                    className="w-full glass-input p-3 rounded-xl text-sm disabled:opacity-50"
-                    >
-                    <option value="">Todos</option>
-                    {subTopicOptions.map((st) => (
-                        <option key={st} value={st}>{st}</option>
-                    ))}
-                    </select>
-                </div>
+                {multiSubtopicsFilter.length > 0 ? (
+                    <div className="p-3 bg-indigo-900/30 rounded-xl border border-indigo-500/30">
+                        <p className="text-xs text-indigo-300 font-bold mb-1">Filtro Especial Ativo</p>
+                        <div className="flex flex-wrap gap-1">
+                            {multiSubtopicsFilter.map(sub => (
+                                <span key={sub} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded">{sub}</span>
+                            ))}
+                        </div>
+                        <button onClick={() => setMultiSubtopicsFilter([])} className="text-[10px] text-red-400 underline mt-2">Limpar Filtro Especial</button>
+                    </div>
+                ) : (
+                    <div>
+                        <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Específico (Opcional)</label>
+                        <select
+                        value={selectedSubTopic}
+                        onChange={(e) => setSelectedSubTopic(e.target.value)}
+                        disabled={!selectedTopic}
+                        className="w-full glass-input p-3 rounded-xl text-sm disabled:opacity-50"
+                        >
+                        <option value="">Todos</option>
+                        {subTopicOptions.map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                        ))}
+                        </select>
+                    </div>
+                )}
 
                 <div className="pt-4 border-t border-white/10 text-center text-xs text-slate-500">
                     O filtro aplica automaticamente.

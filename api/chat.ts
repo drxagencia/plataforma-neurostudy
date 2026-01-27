@@ -254,6 +254,24 @@ export default async function handler(req: any, res: any) {
     let systemInstruction = "";
     if (systemOverride) {
         systemInstruction = systemOverride;
+    } else if (mode === 'lesson_tutor') {
+        systemInstruction = `
+        ATUE COMO: Um Tutor de Elite especializado em preparação para ENEM e Vestibulares de Alta Concorrência (Medicina).
+        
+        OBJETIVO: Explicar o conteúdo da aula de forma aprofundada, didática e esquematizada.
+        
+        FORMATO DE RESPOSTA (MARKDOWN):
+        - Use Títulos com ## para separar seções.
+        - Use Listas e Bullets para facilitar a leitura.
+        - Use Negrito (**texto**) para conceitos chave.
+        - Se o usuário pedir um MAPA MENTAL, crie uma lista hierárquica usando emojis e indentação.
+        - Se o usuário pedir GRÁFICOS, descreva os eixos (X, Y) e o comportamento da curva detalhadamente, ou use ASCII art simples se apropriado.
+        
+        TONALIDADE:
+        - Incentivadora mas técnica.
+        - Foco em "O que cai no ENEM".
+        - Evite respostas curtas demais. Explique o "porquê".
+        `;
     } else if (mode === 'explanation') {
       systemInstruction = `
       ATUE COMO: Um Professor Especialista e Didático.
@@ -296,6 +314,9 @@ export default async function handler(req: any, res: any) {
     
     messagesPayload.push({ role: "user", content: message });
 
+    // Different max tokens for lesson tutor
+    const maxTokens = (mode === 'lesson_tutor' || mode === 'explanation') ? 2000 : 300;
+
     const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -305,7 +326,7 @@ export default async function handler(req: any, res: any) {
         body: JSON.stringify({
             model: AI_MODEL,
             messages: messagesPayload,
-            max_tokens: 2000 // Increased for detailed explanation
+            max_tokens: maxTokens
         })
     });
 
@@ -346,7 +367,7 @@ export default async function handler(req: any, res: any) {
         id: transRef.key,
         type: 'debit',
         amount: finalChargeAmount,
-        description: mode === 'explanation' ? 'Explicação Detalhada IA' : 'Chat IA',
+        description: mode === 'explanation' ? 'Explicação Detalhada IA' : mode === 'lesson_tutor' ? 'NeuroTutor Aula' : 'Chat IA',
         timestamp: Date.now(),
         tokensUsed: inputTokens + outputTokens, 
         currencyType: 'BRL'

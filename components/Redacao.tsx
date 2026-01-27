@@ -207,6 +207,12 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
+          // XP Awards
+          await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_CORRECTION');
+          if (finalTotal > 800) {
+              await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_GOOD_SCORE_BONUS');
+          }
+
           // Fix: Explicitly cast essayCredits to number
           const currentCredits = Number(user.essayCredits || 0);
           onUpdateUser({

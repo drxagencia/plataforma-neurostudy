@@ -20,6 +20,36 @@ import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Zap } from 'lucide-react';
+
+const XP_TOAST_DURATION = 3000;
+
+// Sub-component for XP Notification
+const XpToast = () => {
+    const [xpNotification, setXpNotification] = useState<{amount: number, reason: string} | null>(null);
+
+    useEffect(() => {
+        const unsubscribe = DatabaseService.onXpEarned((amount, reason) => {
+            setXpNotification({ amount, reason });
+            setTimeout(() => setXpNotification(null), XP_TOAST_DURATION);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    if (!xpNotification) return null;
+
+    return (
+        <div className="fixed top-24 right-4 z-[100] bg-slate-900/90 backdrop-blur-xl border border-yellow-500/30 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right duration-500">
+            <div className="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center border border-yellow-500/50">
+                <Zap className="text-yellow-400 fill-yellow-400" size={24} />
+            </div>
+            <div>
+                <p className="text-2xl font-black text-white leading-none">+{xpNotification.amount} <span className="text-sm font-bold text-yellow-400 uppercase tracking-widest">XP</span></p>
+                <p className="text-xs text-slate-400 font-medium uppercase mt-1">Conquista Desbloqueada</p>
+            </div>
+        </div>
+    );
+};
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null); 
@@ -130,6 +160,7 @@ const App: React.FC = () => {
     <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       
       <FullScreenPrompt /> {/* New Full Screen Suggestion */}
+      <XpToast /> {/* Global XP Notification */}
 
       {/* Background Animation Container */}
       <div className="stars-container">

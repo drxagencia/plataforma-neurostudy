@@ -132,6 +132,12 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
       
       setMessages(prev => [...prev, aiMsg]);
       await updateBalanceLocally();
+      
+      // Award XP for interaction
+      if (auth.currentUser) {
+          await DatabaseService.processXpAction(auth.currentUser.uid, 'AI_CHAT_MESSAGE');
+      }
+
     } catch (error: any) {
       if (error.message.includes('402')) {
           triggerNotification('error', 'Seu saldo acabou durante a requisição.');
@@ -388,7 +394,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                                       </span>
                                   </div>
                                   <div className="flex justify-between items-center text-[10px] text-slate-500">
-                                      <span>{new Date(t.timestamp).toLocaleDateString()} {new Date(t.timestamp).toLocaleTimeString()}</span>
+                                      <span>{new Date(t.timestamp).toLocaleDateString()}</p>
                                   </div>
                               </div>
                           ))}

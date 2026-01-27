@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { Subject, Lesson, View, UserProfile } from '../types';
 import * as Icons from 'lucide-react';
-import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, ExternalLink, Clock, MonitorPlay, GraduationCap, CheckCircle, BrainCircuit, X, MessageCircle, Target, ArrowRight } from 'lucide-react';
+import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, ExternalLink, Clock, MonitorPlay, GraduationCap, CheckCircle, BrainCircuit, X, MessageCircle, Target, ArrowRight, Zap, Network, BarChart, FileType } from 'lucide-react';
 import { AiService } from '../services/aiService';
 import { auth } from '../services/firebaseConfig';
 
@@ -35,6 +35,44 @@ const VideoPlayer = React.memo(({ videoId, title }: { videoId: string, title: st
     );
 });
 
+// --- HELPER: Rich Markdown Renderer for Tutor ---
+const TutorMarkdown: React.FC<{ text: string }> = ({ text }) => {
+    if (!text) return null;
+    return (
+        <div className="space-y-4 text-slate-300 leading-relaxed font-light text-sm md:text-base">
+            {text.split('\n').map((line, i) => {
+                // Header detection
+                if (line.trim().startsWith('###')) return <h4 key={i} className="text-lg font-bold text-indigo-300 mt-6 mb-2 border-b border-indigo-500/30 pb-1">{line.replace(/###/g, '').trim()}</h4>;
+                if (line.trim().startsWith('##')) return <h3 key={i} className="text-xl font-bold text-white mt-8 mb-3 flex items-center gap-2"><Zap size={18} className="text-yellow-400"/> {line.replace(/##/g, '').trim()}</h3>;
+                
+                // List items (Mind map style)
+                if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+                    const depth = line.search(/\S/) / 2;
+                    return (
+                        <div key={i} className="flex gap-2 ml-2" style={{ paddingLeft: `${depth * 10}px` }}>
+                            <span className="text-emerald-400 mt-1.5">•</span>
+                            <p className="flex-1">
+                                {line.replace(/^[-*]\s+/, '').split(/(\*\*.*?\*\*)/g).map((part, j) => 
+                                    part.startsWith('**') ? <strong key={j} className="text-white font-semibold">{part.slice(2, -2)}</strong> : part
+                                )}
+                            </p>
+                        </div>
+                    );
+                }
+                
+                // Standard text
+                return (
+                    <p key={i} className="min-h-[10px]">
+                        {line.split(/(\*\*.*?\*\*)/g).map((part, j) => 
+                            part.startsWith('**') ? <strong key={j} className="text-indigo-200 font-semibold bg-indigo-900/20 px-1 rounded">{part.slice(2, -2)}</strong> : part
+                        )}
+                    </p>
+                );
+            })}
+        </div>
+    );
+};
+
 interface ClassesProps {
     onNavigate: (view: View) => void;
     user: UserProfile;
@@ -54,16 +92,16 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
   const [topicsWithLessons, setTopicsWithLessons] = useState<Record<string, Lesson[]>>({});
   const [loadingContent, setLoadingContent] = useState(false);
 
-  // AI Summary Modal State
+  // AI Summary Modal State (Legacy - kept for "Concluir Aula" flow)
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Chat Bubble State (Contextual Help)
-  const [showChat, setShowChat] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [chatResponse, setChatResponse] = useState<string | null>(null);
-  const [chatLoading, setChatLoading] = useState(false);
+  // --- ULTRA NEURO TUTOR STATE ---
+  const [showSmartPanel, setShowSmartPanel] = useState(false);
+  const [tutorInput, setTutorInput] = useState('');
+  const [tutorHistory, setTutorHistory] = useState<{role: 'user' | 'ai', content: string}[]>([]);
+  const [tutorLoading, setTutorLoading] = useState(false);
 
   useEffect(() => {
     const fetchAndFilterSubjects = async () => {
@@ -94,16 +132,15 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
 
   const handleLessonClick = (lesson: Lesson) => {
       if (lesson.type === 'exercise_block' && lesson.exerciseFilters) {
-          // It's a Block, Redirect to Question Bank
           sessionStorage.setItem('qb_filters', JSON.stringify(lesson.exerciseFilters));
           onNavigate('questoes');
       } else {
           setSelectedLesson(lesson);
           setShowAiModal(false);
           setAiSummary(null);
-          setShowChat(false);
-          setChatResponse(null);
-          // Scroll to top when selecting a lesson
+          // Reset Tutor on new lesson
+          setShowSmartPanel(false);
+          setTutorHistory([]);
           window.scrollTo({ top: 0, behavior: 'smooth' });
       }
   };
@@ -124,47 +161,93 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
 
   const handleFinishLesson = () => {
       setShowAiModal(true);
-      // Optional: Add XP here for finishing video
+      if (auth.currentUser) {
+          DatabaseService.processXpAction(auth.currentUser.uid, 'LESSON_WATCHED');
+      }
   };
 
   const generateSummary = async () => {
       if (!selectedLesson) return;
       if (user.balance < 0.05) {
-          alert("Saldo insuficiente para gerar resumo. Recarregue no menu do NeuroAI.");
+          alert("Saldo insuficiente. Recarregue no menu.");
           return;
       }
 
       setAiLoading(true);
       try {
-          const prompt = `O aluno acabou de assistir à aula "${selectedLesson.title}" do tópico "${selectedTopic}". Gere um resumo conciso de 3 tópicos principais que ele deve ter aprendido.`;
-          const text = await AiService.sendMessage(prompt, []);
+          const prompt = `Resumo da aula "${selectedLesson.title}".`;
+          const text = await AiService.sendMessage(prompt, []); // Legacy simple call
           setAiSummary(text);
           await updateBalanceLocally();
       } catch (e) {
-          setAiSummary("Não foi possível gerar o resumo. Verifique seus créditos.");
+          setAiSummary("Erro ao gerar resumo.");
       } finally {
           setAiLoading(false);
       }
   };
 
-  const handleContextualHelp = async () => {
-      if (!chatInput.trim() || !selectedLesson) return;
-      if (user.balance < 0.03) {
-          alert("Saldo insuficiente para consultar o tutor.");
+  // --- ULTRA TUTOR LOGIC ---
+  const handleTutorAction = async (actionType: 'summary' | 'mindmap' | 'graph' | 'custom') => {
+      if (!selectedLesson) return;
+      if (user.balance < 0.05) {
+          alert("Saldo insuficiente para utilizar o NeuroTutor Avançado.");
           return;
       }
 
-      setChatLoading(true);
+      setTutorLoading(true);
+      
+      // Context Engineering
+      let systemPrompt = "";
+      let userQuery = "";
+
+      const contextHeader = `[CONTEXTO DA AULA]\nTítulo: ${selectedLesson.title}\nTópico: ${selectedTopic}\nMatéria: ${selectedSubject?.name}`;
+
+      if (actionType === 'mindmap') {
+          userQuery = "Crie um MAPA MENTAL esquematizado desta aula.";
+          systemPrompt = `${contextHeader}\n\nVocê é um especialista em Aprendizagem Acelerada. Crie um mapa mental usando Markdown (listas com indentação - ou *). Use EMOJIS para categorizar. Seja hierárquico e visual.`;
+      } else if (actionType === 'graph') {
+          userQuery = "Desenhe/Explique os GRÁFICOS ou ESQUEMAS visuais importantes deste conceito.";
+          systemPrompt = `${contextHeader}\n\nSe a matéria envolve exatas, descreva detalhadamente os eixos, comportamento da curva e desenhe usando arte ASCII ou Markdown code blocks se possível. Se for humanas, faça um esquema de causa/consequência. Foco no ENEM.`;
+      } else if (actionType === 'summary') {
+          userQuery = "Gere um RESUMO DE ALTA PERFORMANCE focado no ENEM.";
+          systemPrompt = `${contextHeader}\n\nVocê é um Professor Sênior de Cursinho. Crie um resumo 'direto ao ponto'. Use negrito para conceitos chave. Liste 'O que cai no ENEM' no final.`;
+      } else {
+          userQuery = tutorInput;
+          systemPrompt = `${contextHeader}\n\nResponda como um Tutor de Elite. Seja detalhista, use exemplos, analogias e formatação rica.`;
+      }
+
+      // Add user message to history optimistically
+      const newUserMsg = { role: 'user' as const, content: userQuery };
+      const newHistory = [...tutorHistory, newUserMsg];
+      setTutorHistory(newHistory);
+      setTutorInput('');
+
       try {
-          // Provide context about the current lesson
-          const fullPrompt = `[Contexto: Aula ${selectedLesson.title} de ${selectedTopic}] Aluno pergunta: ${chatInput}`;
-          const text = await AiService.sendMessage(fullPrompt, []);
-          setChatResponse(text);
+          // Call Backend with special override
+          const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  message: userQuery,
+                  history: tutorHistory, // Pass previous context
+                  uid: auth.currentUser?.uid,
+                  systemOverride: systemPrompt, // Force specific persona
+                  mode: 'lesson_tutor' // Trigger specific pricing/logging if needed
+              }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error);
+
+          setTutorHistory(prev => [...prev, { role: 'ai', content: data.text }]);
           await updateBalanceLocally();
-      } catch (e) {
-          setChatResponse("Erro ao consultar o tutor.");
+          
+          if(auth.currentUser) DatabaseService.processXpAction(auth.currentUser.uid, 'AI_CHAT_MESSAGE');
+
+      } catch (e: any) {
+          setTutorHistory(prev => [...prev, { role: 'ai', content: "Erro de conexão com o NeuroTutor." }]);
       } finally {
-          setChatLoading(false);
+          setTutorLoading(false);
       }
   };
 
@@ -180,10 +263,109 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
   if (selectedLesson && selectedSubject) {
       const videoId = getYouTubeId(selectedLesson.videoUrl || '');
       const topicLessons = selectedTopic ? topicsWithLessons[selectedTopic] : [];
+      // Note: topicLessons is already sorted by DatabaseService.getLessonsByTopic
 
       return (
-          <div className="space-y-6 animate-in slide-in-from-right max-w-[1600px] mx-auto relative">
-              {/* AI Summary Modal */}
+          <div className="space-y-6 animate-in slide-in-from-right max-w-[1600px] mx-auto relative pb-20">
+              
+              {/* --- ULTRA NEURO TUTOR PANEL (DRAWER) --- */}
+              <div className={`fixed inset-y-0 right-0 w-full md:w-[600px] bg-slate-950/95 backdrop-blur-2xl border-l border-indigo-500/30 shadow-[0_0_100px_rgba(79,70,229,0.3)] z-[100] transform transition-transform duration-500 ease-in-out flex flex-col ${showSmartPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+                  {/* Panel Background FX */}
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent pointer-events-none" />
+                  
+                  {/* Header */}
+                  <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50">
+                      <div>
+                          <h3 className="text-2xl font-black text-white flex items-center gap-2">
+                              <BrainCircuit className="text-indigo-400" /> NeuroTutor <span className="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded font-bold uppercase">Pro</span>
+                          </h3>
+                          <p className="text-slate-400 text-xs mt-1">Inteligência Artificial contextualizada na sua aula.</p>
+                      </div>
+                      <button onClick={() => setShowSmartPanel(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-slate-400 hover:text-white">
+                          <X size={24} />
+                      </button>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="p-4 grid grid-cols-3 gap-2 border-b border-white/5 bg-slate-900/30">
+                      <button 
+                        onClick={() => handleTutorAction('mindmap')}
+                        disabled={tutorLoading}
+                        className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-800 hover:bg-indigo-600/20 border border-white/5 hover:border-indigo-500/50 transition-all group"
+                      >
+                          <Network size={20} className="mb-2 text-indigo-400 group-hover:text-white" />
+                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Mapa Mental</span>
+                      </button>
+                      <button 
+                        onClick={() => handleTutorAction('summary')}
+                        disabled={tutorLoading}
+                        className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-800 hover:bg-emerald-600/20 border border-white/5 hover:border-emerald-500/50 transition-all group"
+                      >
+                          <FileType size={20} className="mb-2 text-emerald-400 group-hover:text-white" />
+                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Resumo Top</span>
+                      </button>
+                      <button 
+                        onClick={() => handleTutorAction('graph')}
+                        disabled={tutorLoading}
+                        className="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-800 hover:bg-purple-600/20 border border-white/5 hover:border-purple-500/50 transition-all group"
+                      >
+                          <BarChart size={20} className="mb-2 text-purple-400 group-hover:text-white" />
+                          <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Gráficos</span>
+                      </button>
+                  </div>
+
+                  {/* Chat Area */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-slate-950/50">
+                      {tutorHistory.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-full text-slate-500 opacity-60">
+                              <BrainCircuit size={64} className="mb-4 stroke-1" />
+                              <p className="text-center max-w-xs">Estou pronto para analisar a aula "{selectedLesson.title}" com você. Escolha uma ação rápida acima ou digite sua dúvida.</p>
+                          </div>
+                      ) : (
+                          tutorHistory.map((msg, idx) => (
+                              <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                  <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${msg.role === 'ai' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                                      {msg.role === 'ai' ? <BrainCircuit size={16}/> : <div className="text-xs font-bold">VC</div>}
+                                  </div>
+                                  <div className={`p-4 rounded-2xl max-w-[85%] text-sm ${msg.role === 'ai' ? 'bg-slate-900 border border-white/10' : 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-100'}`}>
+                                      {msg.role === 'ai' ? <TutorMarkdown text={msg.content} /> : msg.content}
+                                  </div>
+                              </div>
+                          ))
+                      )}
+                      {tutorLoading && (
+                          <div className="flex gap-4 animate-pulse">
+                              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
+                                  <Loader2 className="animate-spin text-white" size={16}/>
+                              </div>
+                              <div className="p-4 rounded-2xl bg-slate-900 border border-white/10 w-3/4 h-24"></div>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* Input Area */}
+                  <div className="p-4 border-t border-white/10 bg-slate-900">
+                      <div className="relative">
+                          <input 
+                            value={tutorInput}
+                            onChange={(e) => setTutorInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleTutorAction('custom')}
+                            placeholder="Pergunte algo específico sobre a aula..."
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-4 pl-4 pr-12 text-white focus:border-indigo-500 focus:outline-none transition-colors"
+                          />
+                          <button 
+                            onClick={() => handleTutorAction('custom')}
+                            disabled={!tutorInput.trim() || tutorLoading}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors disabled:opacity-50"
+                          >
+                              <ArrowRight size={18} />
+                          </button>
+                      </div>
+                      <p className="text-center text-[10px] text-slate-500 mt-2">NeuroTutor tem acesso total ao contexto desta aula.</p>
+                  </div>
+              </div>
+
+              {/* Legacy AI Summary Modal (Only for 'Finish Lesson') */}
               {showAiModal && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
                       <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-8 max-w-lg w-full relative shadow-2xl">
@@ -208,13 +390,10 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                           <span className="text-xs">Gerar Resumo IA</span>
                                       </button>
                                   </div>
-                                  <p className="text-center text-[10px] uppercase tracking-wider font-bold text-indigo-400/80 animate-pulse">
-                                      Custo Estimado: ~R$ 0,05
-                                  </p>
                               </div>
                           ) : (
                               <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 animate-in slide-in-from-bottom-2">
-                                  <h4 className="text-indigo-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit size={16}/> Resumo do NeuroAI</h4>
+                                  <h4 className="text-indigo-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit size={16}/> Resumo Rápido</h4>
                                   <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
                                   <button onClick={() => setShowAiModal(false)} className="mt-4 w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold">
                                       Fechar
@@ -236,7 +415,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                   {/* Left Column: Video & Details */}
                   <div className="xl:col-span-2 space-y-6">
                       
-                      {/* Video Container with Contextual Help Button */}
+                      {/* Video Container */}
                       <div className="relative">
                         {videoId ? (
                             <VideoPlayer videoId={videoId} title={selectedLesson.title} />
@@ -246,55 +425,11 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                 <p className="text-lg font-medium">Vídeo indisponível ou link inválido.</p>
                             </div>
                         )}
-                        
-                        {/* Contextual AI Help FAB */}
-                        <div className="absolute -bottom-6 right-6 z-20">
-                            <button 
-                                onClick={() => setShowChat(!showChat)}
-                                className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-900/40 transition-all hover:scale-105 font-bold"
-                            >
-                                <MessageCircle size={20} />
-                                {showChat ? 'Fechar Tutor' : 'Dúvida na Aula?'}
-                            </button>
-                        </div>
                       </div>
                       
-                      {/* Contextual Chat Box */}
-                      {showChat && (
-                          <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2">
-                              <div className="flex justify-between items-start mb-2">
-                                  <h4 className="font-bold text-white flex items-center gap-2"><BrainCircuit size={18} className="text-indigo-400"/> Tutor da Aula</h4>
-                                  <span className="text-[10px] uppercase tracking-wider font-bold text-indigo-400/80">
-                                      Custo: ~R$ 0,05 / envio
-                                  </span>
-                              </div>
-                              
-                              {chatResponse && (
-                                  <div className="bg-slate-800/50 p-3 rounded-xl mb-3 text-sm text-slate-300 border border-white/5">
-                                      {chatResponse}
-                                  </div>
-                              )}
-
-                              <div className="flex gap-2">
-                                  <input 
-                                    className="flex-1 glass-input p-2 rounded-lg text-sm"
-                                    placeholder="O que você não entendeu nesta aula?"
-                                    value={chatInput}
-                                    onChange={e => setChatInput(e.target.value)}
-                                  />
-                                  <button 
-                                    onClick={handleContextualHelp}
-                                    disabled={chatLoading || !chatInput}
-                                    className="p-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white disabled:opacity-50"
-                                  >
-                                      {chatLoading ? <Loader2 className="animate-spin" size={18}/> : <ArrowRight size={18}/>}
-                                  </button>
-                              </div>
-                          </div>
-                      )}
-
-                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-white/5 mt-8">
-                        <div className="space-y-2">
+                      {/* ACTION BAR: Title + Actions */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5 mt-4">
+                        <div className="space-y-2 flex-1">
                             <h2 className="text-3xl font-bold text-white tracking-tight leading-tight">{selectedLesson.title}</h2>
                             <div className="flex flex-wrap items-center gap-3 text-sm">
                                 <span className="text-indigo-400 font-bold bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">{selectedSubject.name}</span>
@@ -307,12 +442,22 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                 </div>
                             </div>
                         </div>
-                        <button 
-                            onClick={handleFinishLesson}
-                            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2"
-                        >
-                            <CheckCircle size={20} /> Concluir Aula
-                        </button>
+
+                        {/* PRIMARY ACTIONS: Finish & Question */}
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => setShowSmartPanel(true)}
+                                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-900/20 transition-all flex items-center gap-2 border border-indigo-400/20 hover:scale-105"
+                            >
+                                <MessageCircle size={20} /> Dúvida na Aula?
+                            </button>
+                            <button 
+                                onClick={handleFinishLesson}
+                                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20 transition-all flex items-center gap-2 hover:scale-105"
+                            >
+                                <CheckCircle size={20} /> Concluir Aula
+                            </button>
+                        </div>
                       </div>
 
                       {/* Materials Section */}

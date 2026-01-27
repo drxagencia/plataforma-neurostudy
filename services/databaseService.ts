@@ -19,6 +19,10 @@ const CACHE: {
     aiConfig: null
 };
 
+// --- XP EVENT SYSTEM ---
+type XpCallback = (amount: number, reason: string) => void;
+let xpListeners: XpCallback[] = [];
+
 export const DatabaseService = {
   // --- GENERIC HELPERS FOR ADMIN ---
   updatePath: async (path: string, data: any): Promise<void> => {
@@ -150,6 +154,14 @@ export const DatabaseService = {
       await update(ref(database), updates);
   },
 
+  // Subscribe to XP events for UI Toast
+  onXpEarned: (callback: XpCallback) => {
+      xpListeners.push(callback);
+      return () => {
+          xpListeners = xpListeners.filter(cb => cb !== callback);
+      };
+  },
+
   // Centralized XP Logic
   processXpAction: async (uid: string, actionType: keyof typeof XP_VALUES, customAmount?: number): Promise<number> => {
       const userRef = ref(database, `users/${uid}`);
@@ -206,6 +218,9 @@ export const DatabaseService = {
 
           // Sync Leaderboard if XP changed
           if (earnedXp > 0) {
+              // Trigger UI Notification
+              xpListeners.forEach(cb => cb(earnedXp, actionType));
+
               // We need the new XP value, fetch it again or optimistically calc (fetch safer)
               const snap = await get(child(userRef, 'xp'));
               const newTotal = snap.val();
@@ -593,6 +608,24 @@ export const DatabaseService = {
     return [];
   },
 
+  // Fetch questions from multiple subtopics in parallel (Updated)
+  getQuestionsFromSubtopics: async (category: string, subjectId: string, topic: string, subtopics: string[]): Promise<Question[]> => {
+      if (!subtopics || subtopics.length === 0) return [];
+      
+      try {
+          const promises = subtopics.map(sub => 
+              DatabaseService.getQuestions(category, subjectId, topic, sub)
+          );
+          
+          const results = await Promise.all(promises);
+          // Flatten array
+          return results.flat();
+      } catch (e) {
+          console.error("Error fetching multi-subtopic questions", e);
+          return [];
+      }
+  },
+
   getQuestionsByPath: async (category: string, subjectId: string, topic: string): Promise<(Question & { path: string, subtopic: string })[]> => {
      try {
          const root = category ? `questions/${category}` : `questions/regular`;
@@ -691,11 +724,17 @@ export const DatabaseService = {
               const normalized: Record<string, Lesson[]> = {};
               Object.keys(data).forEach(topic => {
                   const val = data[topic];
+                  let lessonsList: Lesson[] = [];
                   if (Array.isArray(val)) {
-                      normalized[topic] = val;
+                      lessonsList = val;
                   } else {
-                      normalized[topic] = Object.keys(val).map(k => ({...val[k], id: k}));
+                      lessonsList = Object.keys(val).map(k => ({...val[k], id: k}));
                   }
+                  
+                  // Sort by Order
+                  lessonsList.sort((a, b) => (a.order || 0) - (b.order || 0));
+                  
+                  normalized[topic] = lessonsList;
               });
               return normalized;
           }
@@ -713,11 +752,95 @@ export const DatabaseService = {
     try {
       const lessonsRef = ref(database, `lessons/${subjectId}/${topic}`);
       const newRef = push(lessonsRef);
+      // Ensure order is set if not present (simple append)
+      // Note: This relies on manual order setting or default 0.
       await set(newRef, lesson);
     } catch (error) {
       console.error("Error creating lesson:", error);
       throw error;
     }
+  },
+
+  // NEW: Insert lesson at specific position and shift others
+  createLessonWithOrder: async (subjectId: string, topic: string, lesson: Lesson, targetIndex: number): Promise<void> => {
+      try {
+          const topicRef = ref(database, `lessons/${subjectId}/${topic}`);
+          
+          await runTransaction(topicRef, (currentLessons) => {
+              // Convert object to array if needed
+              let lessonsArray: (Lesson & {key?: string})[] = [];
+              if (currentLessons) {
+                  if (Array.isArray(currentLessons)) {
+                      lessonsArray = currentLessons;
+                  } else {
+                      lessonsArray = Object.keys(currentLessons).map(k => ({...currentLessons[k], key: k}));
+                  }
+              }
+
+              // Sort current list by existing order
+              lessonsArray.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+              // If targetIndex is -1 or greater than length, append to end
+              const insertIdx = (targetIndex === -1 || targetIndex > lessonsArray.length) 
+                                ? lessonsArray.length 
+                                : targetIndex;
+
+              // Insert new lesson (we assign a temporary key or handle it after transaction, 
+              // but transaction needs the full object structure. 
+              // Simplest for Realtime DB is to manage order field on all items)
+              
+              // We need to shift order for items >= insertIdx
+              const updatedMap: Record<string, Lesson> = {};
+              
+              // Add existing items up to insertIdx
+              let currentOrder = 0;
+              
+              // This is a bit tricky inside transaction because we need to generate a key for the new item 
+              // but push() works outside. 
+              // Workaround: We fetch, modify locally, and set via update outside, OR use transaction purely on the list.
+              // Since RealtimeDB returns the value to be set...
+              
+              // Let's rely on `createLesson` + manual update logic which is safer than complex transaction here
+              return; // Abort transaction, we will do manual update below
+          });
+
+          // MANUAL ORDER UPDATE APPROACH (Safer for large lists)
+          const snapshot = await get(topicRef);
+          let lessonsList: {id: string, data: Lesson}[] = [];
+          
+          if (snapshot.exists()) {
+              const val = snapshot.val();
+              lessonsList = Object.keys(val).map(k => ({id: k, data: val[k]}));
+              lessonsList.sort((a, b) => (a.data.order || 0) - (b.data.order || 0));
+          }
+
+          const insertIdx = (targetIndex === -1 || targetIndex > lessonsList.length) 
+                            ? lessonsList.length 
+                            : targetIndex;
+
+          // 1. Create New Lesson
+          const newRef = push(topicRef);
+          const newId = newRef.key!;
+          
+          // 2. Prepare Updates
+          const updates: Record<string, any> = {};
+          
+          // Add new lesson at determined order
+          updates[`${newId}`] = { ...lesson, order: insertIdx };
+
+          // Shift subsequent lessons
+          for (let i = insertIdx; i < lessonsList.length; i++) {
+              const item = lessonsList[i];
+              updates[`${item.id}/order`] = i + 1;
+          }
+
+          // 3. Execute Batch Update
+          await update(topicRef, updates);
+
+      } catch (error) {
+          console.error("Error creating lesson with order:", error);
+          throw error;
+      }
   },
 
   // --- Community ---

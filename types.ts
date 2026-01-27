@@ -114,12 +114,14 @@ export interface Lesson {
   duration?: string;
   subjectId?: string; 
   topic?: string;
+  order?: number; // For manual ordering in playlist
   materials?: LessonMaterial[];
   // Filters for exercise blocks
   exerciseFilters?: {
       category: string;
       subject: string;
       topic: string;
+      subtopics?: string[]; // Multiple subtopics support
   }
 }
 
