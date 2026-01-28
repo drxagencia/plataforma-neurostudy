@@ -16,7 +16,7 @@ import Militares from './components/Militares';
 import AccessDenied from './components/AccessDenied'; 
 import FullScreenPrompt from './components/FullScreenPrompt'; 
 import RankUpOverlay from './components/RankUpOverlay'; 
-import LandingPage from './components/LandingPage'; // Import Landing Page
+import LandingPage from './components/LandingPage'; 
 import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
@@ -80,8 +80,14 @@ const XpToast = () => {
 };
 
 const App: React.FC = () => {
-  // Check URL immediately for LP
-  const [showLanding, setShowLanding] = useState(window.location.pathname.endsWith('/lp'));
+  // ROBUST ROUTING CHECK: Support Path (/lp), Hash (#lp), or Query (?lp)
+  // This prevents 404s on servers that don't handle clean URL rewrites correctly.
+  const [showLanding, setShowLanding] = useState(() => {
+      const p = window.location.pathname;
+      const h = window.location.hash;
+      const s = window.location.search;
+      return p.endsWith('/lp') || h === '#lp' || s === '?lp' || s.includes('page=lp');
+  });
   
   const [user, setUser] = useState<UserProfile | null>(null); 
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -103,7 +109,7 @@ const App: React.FC = () => {
   // Theme Application Logic
   useEffect(() => {
       const root = document.documentElement;
-      // Force Dark Mode always for now, regardless of user preference
+      // Force Dark Mode always for now
       root.classList.remove('light');
       root.classList.add('dark');
   }, [user?.theme]);
@@ -181,8 +187,19 @@ const App: React.FC = () => {
   };
 
   const handleStartGame = () => {
-      // Remove /lp from URL visually without reloading
-      window.history.pushState({}, '', '/');
+      // Clean URL logic: Remove /lp, #lp, ?lp triggers visually without reloading
+      try {
+          const url = new URL(window.location.href);
+          if (url.pathname.endsWith('/lp')) url.pathname = '/';
+          if (url.hash === '#lp') url.hash = '';
+          if (url.searchParams.has('lp')) url.searchParams.delete('lp');
+          
+          window.history.pushState({}, '', url.toString());
+      } catch (e) {
+          // Fallback for older browsers
+          window.history.pushState({}, '', '/');
+      }
+      
       setShowLanding(false);
   };
 
