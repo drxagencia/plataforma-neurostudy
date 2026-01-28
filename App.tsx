@@ -15,7 +15,8 @@ import Redacao from './components/Redacao';
 import Militares from './components/Militares';
 import AccessDenied from './components/AccessDenied'; 
 import FullScreenPrompt from './components/FullScreenPrompt'; 
-import RankUpOverlay from './components/RankUpOverlay'; // Imported
+import RankUpOverlay from './components/RankUpOverlay'; 
+import LandingPage from './components/LandingPage'; // Import Landing Page
 import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
@@ -79,6 +80,9 @@ const XpToast = () => {
 };
 
 const App: React.FC = () => {
+  // Check URL immediately for LP
+  const [showLanding, setShowLanding] = useState(window.location.pathname.endsWith('/lp'));
+  
   const [user, setUser] = useState<UserProfile | null>(null); 
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -102,15 +106,6 @@ const App: React.FC = () => {
       // Force Dark Mode always for now, regardless of user preference
       root.classList.remove('light');
       root.classList.add('dark');
-      
-      /* 
-      // DISABLED WHITE MODE TEMPORARILY
-      if (user && user.theme === 'light') {
-          root.classList.add('light');
-      } else {
-          root.classList.add('dark');
-      }
-      */
   }, [user?.theme]);
 
   // Auth Persistence & DB Structure Enforcement
@@ -185,6 +180,12 @@ const App: React.FC = () => {
     setCurrentView('dashboard');
   };
 
+  const handleStartGame = () => {
+      // Remove /lp from URL visually without reloading
+      window.history.pushState({}, '', '/');
+      setShowLanding(false);
+  };
+
   const checkAccess = (view: View): boolean => {
     if (!user) return false;
     if (user.isAdmin || user.plan === 'admin' || user.plan === 'advanced') return true;
@@ -203,6 +204,12 @@ const App: React.FC = () => {
       setUser(updatedUser);
   };
 
+  // --- LANDING PAGE RENDER ---
+  if (showLanding) {
+      return <LandingPage onStartGame={handleStartGame} />;
+  }
+
+  // --- APP RENDER ---
   if (loadingAuth) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -216,7 +223,6 @@ const App: React.FC = () => {
   }
 
   return (
-    // REMOVED bg-slate-950 here to allow body background to show
     <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       
       <FullScreenPrompt /> 
