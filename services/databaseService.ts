@@ -46,6 +46,22 @@ export const DatabaseService = {
   },
 
   // --- LEADS & LANDING PAGE INTEGRATION ---
+  createLead: async (leadData: Omit<Lead, 'id' | 'processed' | 'status'>): Promise<void> => {
+      try {
+          const leadsRef = ref(database, 'leads');
+          const newLeadRef = push(leadsRef);
+          await set(newLeadRef, {
+              ...leadData,
+              status: 'pending_pix',
+              processed: false,
+              timestamp: new Date().toISOString()
+          });
+      } catch (e) {
+          console.error("Error creating lead", e);
+          throw e;
+      }
+  },
+
   getLeads: async (): Promise<Lead[]> => {
       try {
           const snapshot = await get(ref(database, 'leads'));
