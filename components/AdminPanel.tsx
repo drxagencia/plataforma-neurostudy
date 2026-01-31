@@ -558,7 +558,11 @@ const AdminPanel: React.FC = () => {
               
               alert("Aula criada com sucesso!");
               setMaterials([]);
-              // Refresh dropdown list
+              
+              // Force refresh of topics/config to ensure the new topic appears in the dropdowns immediately
+              await fetchConfigData();
+
+              // Refresh dropdown list for ordering
               DatabaseService.getLessonsByTopic(contentForm.subjectId).then(res => {
                   const flattened: {lesson: Lesson, topic: string}[] = [];
                   Object.entries(res).forEach(([topic, lessons]) => {

@@ -733,6 +733,17 @@ export const DatabaseService = {
       const newRef = push(lessonsRef);
       const cleanLesson = JSON.parse(JSON.stringify(lesson));
       await set(newRef, cleanLesson);
+
+      // Register Topic to ensure visibility in Admin Panel
+      const topicsRef = ref(database, `topics/${subjectId}`);
+      const topicsSnap = await get(topicsRef);
+      let currentTopics: string[] = [];
+      if (topicsSnap.exists()) currentTopics = topicsSnap.val();
+      if (!currentTopics.includes(topic)) {
+          currentTopics.push(topic);
+          await set(topicsRef, currentTopics);
+          LocalCache.clear('topics');
+      }
     } catch (error) {
       throw error;
     }
@@ -765,6 +776,17 @@ export const DatabaseService = {
               updates[`${item.id}/order`] = i + 1;
           }
           await update(topicRef, updates);
+
+          // Register Topic to ensure visibility in Admin Panel
+          const topicsRef = ref(database, `topics/${subjectId}`);
+          const topicsSnap = await get(topicsRef);
+          let currentTopics: string[] = [];
+          if (topicsSnap.exists()) currentTopics = topicsSnap.val();
+          if (!currentTopics.includes(topic)) {
+              currentTopics.push(topic);
+              await set(topicsRef, currentTopics);
+              LocalCache.clear('topics');
+          }
       } catch (error) {
           throw error;
       }
