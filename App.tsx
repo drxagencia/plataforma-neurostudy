@@ -65,7 +65,7 @@ const XpToast = () => {
     if (!xpNotification) return null;
 
     return (
-        <div className={`fixed bottom-6 left-6 z-[100] transition-all duration-500 ease-out transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
+        <div className={`fixed bottom-20 md:bottom-6 left-1/2 md:left-6 -translate-x-1/2 md:translate-x-0 z-[100] transition-all duration-500 ease-out transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
             <div className="bg-slate-950/80 backdrop-blur-md border border-white/5 pr-5 pl-4 py-3 rounded-full shadow-2xl flex items-center gap-3">
                 <div className="bg-yellow-500/10 p-1.5 rounded-full">
                     <Zap className="text-yellow-400 fill-yellow-400" size={14} />
@@ -80,8 +80,7 @@ const XpToast = () => {
 };
 
 const App: React.FC = () => {
-  // ROBUST ROUTING CHECK: Support Path (/lp), Hash (#lp), or Query (?lp)
-  // This prevents 404s on servers that don't handle clean URL rewrites correctly.
+  // ROBUST ROUTING CHECK
   const [showLanding, setShowLanding] = useState(() => {
       const p = window.location.pathname;
       const h = window.location.hash;
@@ -187,19 +186,15 @@ const App: React.FC = () => {
   };
 
   const handleStartGame = () => {
-      // Clean URL logic: Remove /lp, #lp, ?lp triggers visually without reloading
       try {
           const url = new URL(window.location.href);
           if (url.pathname.endsWith('/lp')) url.pathname = '/';
           if (url.hash === '#lp') url.hash = '';
           if (url.searchParams.has('lp')) url.searchParams.delete('lp');
-          
           window.history.pushState({}, '', url.toString());
       } catch (e) {
-          // Fallback for older browsers
           window.history.pushState({}, '', '/');
       }
-      
       setShowLanding(false);
   };
 
@@ -216,7 +211,6 @@ const App: React.FC = () => {
     return true;
   };
 
-  // Helper to update local user state when credits/balance change
   const handleUpdateUser = (updatedUser: UserProfile) => {
       setUser(updatedUser);
   };
@@ -271,7 +265,7 @@ const App: React.FC = () => {
 
       <main 
         className={`flex-1 relative overflow-y-auto overflow-x-hidden transition-all duration-300 z-10 ${
-          isMobile ? 'pb-20 p-4' : 'ml-64 p-8'
+          isMobile ? 'pb-24 p-4' : 'ml-64 p-8'
         }`}
         style={{ height: '100vh' }}
       >

@@ -44,12 +44,12 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
 
   if (isMobile) {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-950/60 backdrop-blur-xl border-t border-white/5 flex justify-around items-center z-50 px-2 pb-safe">
-        {visibleMenuItems.slice(0, 6).map((item) => (
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-950/80 backdrop-blur-xl border-t border-white/5 flex justify-around items-center z-[50] px-2 pb-safe">
+        {visibleMenuItems.slice(0, 5).map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
-            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all active:scale-95 ${
+            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all active:scale-95 flex-1 ${
               currentView === item.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
@@ -59,6 +59,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
             <span className="text-[9px] mt-1 font-medium font-sans">{item.label}</span>
           </button>
         ))}
+        {/* Overflow Menu item if needed, for now limiting to 5 main items for clean UI */}
       </nav>
     );
   }

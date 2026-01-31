@@ -283,7 +283,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const subTopicOptions = selectedTopic ? subtopics[selectedTopic] || [] : [];
 
   return (
-    <div className="h-full flex flex-col relative animate-fade-in pb-20">
+    <div className="h-full flex flex-col relative animate-fade-in">
       
       {/* HEADER & FILTER TOGGLE */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0 relative z-20">
@@ -301,16 +301,19 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
             }`}
         >
             <Filter size={18} />
-            {isFilterOpen ? 'Fechar Filtros' : 'Filtrar Questões'}
+            {isFilterOpen ? 'Fechar' : 'Filtrar'}
         </button>
       </div>
 
-      {/* COMPACT FILTER PANEL (Absolute/Overlay) */}
+      {/* COMPACT FILTER PANEL (Overlay for Mobile/Desktop) */}
       {isFilterOpen && (
-        <div className="absolute top-20 right-0 z-30 w-full md:w-80 bg-slate-900/95 backdrop-blur-xl border border-indigo-500/30 p-6 rounded-2xl shadow-2xl animate-in slide-in-from-top-4">
-            <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Filter size={16}/> Configurar Filtro</h3>
+        <div className="fixed inset-0 z-50 md:absolute md:top-20 md:right-0 md:inset-auto md:w-80 bg-slate-950/95 md:bg-slate-900/95 backdrop-blur-xl border-t md:border border-indigo-500/30 p-6 md:rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 md:slide-in-from-top-4 flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-white font-bold flex items-center gap-2"><Filter size={16}/> Configurar Filtro</h3>
+                <button onClick={() => setIsFilterOpen(false)} className="md:hidden p-2 bg-slate-800 rounded-full"><X size={20}/></button>
+            </div>
             
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 overflow-y-auto">
                 <div>
                     <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Categoria</label>
                     <select
@@ -398,6 +401,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                     O filtro aplica automaticamente.
                 </div>
             </div>
+            
+            <button 
+                onClick={() => setIsFilterOpen(false)}
+                className="mt-6 w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl md:hidden"
+            >
+                Ver Questões
+            </button>
         </div>
       )}
 
@@ -422,7 +432,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                  </div>
 
                  {/* Question Card */}
-                 <div className="glass-card p-8 md:p-10 rounded-3xl border border-white/5 shadow-2xl animate-in fade-in zoom-in-95 duration-300 flex-1 overflow-y-auto custom-scrollbar">
+                 <div className="glass-card p-4 md:p-10 rounded-3xl border border-white/5 shadow-2xl animate-in fade-in zoom-in-95 duration-300 flex-1 overflow-y-auto custom-scrollbar">
                      <div className="mb-8">
                         <SimpleMarkdown text={currentQ.text} />
                         {currentQ.imageUrl && (
@@ -445,7 +455,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                                 if (idx === currentQ.correctAnswer) {
                                     containerClass = "bg-emerald-500/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]";
                                     textClass = "text-emerald-100 font-bold";
-                                } else if (!wasCorrect && idx !== currentQ.correctAnswer) { // Show selection logic if we tracked user choice, for now simple reveal
+                                } else if (!wasCorrect && idx !== currentQ.correctAnswer) { 
                                     containerClass = "bg-slate-900/40 border-slate-800 opacity-50"; 
                                 }
                             } else {
@@ -463,7 +473,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                                     <button
                                         onClick={() => !isAnswered && handleAnswerSubmit(idx)}
                                         disabled={isAnswered || isEliminated}
-                                        className={`flex-1 p-5 rounded-xl border text-left text-lg transition-all relative overflow-hidden ${containerClass} ${isAnswered ? 'cursor-default' : isEliminated ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                        className={`flex-1 p-4 md:p-5 rounded-xl border text-left text-sm md:text-lg transition-all relative overflow-hidden ${containerClass} ${isAnswered ? 'cursor-default' : isEliminated ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                                     >
                                         <div className="flex items-start gap-4">
                                             <div className={`w-8 h-8 rounded-full border flex items-center justify-center font-bold text-sm flex-shrink-0 mt-0.5 ${isAnswered && idx === currentQ.correctAnswer ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 text-slate-400'}`}>
@@ -506,7 +516,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                                  
                                  <div className="relative z-10">
                                      {!aiExplanation ? (
-                                         <div className="flex items-center justify-between">
+                                         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                                              <div>
                                                  <h4 className="text-xl font-bold text-white mb-1">Ficou com dúvida?</h4>
                                                  <p className="text-slate-400 text-sm">O NeuroAI pode explicar detalhadamente este conceito.</p>
@@ -514,7 +524,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                                              <button 
                                                 onClick={handleExplain}
                                                 disabled={isExplaining}
-                                                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all hover:scale-105"
+                                                className="w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all hover:scale-105"
                                              >
                                                  {isExplaining ? <Loader2 className="animate-spin" size={20}/> : <Sparkles size={20}/>}
                                                  Explicar Erro
@@ -549,10 +559,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                         disabled={currentIndex === 0}
                         className="px-6 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-3"
                      >
-                         <ArrowLeft size={20} /> Anterior
+                         <ArrowLeft size={20} /> <span className="hidden md:inline">Anterior</span>
                      </button>
 
-                     <span className="text-slate-500 font-mono text-sm hidden md:block">
+                     <span className="text-slate-500 font-mono text-xs md:text-sm text-center px-2">
                          {selectedTopic || selectedSubject}
                      </span>
                      
@@ -561,12 +571,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                         disabled={currentIndex === questions.length - 1}
                         className="px-8 py-4 bg-white text-slate-950 hover:bg-indigo-50 rounded-2xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-3 shadow-xl"
                      >
-                         Próxima <ArrowRight size={20} />
+                         <span className="hidden md:inline">Próxima</span> <ArrowRight size={20} />
                      </button>
                  </div>
              </div>
           ) : (
-             <div className="flex flex-col items-center justify-center h-full text-slate-500 border-2 border-dashed border-white/5 rounded-3xl bg-slate-900/20">
+             <div className="flex flex-col items-center justify-center h-full text-slate-500 border-2 border-dashed border-white/5 rounded-3xl bg-slate-900/20 p-8">
                  {selectedSubject && selectedTopic ? (
                      <>
                         <Filter size={48} className="mb-4 opacity-30" />
@@ -576,7 +586,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                  ) : (
                      <>
                         <PlayCircle size={64} className="mb-6 opacity-30 text-indigo-500" />
-                        <h3 className="text-2xl font-bold text-white mb-2">Comece a Praticar</h3>
+                        <h3 className="text-2xl font-bold text-white mb-2 text-center">Comece a Praticar</h3>
                         <p className="max-w-sm text-center mb-8">Selecione uma matéria e um assunto no filtro acima para carregar as questões.</p>
                         <button onClick={() => setIsFilterOpen(true)} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-colors">
                             Abrir Filtros

@@ -4,19 +4,41 @@ import { database } from "./firebaseConfig";
 import { Announcement, Subject, CommunityPost, Simulation, UserProfile, Question, Lesson, RechargeRequest, Transaction, AiConfig, UserPlan, SimulationResult, EssayCorrection, Lead } from "../types";
 import { XP_VALUES } from "../constants";
 
-// --- MEMORY CACHE TO PREVENT REDUNDANT DOWNLOADS ---
-const CACHE: {
-    subjects: Subject[] | null;
-    topics: Record<string, string[]> | null;
-    subtopics: Record<string, string[]> | null;
-    announcements: Announcement[] | null;
-    aiConfig: AiConfig | null;
-} = {
-    subjects: null,
-    topics: null,
-    subtopics: null,
-    announcements: null,
-    aiConfig: null
+// --- CACHE SYSTEM (LOCAL STORAGE + MEMORY) ---
+const CACHE_TTL = 60 * 60 * 1000; // 1 Hour Cache Validity
+
+const LocalCache = {
+    get: <T>(key: string): T | null => {
+        try {
+            const itemStr = localStorage.getItem(`neuro_cache_${key}`);
+            if (!itemStr) return null;
+            
+            const item = JSON.parse(itemStr);
+            const now = Date.now();
+            
+            if (now > item.expiry) {
+                localStorage.removeItem(`neuro_cache_${key}`);
+                return null;
+            }
+            return item.value;
+        } catch (e) {
+            return null;
+        }
+    },
+    set: (key: string, value: any) => {
+        try {
+            const item = {
+                value: value,
+                expiry: Date.now() + CACHE_TTL,
+            };
+            localStorage.setItem(`neuro_cache_${key}`, JSON.stringify(item));
+        } catch (e) {
+            console.warn("Local storage full or disabled");
+        }
+    },
+    clear: (key: string) => {
+        localStorage.removeItem(`neuro_cache_${key}`);
+    }
 };
 
 // --- XP EVENT SYSTEM ---
@@ -27,7 +49,6 @@ export const DatabaseService = {
   // --- GENERIC HELPERS FOR ADMIN ---
   updatePath: async (path: string, data: any): Promise<void> => {
       try {
-          // Remove undefined values from data
           const cleanData = JSON.parse(JSON.stringify(data));
           await update(ref(database, path), cleanData);
       } catch (e) {
@@ -45,7 +66,7 @@ export const DatabaseService = {
       }
   },
 
-  // --- LEADS & LANDING PAGE INTEGRATION ---
+  // --- LEADS ---
   createLead: async (leadData: Omit<Lead, 'id' | 'processed' | 'status'>): Promise<void> => {
       try {
           const leadsRef = ref(database, 'leads');
@@ -64,10 +85,10 @@ export const DatabaseService = {
 
   getLeads: async (): Promise<Lead[]> => {
       try {
+          // Admin only, no caching needed usually, or short cache
           const snapshot = await get(ref(database, 'leads'));
           if (snapshot.exists()) {
               const data = snapshot.val();
-              // Convert object to array and sort by timestamp desc
               return Object.keys(data)
                 .map(key => ({ ...data[key], id: key }))
                 .sort((a, b) => {
@@ -78,7 +99,6 @@ export const DatabaseService = {
           }
           return [];
       } catch (e) {
-          console.error("Error fetching leads", e);
           return [];
       }
   },
@@ -94,11 +114,10 @@ export const DatabaseService = {
       }
   },
 
-  // --- User Profile & XP ---
+  // --- User Profile ---
   getUserProfile: async (uid: string): Promise<UserProfile | null> => {
     try {
-      // OPTIMIZED: Fetches only the user root node. 
-      // We have moved heavy arrays (essays, transactions, results) to their own root nodes (user_essays, etc.)
+      // User profile changes often (balance, xp), so we fetch fresh or use a very short memory cache if implemented in context
       const snapshot = await get(child(ref(database), `users/${uid}`));
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -126,10 +145,8 @@ export const DatabaseService = {
         plan: data.plan || (data.isAdmin ? 'admin' : 'basic'),
         xp: 0
       });
-      // Sync with lightweight leaderboard
       await DatabaseService.syncLeaderboard(uid, data.displayName || 'User', data.photoURL || '', 0);
     } catch (error) {
-      console.error("Error creating user profile:", error);
       throw error;
     }
   },
@@ -143,7 +160,6 @@ export const DatabaseService = {
          }
          return profile!;
      } catch (e) {
-         console.error("Failed to ensure user profile", e);
          throw e;
      }
   },
@@ -151,19 +167,15 @@ export const DatabaseService = {
   saveUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
     try {
       await update(ref(database, `users/${uid}`), data);
-      
-      // Update leaderboard info if name/photo changes
       if (data.displayName || data.photoURL) {
           const currentXP = (await get(child(ref(database), `users/${uid}/xp`))).val() || 0;
           await DatabaseService.syncLeaderboard(uid, data.displayName, data.photoURL, currentXP);
       }
     } catch (error) {
-      console.error("Error saving user profile:", error);
       throw error;
     }
   },
 
-  // Helper to keep a lightweight leaderboard node
   syncLeaderboard: async (uid: string, displayName?: string, photoURL?: string, xp?: number) => {
       const updates: any = {};
       if (displayName) updates[`leaderboard/${uid}/displayName`] = displayName;
@@ -172,7 +184,6 @@ export const DatabaseService = {
       await update(ref(database), updates);
   },
 
-  // Subscribe to XP events for UI Toast
   onXpEarned: (callback: XpCallback) => {
       xpListeners.push(callback);
       return () => {
@@ -180,7 +191,6 @@ export const DatabaseService = {
       };
   },
 
-  // Centralized XP Logic
   processXpAction: async (uid: string, actionType: keyof typeof XP_VALUES, customAmount?: number): Promise<number> => {
       const userRef = ref(database, `users/${uid}`);
       let earnedXp = customAmount || XP_VALUES[actionType] || 0;
@@ -188,65 +198,41 @@ export const DatabaseService = {
       try {
           await runTransaction(userRef, (user) => {
               if (user) {
-                  // Initialize XP if missing
                   if (!user.xp) user.xp = 0;
-
-                  // Handle Limits (Example: Likes)
                   if (actionType === 'LIKE_COMMENT') {
                       const today = new Date().toISOString().split('T')[0];
                       if (user.lastLikeDate !== today) {
                           user.lastLikeDate = today;
                           user.dailyLikesGiven = 0;
                       }
-                      
-                      if ((user.dailyLikesGiven || 0) >= 5) {
-                          earnedXp = 0; // Limit reached
-                      } else {
-                          user.dailyLikesGiven = (user.dailyLikesGiven || 0) + 1;
-                      }
+                      if ((user.dailyLikesGiven || 0) >= 5) earnedXp = 0;
+                      else user.dailyLikesGiven = (user.dailyLikesGiven || 0) + 1;
                   }
-
-                  // Handle Login Streak
                   if (actionType === 'DAILY_LOGIN_BASE') {
                       const today = new Date().toISOString().split('T')[0];
                       const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-                      
-                      if (user.lastLoginDate === today) {
-                          earnedXp = 0; // Already logged in today
-                      } else {
-                          if (user.lastLoginDate === yesterday) {
-                              user.loginStreak = (user.loginStreak || 0) + 1;
-                          } else {
-                              user.loginStreak = 1;
-                          }
+                      if (user.lastLoginDate === today) earnedXp = 0;
+                      else {
+                          if (user.lastLoginDate === yesterday) user.loginStreak = (user.loginStreak || 0) + 1;
+                          else user.loginStreak = 1;
                           user.lastLoginDate = today;
-                          
-                          // Add Streak Bonus
-                          const bonus = Math.min((user.loginStreak || 1) * XP_VALUES.DAILY_LOGIN_STREAK_BONUS, 200); // Cap bonus
+                          const bonus = Math.min((user.loginStreak || 1) * XP_VALUES.DAILY_LOGIN_STREAK_BONUS, 200);
                           earnedXp += bonus;
                       }
                   }
-
-                  if (earnedXp > 0) {
-                      user.xp += earnedXp;
-                  }
+                  if (earnedXp > 0) user.xp += earnedXp;
               }
               return user;
           });
 
-          // Sync Leaderboard if XP changed
           if (earnedXp > 0) {
-              // Trigger UI Notification
               xpListeners.forEach(cb => cb(earnedXp, actionType));
-
-              // We need the new XP value, fetch it again or optimistically calc (fetch safer)
               const snap = await get(child(userRef, 'xp'));
               const newTotal = snap.val();
               const profileSnap = await get(userRef);
               const profile = profileSnap.val();
               await DatabaseService.syncLeaderboard(uid, profile.displayName, profile.photoURL, newTotal);
           }
-
           return earnedXp;
       } catch (e) {
           console.error("XP Transaction failed", e);
@@ -254,9 +240,8 @@ export const DatabaseService = {
       }
   },
 
-  // Legacy Wrapper for simple adds
   addXp: async (uid: string, amount: number): Promise<number> => {
-      return await DatabaseService.processXpAction(uid, 'LESSON_WATCHED', amount); // Defaulting type just for logging if needed
+      return await DatabaseService.processXpAction(uid, 'LESSON_WATCHED', amount);
   },
 
   incrementQuestionsAnswered: async (uid: string, count: number): Promise<void> => {
@@ -274,8 +259,6 @@ export const DatabaseService = {
 
   markQuestionAsAnswered: async (uid: string, questionId: string, isCorrect: boolean): Promise<void> => {
       try {
-          // Optimized: Store only last 100 or restructure if history gets too big
-          // For now, keeping it under user node is okay if it's just IDs and bools.
           await update(ref(database, `users/${uid}/answeredQuestions/${questionId}`), {
               timestamp: Date.now(),
               correct: isCorrect
@@ -287,7 +270,7 @@ export const DatabaseService = {
 
   getAnsweredQuestions: async (uid: string): Promise<Record<string, { correct: boolean }>> => {
       try {
-          // Optimized: Only fetch if needed
+          // Can cache this in session storage if needed, but it changes often
           const snap = await get(ref(database, `users/${uid}/answeredQuestions`));
           return snap.exists() ? snap.val() : {};
       } catch (e) {
@@ -295,13 +278,11 @@ export const DatabaseService = {
       }
   },
 
-  // --- LESSON COMPLETION ---
   getCompletedLessons: async (uid: string): Promise<string[]> => {
       try {
           const snap = await get(ref(database, `users/${uid}/completedLessons`));
           return snap.exists() ? Object.keys(snap.val()) : [];
       } catch (e) {
-          console.error("Error fetching completed lessons", e);
           return [];
       }
   },
@@ -316,26 +297,20 @@ export const DatabaseService = {
       }
   },
 
-  // OPTIMIZED: Fetch from 'leaderboard' node instead of 'users'
   getLeaderboard: async (): Promise<UserProfile[]> => {
     try {
+      // Leaderboard needs to be fresh
       const lbRef = query(ref(database, 'leaderboard'), orderByChild('xp'), limitToLast(50));
       const snapshot = await get(lbRef);
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const users = Object.keys(data).map(key => ({
-          ...data[key],
-          uid: key
-        })) as UserProfile[];
+        const users = Object.keys(data).map(key => ({ ...data[key], uid: key })) as UserProfile[];
         return users.sort((a, b) => (b.xp || 0) - (a.xp || 0));
       }
-    } catch (error) {
-      console.error("Error fetching leaderboard:", error);
-    }
+    } catch (error) {}
     return [];
   },
 
-  // --- Financial & Credits System ---
   createRechargeRequest: async (uid: string, userDisplayName: string, amount: number, type: 'BRL' | 'CREDIT' = 'BRL', quantityCredits?: number, planLabel?: string): Promise<void> => {
     try {
         const reqRef = push(ref(database, 'recharges'));
@@ -352,7 +327,6 @@ export const DatabaseService = {
         };
         await set(reqRef, request);
     } catch (error) {
-        console.error("Error creating recharge:", error);
         throw error;
     }
   },
@@ -383,11 +357,9 @@ export const DatabaseService = {
             const userSnap = await get(userRef);
             
             if (request.type === 'CREDIT' && request.quantityCredits) {
-                // Add Essay Credits
                 const currentCredits = userSnap.val().essayCredits || 0;
                 await update(userRef, { essayCredits: currentCredits + request.quantityCredits });
                 
-                // Transaction Record (Moved to user_transactions)
                 const transRef = push(ref(database, `user_transactions/${request.uid}`));
                 await set(transRef, {
                     id: transRef.key!,
@@ -399,7 +371,6 @@ export const DatabaseService = {
                 });
 
             } else {
-                // Add Balance BRL
                 const currentBalance = userSnap.val().balance || 0;
                 await update(userRef, { balance: currentBalance + request.amount });
 
@@ -417,14 +388,12 @@ export const DatabaseService = {
 
         await update(reqRef, { status });
     } catch (error) {
-        console.error("Error processing recharge:", error);
         throw error;
     }
   },
 
   getUserTransactions: async (uid: string): Promise<Transaction[]> => {
       try {
-          // Changed path to user_transactions
           const q = query(ref(database, `user_transactions/${uid}`), limitToLast(50));
           const snapshot = await get(q);
           if (snapshot.exists()) {
@@ -452,21 +421,11 @@ export const DatabaseService = {
       });
   },
 
-  // OPTIMIZED: Split heavy image data from light metadata
   saveEssayCorrection: async (uid: string, correction: EssayCorrection): Promise<void> => {
-     // 1. Generate ID in the metadata list
-     const correctionRef = push(ref(database, `users/${uid}/essays`)); // Legacy location or move to user_essays_meta? 
-     // Let's keep metadata in users/{uid}/essays BUT strip the image.
-     
+     const correctionRef = push(ref(database, `users/${uid}/essays`)); 
      const correctionId = correctionRef.key!;
-
-     // 2. Extract heavy image data
      const { imageUrl, ...metaData } = correction;
-
-     // 3. Save metadata to user profile list (LIGHTWEIGHT)
      await set(correctionRef, { ...metaData, id: correctionId });
-
-     // 4. Save heavy image to separate node 'essay_blobs' (HEAVY)
      if (imageUrl) {
          await set(ref(database, `essay_blobs/${correctionId}`), { imageUrl });
      }
@@ -474,7 +433,6 @@ export const DatabaseService = {
 
   getEssayCorrections: async (uid: string): Promise<EssayCorrection[]> => {
       try {
-          // This only fetches metadata (no images) because we stripped them on save
           const snap = await get(ref(database, `users/${uid}/essays`));
           if(snap.exists()) {
              return Object.values(snap.val());
@@ -483,7 +441,6 @@ export const DatabaseService = {
       } catch (e) { return []; }
   },
 
-  // New method to fetch the heavy image only when needed
   getEssayImage: async (correctionId: string): Promise<string | null> => {
       try {
           const snap = await get(ref(database, `essay_blobs/${correctionId}/imageUrl`));
@@ -492,63 +449,61 @@ export const DatabaseService = {
       } catch (e) { return null; }
   },
 
-  // --- AI Config ---
+  // --- AI Config (Cached) ---
   getAiConfig: async (): Promise<AiConfig> => {
-      if (CACHE.aiConfig) return CACHE.aiConfig;
+      const cached = LocalCache.get<AiConfig>('aiConfig');
+      if (cached) return cached;
+
       try {
           const snapshot = await get(ref(database, 'config/ai'));
           if (snapshot.exists()) {
-              CACHE.aiConfig = snapshot.val();
-              return CACHE.aiConfig!;
+              const data = snapshot.val();
+              LocalCache.set('aiConfig', data);
+              return data;
           }
-          return {
-              intermediateLimits: {
-                  canUseChat: false,
-                  canUseExplanation: true,
-                  dailyMessageLimit: 10
-              }
-          };
+          return { intermediateLimits: { canUseChat: false, canUseExplanation: true, dailyMessageLimit: 10 } };
       } catch (error) {
           return { intermediateLimits: { canUseChat: false, canUseExplanation: true, dailyMessageLimit: 10 } };
       }
   },
 
   updateAiConfig: async (config: AiConfig): Promise<void> => {
-      CACHE.aiConfig = config; // Update cache immediately
+      LocalCache.set('aiConfig', config);
       await set(ref(database, 'config/ai'), config);
   },
 
-  // --- Announcements ---
+  // --- Announcements (Cached) ---
   getAnnouncements: async (): Promise<Announcement[]> => {
-    if (CACHE.announcements) return CACHE.announcements;
+    // Announcements change rarely, cache safe
+    const cached = LocalCache.get<Announcement[]>('announcements');
+    if (cached) return cached;
+
     try {
       const snapshot = await get(child(ref(database), 'announcements'));
       if (snapshot.exists()) {
         const data = snapshot.val();
         const result = Array.isArray(data) ? data : Object.values(data);
-        CACHE.announcements = result;
+        LocalCache.set('announcements', result);
         return result;
       }
-    } catch (error) {
-      console.warn("Error fetching announcements:", error);
-    }
+    } catch (error) {}
     return [];
   },
 
-  // --- Subjects ---
+  // --- Subjects (Cached) ---
   getSubjects: async (): Promise<Subject[]> => {
-    if (CACHE.subjects) return CACHE.subjects;
+    const cached = LocalCache.get<Subject[]>('subjects');
+    if (cached) return cached;
+
     try {
       const snapshot = await get(child(ref(database), 'subjects'));
       if (snapshot.exists()) {
         const data = snapshot.val();
         const result = Array.isArray(data) ? data : Object.values(data);
-        CACHE.subjects = result;
+        LocalCache.set('subjects', result);
         return result;
       }
-    } catch (error) {
-      console.warn("Error fetching subjects:", error);
-    }
+    } catch (error) {}
     return [];
   },
 
@@ -557,65 +512,60 @@ export const DatabaseService = {
           const subjectsRef = ref(database, 'subjects');
           const snapshot = await get(subjectsRef);
           let currentSubjects: Subject[] = [];
-          
           if (snapshot.exists()) {
              const val = snapshot.val();
              currentSubjects = Array.isArray(val) ? val : Object.values(val);
           }
-          
           currentSubjects.push(subject);
           await set(subjectsRef, currentSubjects);
-          CACHE.subjects = null; // Invalidate cache
+          LocalCache.clear('subjects');
       } catch (e) {
-          console.error("Error creating subject", e);
           throw e;
       }
   },
 
-  // --- Topics & Subtopics ---
+  // --- Topics & Subtopics (Cached) ---
   getTopics: async (): Promise<Record<string, string[]>> => {
-    if (CACHE.topics) return CACHE.topics;
+    const cached = LocalCache.get<Record<string, string[]>>('topics');
+    if (cached) return cached;
+
     try {
       const snapshot = await get(child(ref(database), 'topics'));
       if (snapshot.exists()) {
-          CACHE.topics = snapshot.val();
-          return CACHE.topics!;
+          const data = snapshot.val();
+          LocalCache.set('topics', data);
+          return data;
       }
-    } catch (error) {
-      console.warn("Error fetching topics:", error);
-    }
+    } catch (error) {}
     return {};
   },
 
   getSubTopics: async (): Promise<Record<string, string[]>> => {
-    if (CACHE.subtopics) return CACHE.subtopics;
+    const cached = LocalCache.get<Record<string, string[]>>('subtopics');
+    if (cached) return cached;
+
     try {
       const snapshot = await get(child(ref(database), 'subtopics'));
       if (snapshot.exists()) {
-          CACHE.subtopics = snapshot.val();
-          return CACHE.subtopics!;
+          const data = snapshot.val();
+          LocalCache.set('subtopics', data);
+          return data;
       }
-    } catch (error) {
-      console.warn("Error fetching subtopics:", error);
-    }
+    } catch (error) {}
     return {};
   },
 
-  // --- Questions (Hierarchical) ---
-  // Updated to support Category (regular vs military)
+  // --- Questions (Optimized Limit) ---
   getQuestions: async (category: string, subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
     try {
-      // Path format: questions/{category}/{subject}/{topic}/{subtopic}
-      // If category is not provided, we might default to 'regular' in the path or old path logic
       const root = category ? `questions/${category}` : `questions/regular`;
-      
       let path = `${root}/${subjectId}/${topic}`;
       if (subtopic) {
         path += `/${subtopic}`;
       }
       
       const dbRef = ref(database, path);
-      // Limit to first 30 questions to save bandwidth
+      // STRICT LIMIT: 30 items
       const qQuery = query(dbRef, limitToFirst(30));
       
       const snapshot = await get(qQuery);
@@ -629,7 +579,7 @@ export const DatabaseService = {
         let allQuestions: Question[] = [];
         let count = 0;
         Object.keys(data).forEach(subtopicKey => {
-            if (count >= 30) return; // Client side check just in case
+            if (count >= 30) return;
             const questionsInSubtopic = data[subtopicKey];
             if (typeof questionsInSubtopic === 'object') {
                 Object.keys(questionsInSubtopic).forEach(qKey => {
@@ -644,26 +594,19 @@ export const DatabaseService = {
         });
         return allQuestions;
       }
-    } catch (error) {
-      console.warn("Error fetching questions:", error);
-    }
+    } catch (error) {}
     return [];
   },
 
-  // Fetch questions from multiple subtopics in parallel (Updated)
   getQuestionsFromSubtopics: async (category: string, subjectId: string, topic: string, subtopics: string[]): Promise<Question[]> => {
       if (!subtopics || subtopics.length === 0) return [];
-      
       try {
           const promises = subtopics.map(sub => 
               DatabaseService.getQuestions(category, subjectId, topic, sub)
           );
-          
           const results = await Promise.all(promises);
-          // Flatten array
           return results.flat();
       } catch (e) {
-          console.error("Error fetching multi-subtopic questions", e);
           return [];
       }
   },
@@ -671,7 +614,6 @@ export const DatabaseService = {
   getQuestionsByPath: async (category: string, subjectId: string, topic: string): Promise<(Question & { path: string, subtopic: string })[]> => {
      try {
          const root = category ? `questions/${category}` : `questions/regular`;
-         // Limit this admin query as well
          const snapshot = await get(query(ref(database, `${root}/${subjectId}/${topic}`), limitToFirst(50)));
          if(!snapshot.exists()) return [];
          
@@ -698,7 +640,6 @@ export const DatabaseService = {
   },
 
   getQuestionsByIds: async (ids: string[]): Promise<Question[]> => {
-      // Optimized to use Promise.all instead of fetching parent
       return []; 
   },
   
@@ -727,7 +668,7 @@ export const DatabaseService = {
        if (!currentTopics.includes(topic)) {
            currentTopics.push(topic);
            await set(topicsRef, currentTopics);
-           CACHE.topics = null;
+           LocalCache.clear('topics');
        }
 
        const subtopicsRef = ref(database, `subtopics/${topic}`);
@@ -737,10 +678,9 @@ export const DatabaseService = {
        if (!currentSubtopics.includes(subtopic)) {
            currentSubtopics.push(subtopic);
            await set(subtopicsRef, currentSubtopics);
-           CACHE.subtopics = null;
+           LocalCache.clear('subtopics');
        }
      } catch (error) {
-       console.error("Error creating question:", error);
        throw error;
      }
   },
@@ -772,10 +712,7 @@ export const DatabaseService = {
                   } else {
                       lessonsList = Object.keys(val).map(k => ({...val[k], id: k}));
                   }
-                  
-                  // Sort by Order
                   lessonsList.sort((a, b) => (a.order || 0) - (b.order || 0));
-                  
                   normalized[topic] = lessonsList;
               });
               return normalized;
@@ -794,24 +731,18 @@ export const DatabaseService = {
     try {
       const lessonsRef = ref(database, `lessons/${subjectId}/${topic}`);
       const newRef = push(lessonsRef);
-      // Ensure no undefined values
       const cleanLesson = JSON.parse(JSON.stringify(lesson));
       await set(newRef, cleanLesson);
     } catch (error) {
-      console.error("Error creating lesson:", error);
       throw error;
     }
   },
 
-  // NEW: Insert lesson at specific position and shift others
   createLessonWithOrder: async (subjectId: string, topic: string, lesson: Lesson, targetIndex: number): Promise<void> => {
       try {
           const topicRef = ref(database, `lessons/${subjectId}/${topic}`);
-          
-          // MANUAL ORDER UPDATE APPROACH (Safer for large lists)
           const snapshot = await get(topicRef);
           let lessonsList: {id: string, data: Lesson}[] = [];
-          
           if (snapshot.exists()) {
               const val = snapshot.val();
               lessonsList = Object.keys(val).map(k => ({id: k, data: val[k]}));
@@ -822,47 +753,33 @@ export const DatabaseService = {
                             ? lessonsList.length 
                             : targetIndex;
 
-          // 1. Create New Lesson
           const newRef = push(topicRef);
           const newId = newRef.key!;
-          
-          // 2. Prepare Updates
           const updates: Record<string, any> = {};
-          
-          // Clean undefined values from lesson object to prevent Firebase "update failed: values argument contains undefined" error
-          // JSON.stringify/parse is a safe way to strip undefineds from nested objects
           const cleanLesson = JSON.parse(JSON.stringify(lesson));
 
-          // Add new lesson at determined order
           updates[`${newId}`] = { ...cleanLesson, order: insertIdx };
 
-          // Shift subsequent lessons
           for (let i = insertIdx; i < lessonsList.length; i++) {
               const item = lessonsList[i];
               updates[`${item.id}/order`] = i + 1;
           }
-
-          // 3. Execute Batch Update
           await update(topicRef, updates);
-
       } catch (error) {
-          console.error("Error creating lesson with order:", error);
           throw error;
       }
   },
 
-  // --- Community ---
+  // --- Community (Limited) ---
   getPosts: async (): Promise<CommunityPost[]> => {
     try {
-      const q = query(ref(database, 'posts'), limitToLast(50));
+      const q = query(ref(database, 'posts'), limitToLast(30)); // Lower limit for mobile speed
       const snapshot = await get(q);
       
       if (snapshot.exists()) {
         const data = snapshot.val();
-        
         const postsArray = Object.keys(data).map(key => ({...data[key], id: key}));
         
-        // Fetch XP for authors (Consider caching user profiles in production)
         const posts = await Promise.all(postsArray.map(async (p: any) => {
              let xp = 0;
              if (p.authorId) {
@@ -874,9 +791,7 @@ export const DatabaseService = {
 
         return posts.sort((a, b) => b.timestamp - a.timestamp);
       }
-    } catch (error) {
-      console.warn("Error fetching posts:", error);
-    }
+    } catch (error) {}
     return [];
   },
 
@@ -884,21 +799,17 @@ export const DatabaseService = {
     try {
       const userProfile = await DatabaseService.getUserProfile(uid);
       const now = Date.now();
-      
       if (userProfile?.lastPostedAt) {
         const hoursSinceLastPost = (now - userProfile.lastPostedAt) / (1000 * 60 * 60);
         if (hoursSinceLastPost < 24) {
           throw new Error("Aguarde o timer para postar novamente.");
         }
       }
-
       const postsRef = ref(database, 'posts');
       const newPostRef = push(postsRef);
-      // Store authorId for rank fetching
       await set(newPostRef, { ...post, authorId: uid });
-
       await update(ref(database, `users/${uid}`), { lastPostedAt: now });
-      await DatabaseService.processXpAction(uid, 'DAILY_LOGIN_BASE', 50); // Fallback XP for posting? Or just use specific
+      await DatabaseService.processXpAction(uid, 'DAILY_LOGIN_BASE', 50); 
     } catch (error) {
       throw error;
     }
@@ -909,11 +820,9 @@ export const DatabaseService = {
       await runTransaction(postRef, (post) => {
           if (post) {
               if (post.likedBy && post.likedBy[uid]) {
-                  // Already liked: Remove like
                   post.likes = (post.likes || 1) - 1;
                   delete post.likedBy[uid];
               } else {
-                  // Not liked: Add like
                   post.likes = (post.likes || 0) + 1;
                   if (!post.likedBy) post.likedBy = {};
                   post.likedBy[uid] = true;
@@ -921,7 +830,6 @@ export const DatabaseService = {
           }
           return post;
       });
-      // Award XP for liking
       await DatabaseService.processXpAction(uid, 'LIKE_COMMENT');
   },
 
@@ -946,9 +854,7 @@ export const DatabaseService = {
             questionIds: data[key].questionIds || [] 
         }));
       }
-    } catch (error) {
-      console.warn("Error fetching simulations:", error);
-    }
+    } catch (error) {}
     return [];
   },
 
@@ -963,14 +869,10 @@ export const DatabaseService = {
 
   saveSimulationResult: async (result: SimulationResult): Promise<void> => {
       try {
-          // Moved to user_simulation_results root node
           const resRef = push(ref(database, `user_simulation_results/${result.userId}`));
           await set(resRef, result);
-          
-          // XP Calculation: Base 100 + (Score * 2)
           const xpEarned = XP_VALUES.SIMULATION_FINISH + (result.score * 2);
           await DatabaseService.processXpAction(result.userId, 'SIMULATION_FINISH', xpEarned); 
-          
           await DatabaseService.incrementQuestionsAnswered(result.userId, result.totalQuestions);
       } catch (e) {
           console.error(e);
@@ -989,9 +891,7 @@ export const DatabaseService = {
           uid: key 
         }));
       }
-    } catch (error) {
-      console.warn("Error fetching users:", error);
-    }
+    } catch (error) {}
     return [];
   },
   
@@ -1007,7 +907,6 @@ export const DatabaseService = {
         subscriptionExpiry: expiry
       });
     } catch (error) {
-      console.error("Error updating user:", error);
       throw error;
     }
   }

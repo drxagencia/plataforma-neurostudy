@@ -287,7 +287,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
           <div className="space-y-6 animate-in slide-in-from-right max-w-[1600px] mx-auto relative pb-20">
               
               {/* --- ULTRA NEURO TUTOR PANEL (DRAWER) --- */}
-              <div className={`fixed inset-y-0 right-0 w-full md:w-[600px] bg-slate-950/95 backdrop-blur-2xl border-l border-indigo-500/30 shadow-[0_0_100px_rgba(79,70,229,0.3)] z-[100] transform transition-transform duration-500 ease-in-out flex flex-col ${showSmartPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+              <div className={`fixed inset-y-0 right-0 w-full md:w-[600px] bg-slate-950/95 backdrop-blur-2xl border-l border-indigo-500/30 shadow-[0_0_100px_rgba(79,70,229,0.3)] z-[200] transform transition-transform duration-500 ease-in-out flex flex-col ${showSmartPanel ? 'translate-x-0' : 'translate-x-full'}`}>
                   {/* Panel Background FX */}
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent pointer-events-none" />
                   
@@ -354,7 +354,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                   </div>
 
                   {/* Input Area */}
-                  <div className="p-4 border-t border-white/10 bg-slate-900">
+                  <div className="p-4 border-t border-white/10 bg-slate-900 pb-safe">
                       <div className="relative">
                           <input 
                             value={tutorInput}
@@ -457,16 +457,16 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                         </div>
 
                         {/* PRIMARY ACTIONS: Finish & Question */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
                             <button 
                                 onClick={() => setShowSmartPanel(true)}
-                                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-900/20 transition-all flex items-center gap-2 border border-indigo-400/20 hover:scale-105"
+                                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-900/20 transition-all flex items-center justify-center gap-2 border border-indigo-400/20 hover:scale-105"
                             >
                                 <MessageCircle size={20} /> Dúvida na Aula?
                             </button>
                             <button 
                                 onClick={handleFinishLesson}
-                                className={`px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 hover:scale-105 ${isCompleted ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 cursor-default' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'}`}
+                                className={`px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 hover:scale-105 ${isCompleted ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 cursor-default' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'}`}
                             >
                                 <CheckCircle size={20} /> {isCompleted ? 'Aula Concluída' : 'Concluir Aula'}
                             </button>
