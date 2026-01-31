@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config' | 'metrics'>('leads');
@@ -1292,27 +1292,42 @@ const AdminPanel: React.FC = () => {
                   </div>
               )}
 
-              {/* ... Manage Views Preserved ... */}
+              {/* ... Manage Views ... */}
               {viewMode === 'manage' && (
                    <div className="space-y-6 animate-fade-in">
                          <div className="glass-card p-6 rounded-2xl">
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                 {contentTab === 'question' && (
-                                     <select className="glass-input p-2 rounded-lg" value={manageQCategory} onChange={e => setManageQCategory(e.target.value)}>
-                                        <option value="regular">Regular</option>
-                                        <option value="military">Militar</option>
-                                     </select>
-                                 )}
-                                 <select className="glass-input p-2 rounded-lg" value={manageQSubject} onChange={e => setManageQSubject(e.target.value)}>
-                                     <option value="">Matéria</option>
-                                     {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                 </select>
-                                 <select className="glass-input p-2 rounded-lg" value={manageQTopic} onChange={e => setManageQTopic(e.target.value)}>
-                                     <option value="">Tópico</option>
-                                     {manageQSubject && topics[manageQSubject]?.map(t => <option key={t} value={t}>{t}</option>)}
-                                 </select>
+                                 {/* FILTER LOGIC */}
+                                 {contentTab === 'question' ? (
+                                     <>
+                                        <select className="glass-input p-2 rounded-lg" value={manageQCategory} onChange={e => setManageQCategory(e.target.value)}>
+                                            <option value="regular">Regular</option>
+                                            <option value="military">Militar</option>
+                                        </select>
+                                        <select className="glass-input p-2 rounded-lg" value={manageQSubject} onChange={e => setManageQSubject(e.target.value)}>
+                                            <option value="">Matéria</option>
+                                            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                        </select>
+                                        <select className="glass-input p-2 rounded-lg" value={manageQTopic} onChange={e => setManageQTopic(e.target.value)}>
+                                            <option value="">Tópico</option>
+                                            {manageQSubject && topics[manageQSubject]?.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                     </>
+                                 ) : contentTab === 'lesson' ? (
+                                     <>
+                                        <select className="glass-input p-2 rounded-lg" value={manageLessonSubject} onChange={e => setManageLessonSubject(e.target.value)}>
+                                            <option value="">Matéria</option>
+                                            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                        </select>
+                                        <select className="glass-input p-2 rounded-lg" value={manageLessonTopic} onChange={e => setManageLessonTopic(e.target.value)}>
+                                            <option value="">Tópico</option>
+                                            {manageLessonSubject && topics[manageLessonSubject]?.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                     </>
+                                 ) : null}
                              </div>
 
+                             {/* QUESTION LIST */}
                              {contentTab === 'question' && (
                                 <div className="space-y-2">
                                     {filteredQuestions.map(q => (
@@ -1321,6 +1336,45 @@ const AdminPanel: React.FC = () => {
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={() => handleEditItem(q, 'question')} className="p-1 hover:bg-white/10 rounded"><Pencil size={16}/></button>
                                                 <button onClick={() => handleDeleteItem(q.path)} className="p-1 hover:bg-red-900/50 text-red-400 rounded"><Trash2 size={16}/></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                             )}
+
+                             {/* LESSON LIST */}
+                             {contentTab === 'lesson' && (
+                                <div className="space-y-2">
+                                    {topicLessons.length === 0 && manageLessonTopic && (
+                                        <p className="text-slate-500 text-sm text-center py-4">Nenhuma aula encontrada neste tópico.</p>
+                                    )}
+                                    {topicLessons.map((l) => (
+                                        <div key={l.id} className="p-3 bg-slate-900 rounded-lg flex justify-between items-center group border border-white/5 hover:border-white/10">
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <div className={`p-2 rounded-lg ${l.type === 'exercise_block' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+                                                    {l.type === 'exercise_block' ? <Target size={16}/> : <Video size={16}/>}
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="font-bold text-slate-200 truncate">{l.title}</span>
+                                                    <span className="text-[10px] text-slate-500 uppercase">{l.type === 'exercise_block' ? 'Exercícios' : l.duration}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button 
+                                                    onClick={() => handleEditItem(l, 'lesson')} 
+                                                    className="p-2 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors"
+                                                    title="Editar"
+                                                >
+                                                    <Pencil size={16}/>
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteItem(`lessons/${manageLessonSubject}/${manageLessonTopic}/${l.id}`)} 
+                                                    className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                                                    title="Excluir"
+                                                >
+                                                    <Trash2 size={16}/>
+                                                </button>
                                             </div>
                                         </div>
                                     ))}
