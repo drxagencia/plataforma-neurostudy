@@ -89,6 +89,11 @@ export interface Subject {
   category?: 'regular' | 'military'; // Distinction
 }
 
+export interface ContentTag {
+    text: string;
+    color: 'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orange' | 'pink' | 'indigo' | 'gray';
+}
+
 export interface Question {
   id?: string;
   text: string;
@@ -98,7 +103,8 @@ export interface Question {
   difficulty: 'easy' | 'medium' | 'hard';
   explanation?: string;
   subjectId?: string; 
-  topic?: string;    
+  topic?: string;
+  tag?: ContentTag; // NEW: Optional tag
 }
 
 export interface LessonMaterial {
@@ -117,6 +123,7 @@ export interface Lesson {
   topic?: string;
   order?: number; // For manual ordering in playlist
   materials?: LessonMaterial[];
+  tag?: ContentTag; // NEW: Optional tag
   // Filters for exercise blocks
   exerciseFilters?: {
       category: string;

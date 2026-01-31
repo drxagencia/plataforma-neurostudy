@@ -453,6 +453,11 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                     <Clock size={14} /> 
                                     <span>{selectedLesson.duration || '00:00'}</span>
                                 </div>
+                                {selectedLesson.tag && (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase bg-${selectedLesson.tag.color}-500/20 text-${selectedLesson.tag.color}-400 border-${selectedLesson.tag.color}-500/30`}>
+                                        {selectedLesson.tag.text}
+                                    </span>
+                                )}
                             </div>
                         </div>
 
@@ -558,13 +563,18 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                             <p className={`font-medium text-sm leading-snug ${isActive ? 'text-indigo-200' : isBlock ? 'text-emerald-200' : isDone ? 'text-emerald-400 line-through decoration-emerald-500/50' : 'text-slate-300 group-hover:text-white'}`}>
                                                 {l.title}
                                             </p>
-                                            {!isBlock && (
-                                                <div className="flex items-center gap-2 mt-1.5">
+                                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                                {!isBlock && (
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${isActive ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500'}`}>
                                                         <Clock size={10} /> {l.duration}
                                                     </span>
-                                                </div>
-                                            )}
+                                                )}
+                                                {l.tag && (
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase bg-${l.tag.color}-500/20 text-${l.tag.color}-400 border-${l.tag.color}-500/30`}>
+                                                        {l.tag.text}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </button>
                                   );
@@ -657,7 +667,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                   {isBlock ? 'Pratique o conteúdo com questões selecionadas do Banco de Questões.' : `Nesta aula, abordaremos os conceitos fundamentais de ${selectedTopic.toLowerCase()}.`}
                               </p>
                               
-                              <div className="flex items-center gap-4 mt-4">
+                              <div className="flex flex-wrap items-center gap-4 mt-4">
                                   {isBlock ? (
                                       <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded-md border border-emerald-500/20">
                                           <Target size={12} /> Exercícios Práticos
@@ -673,6 +683,11 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                                             </div>
                                         )}
                                       </>
+                                  )}
+                                  {lesson.tag && (
+                                      <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded border uppercase bg-${lesson.tag.color}-500/20 text-${lesson.tag.color}-400 border-${lesson.tag.color}-500/30`}>
+                                          {lesson.tag.text}
+                                      </div>
                                   )}
                               </div>
                           </div>

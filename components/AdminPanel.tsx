@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target, Tag } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config' | 'metrics'>('leads');
@@ -113,7 +113,11 @@ const AdminPanel: React.FC = () => {
       sName: '',
       sIcon: 'BookOpen',
       sColor: 'text-indigo-400',
-      sCategory: 'regular'
+      sCategory: 'regular',
+
+      // Tagging System
+      tagText: '',
+      tagColor: 'indigo'
   });
 
   // NEW: Helper State for existing lessons in Create Mode (for dropdown ordering)
@@ -397,7 +401,9 @@ const AdminPanel: React.FC = () => {
               qOptions: item.options,
               qCorrect: item.correctAnswer,
               qDifficulty: item.difficulty,
-              qExplanation: item.explanation || ''
+              qExplanation: item.explanation || '',
+              tagText: item.tag?.text || '',
+              tagColor: item.tag?.color || 'indigo'
           });
           setEditingPath(item.path);
       } else if (type === 'lesson') {
@@ -412,7 +418,9 @@ const AdminPanel: React.FC = () => {
               lExCategory: item.exerciseFilters?.category || 'regular',
               lExSubject: item.exerciseFilters?.subject || '',
               lExTopic: item.exerciseFilters?.topic || '',
-              lExSubtopics: item.exerciseFilters?.subtopics || [] // Load existing subtopics
+              lExSubtopics: item.exerciseFilters?.subtopics || [], // Load existing subtopics
+              tagText: item.tag?.text || '',
+              tagColor: item.tag?.color || 'indigo'
           });
           setMaterials(item.materials || []);
           setEditingPath(`lessons/${manageLessonSubject}/${manageLessonTopic}/${item.id}`);
@@ -465,6 +473,7 @@ const AdminPanel: React.FC = () => {
                     explanation: contentForm.qExplanation,
                     subjectId: contentForm.subjectId,
                     topic: contentForm.topicName,
+                    tag: contentForm.tagText ? { text: contentForm.tagText, color: contentForm.tagColor } : null
                 };
              } else if (contentTab === 'lesson') {
                 updateData = {
@@ -474,6 +483,7 @@ const AdminPanel: React.FC = () => {
                     videoUrl: contentForm.lType === 'video' ? contentForm.lUrl : null,
                     duration: contentForm.lType === 'video' ? contentForm.lDuration : null,
                     materials: contentForm.lType === 'video' ? materials : null,
+                    tag: contentForm.tagText ? { text: contentForm.tagText, color: contentForm.tagColor } : null,
                     exerciseFilters: contentForm.lType === 'exercise_block' ? {
                         category: contentForm.lExCategory,
                         subject: contentForm.lExSubject,
@@ -561,7 +571,8 @@ const AdminPanel: React.FC = () => {
                   difficulty: contentForm.qDifficulty as any,
                   explanation: contentForm.qExplanation,
                   subjectId: contentForm.subjectId,
-                  topic: contentForm.topicName
+                  topic: contentForm.topicName,
+                  tag: contentForm.tagText ? { text: contentForm.tagText, color: contentForm.tagColor as any } : undefined
               };
               
               await DatabaseService.createQuestion(contentForm.category, contentForm.subjectId, contentForm.topicName, contentForm.subtopicName, newQuestion);
@@ -576,6 +587,7 @@ const AdminPanel: React.FC = () => {
                   videoUrl: contentForm.lType === 'video' ? contentForm.lUrl : undefined,
                   duration: contentForm.lType === 'video' ? contentForm.lDuration : undefined,
                   materials: contentForm.lType === 'video' ? materials : undefined,
+                  tag: contentForm.tagText ? { text: contentForm.tagText, color: contentForm.tagColor as any } : undefined,
                   exerciseFilters: contentForm.lType === 'exercise_block' ? {
                       category: contentForm.lExCategory,
                       subject: contentForm.lExSubject,
@@ -633,7 +645,8 @@ const AdminPanel: React.FC = () => {
           ...prev, 
           qText: '', qImageUrl: '', lTitle: '', lUrl: '', lDuration: '', 
           qOptions: ['', '', '', ''], qExplanation: '', lType: 'video',
-          lExSubtopics: [], lInsertAfterId: 'end'
+          lExSubtopics: [], lInsertAfterId: 'end',
+          tagText: '', tagColor: 'indigo'
       }));
       setMaterials([]);
   };
@@ -1212,6 +1225,45 @@ const AdminPanel: React.FC = () => {
                                          </div>
                                      )}
 
+                                     {/* Tag Input for Lessons and Questions */}
+                                     {(contentTab === 'lesson' || contentTab === 'question') && (
+                                         <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5 space-y-2">
+                                             <label className="text-xs text-slate-400 font-bold uppercase flex items-center gap-2">
+                                                 <Tag size={12} /> Etiqueta (Tag) Opcional
+                                             </label>
+                                             <div className="flex gap-2">
+                                                 <input 
+                                                    className="flex-1 glass-input p-3 rounded-lg" 
+                                                    placeholder="Texto da Tag (Ex: ALTA RELEVÂNCIA)" 
+                                                    value={contentForm.tagText} 
+                                                    onChange={e => setContentForm({...contentForm, tagText: e.target.value})} 
+                                                 />
+                                                 <select 
+                                                    className="w-32 glass-input p-3 rounded-lg" 
+                                                    value={contentForm.tagColor} 
+                                                    onChange={e => setContentForm({...contentForm, tagColor: e.target.value})}
+                                                 >
+                                                     <option value="indigo">Indigo</option>
+                                                     <option value="red">Vermelho</option>
+                                                     <option value="green">Verde</option>
+                                                     <option value="yellow">Amarelo</option>
+                                                     <option value="blue">Azul</option>
+                                                     <option value="purple">Roxo</option>
+                                                     <option value="orange">Laranja</option>
+                                                     <option value="pink">Rosa</option>
+                                                     <option value="gray">Cinza</option>
+                                                 </select>
+                                             </div>
+                                             {contentForm.tagText && (
+                                                 <div className="mt-2">
+                                                     <span className={`text-[10px] font-bold px-2 py-1 rounded border uppercase tracking-wider bg-${contentForm.tagColor}-500/20 text-${contentForm.tagColor}-400 border-${contentForm.tagColor}-500/30`}>
+                                                         {contentForm.tagText}
+                                                     </span>
+                                                 </div>
+                                             )}
+                                         </div>
+                                     )}
+
                                      {contentTab === 'question' && (
                                         <div className="space-y-4">
                                             {/* ... Question Form Fields ... */}
@@ -1408,7 +1460,14 @@ const AdminPanel: React.FC = () => {
                                 <div className="space-y-2">
                                     {filteredQuestions.map(q => (
                                         <div key={q.id} className="p-3 bg-slate-900 rounded-lg flex justify-between items-center group">
-                                            <span className="truncate flex-1 pr-4">{q.text}</span>
+                                            <div className="flex items-center gap-2 truncate pr-4">
+                                                {q.tag && (
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase bg-${q.tag.color}-500/20 text-${q.tag.color}-400 border-${q.tag.color}-500/30`}>
+                                                        {q.tag.text}
+                                                    </span>
+                                                )}
+                                                <span className="truncate">{q.text}</span>
+                                            </div>
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={() => handleEditItem(q, 'question')} className="p-1 hover:bg-white/10 rounded"><Pencil size={16}/></button>
                                                 <button onClick={() => handleDeleteItem(q.path)} className="p-1 hover:bg-red-900/50 text-red-400 rounded"><Trash2 size={16}/></button>
@@ -1431,7 +1490,14 @@ const AdminPanel: React.FC = () => {
                                                     {l.type === 'exercise_block' ? <Target size={16}/> : <Video size={16}/>}
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="font-bold text-slate-200 truncate">{l.title}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-slate-200 truncate">{l.title}</span>
+                                                        {l.tag && (
+                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase bg-${l.tag.color}-500/20 text-${l.tag.color}-400 border-${l.tag.color}-500/30`}>
+                                                                {l.tag.text}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <span className="text-[10px] text-slate-500 uppercase">{l.type === 'exercise_block' ? 'Exercícios' : l.duration}</span>
                                                 </div>
                                             </div>

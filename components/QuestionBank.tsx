@@ -434,6 +434,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                  {/* Question Card */}
                  <div className="glass-card p-4 md:p-10 rounded-3xl border border-white/5 shadow-2xl animate-in fade-in zoom-in-95 duration-300 flex-1 overflow-y-auto custom-scrollbar">
                      <div className="mb-8">
+                        <div className="flex justify-between items-start mb-2">
+                            {currentQ.tag && (
+                                <span className={`text-xs font-bold px-2 py-1 rounded border uppercase mb-3 inline-block bg-${currentQ.tag.color}-500/20 text-${currentQ.tag.color}-400 border-${currentQ.tag.color}-500/30`}>
+                                    {currentQ.tag.text}
+                                </span>
+                            )}
+                        </div>
                         <SimpleMarkdown text={currentQ.text} />
                         {currentQ.imageUrl && (
                             <div className="mt-6 rounded-2xl overflow-hidden border border-white/10 bg-black/20 max-w-2xl mx-auto">
