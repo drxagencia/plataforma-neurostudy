@@ -4,7 +4,7 @@ import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { auth } from '../services/firebaseConfig';
 import { EssayCorrection, UserProfile } from '../types';
-import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight } from 'lucide-react';
+import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight, Crown } from 'lucide-react';
 
 interface RedacaoProps {
     user: UserProfile;
@@ -22,6 +22,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [showPix, setShowPix] = useState(false);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  
+  // Upgrade Flow
+  const [isUpgrading, setIsUpgrading] = useState(false);
 
   // Upload Flow
   const [theme, setTheme] = useState('');
@@ -36,6 +39,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   // Notification State
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  const isBasicPlan = user.plan === 'basic';
+  const priceMultiplier = isBasicPlan ? 2.5 : 1;
 
   useEffect(() => {
     fetchHistory();
@@ -91,16 +97,40 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   // --- Pricing Logic ---
   const getPricePerUnit = (qty: number) => {
-      if (qty >= 10) return 3.50;
-      if (qty >= 5) return 3.75;
-      return 4.00;
+      let basePrice = 4.00;
+      if (qty >= 10) basePrice = 3.50;
+      else if (qty >= 5) basePrice = 3.75;
+      
+      return basePrice * priceMultiplier;
   };
 
   const totalPrice = buyQty * getPricePerUnit(buyQty);
 
+  // --- Upgrade Logic ---
+  const handleUpgradeRequest = () => {
+      if (!auth.currentUser) return;
+      setIsUpgrading(true);
+      
+      // Calculate difference
+      let upgradeCost = 10; // Default Monthly Diff (19.90 - 9.90)
+      if (user.billingCycle === 'yearly') {
+          upgradeCost = 100; // Yearly Diff (197 - 97)
+      }
+
+      try {
+          const payload = PixService.generatePayload(upgradeCost);
+          setPixPayload(payload);
+          setShowPix(true);
+      } catch (e) {
+          setNotification({ type: 'error', message: "Erro ao gerar PIX de Upgrade" });
+          setIsUpgrading(false);
+      }
+  };
+
   // --- Payment Handlers ---
   const handleGeneratePix = () => {
       if (buyQty < 1) return;
+      setIsUpgrading(false);
       try {
           const payload = PixService.generatePayload(totalPrice);
           setPixPayload(payload);
@@ -112,9 +142,27 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   const handleConfirmPayment = async () => {
       if (!auth.currentUser) return;
-      await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'User', totalPrice, 'CREDIT', buyQty);
-      setNotification({ type: 'success', message: "Solicitação enviada! Aguarde a aprovação." });
+      
+      if (isUpgrading) {
+          let upgradeCost = user.billingCycle === 'yearly' ? 100 : 10;
+          const label = `UPGRADE: Basic to Pro (${user.billingCycle === 'yearly' ? 'Anual' : 'Mensal'})`;
+          
+          await DatabaseService.createRechargeRequest(
+              auth.currentUser.uid, 
+              auth.currentUser.displayName || 'User', 
+              upgradeCost, 
+              'BRL', 
+              undefined, 
+              label
+          );
+          setNotification({ type: 'success', message: "Upgrade solicitado! Aguardando aprovação." });
+      } else {
+          await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'User', totalPrice, 'CREDIT', buyQty);
+          setNotification({ type: 'success', message: "Solicitação enviada! Aguarde a aprovação." });
+      }
+      
       setShowPix(false);
+      setIsUpgrading(false);
       setView('home');
   };
 
@@ -291,7 +339,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       );
   }
 
-  // --- RESULT VIEW: THE "WOW" FACTOR ---
+  // --- RESULT VIEW ---
   if (view === 'result' && currentResult) {
       const getScoreColor = (score: number) => {
           if (score >= 900) return 'text-emerald-400';
@@ -560,7 +608,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                 <h3 className="font-bold text-white text-lg">Básico</h3>
                                 <p className="text-slate-400 text-xs mt-1">Para correções pontuais.</p>
                                 <div className="mt-4">
-                                    <span className="text-3xl font-bold text-white">R$ 4,00</span>
+                                    <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 4,00</span>
+                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 10,00</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
@@ -575,7 +624,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                 <h3 className="font-bold text-indigo-300 text-lg">Intermediário</h3>
                                 <p className="text-slate-400 text-xs mt-1">Foco e constância.</p>
                                 <div className="mt-4">
-                                    <span className="text-3xl font-bold text-white">R$ 3,75</span>
+                                    <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 3,75</span>
+                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 9,37</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
@@ -591,7 +641,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                 <h3 className="font-bold text-emerald-400 text-lg">Pro</h3>
                                 <p className="text-slate-300 text-xs mt-1">Intensivo reta final.</p>
                                 <div className="mt-4">
-                                    <span className="text-3xl font-bold text-white">R$ 3,50</span>
+                                    <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 3,50</span>
+                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 8,75</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
@@ -602,8 +653,20 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                       </div>
 
                       {/* Right: Interactive Calculator */}
-                      <div className="glass-card p-8 rounded-3xl border-t-4 border-t-indigo-500 bg-slate-900/80 shadow-2xl">
-                          <label className="text-xs text-slate-400 font-bold uppercase mb-4 block tracking-wider">Calculadora de Investimento</label>
+                      <div className="glass-card p-8 rounded-3xl border-t-4 border-t-indigo-500 bg-slate-900/80 shadow-2xl relative overflow-hidden">
+                          
+                          {/* WARNING BANNER FOR BASIC USERS */}
+                          {isBasicPlan && (
+                              <div className="absolute inset-x-0 top-0 bg-red-900/90 p-4 z-20 text-center animate-pulse">
+                                  <p className="text-white font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                                      <AlertTriangle size={14} className="text-yellow-400" />
+                                      Você está pagando 2.5x mais caro
+                                  </p>
+                                  <p className="text-[10px] text-red-200 mt-1">Upgrade agora e economize R$ {(totalPrice - (totalPrice / 2.5)).toFixed(2)} nesta compra.</p>
+                              </div>
+                          )}
+
+                          <label className={`text-xs text-slate-400 font-bold uppercase mb-4 block tracking-wider ${isBasicPlan ? 'mt-12' : ''}`}>Calculadora de Investimento</label>
                           
                           <div className="flex items-center gap-2 mb-8">
                               <button onClick={() => setBuyQty(Math.max(1, buyQty - 1))} className="w-12 h-12 bg-slate-800 rounded-xl text-white font-bold hover:bg-slate-700 transition-colors text-xl">-</button>
@@ -626,16 +689,28 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                               </div>
                               <div className="flex justify-between items-center pt-4 border-t border-white/10">
                                   <span className="text-slate-300 font-bold">Total</span>
-                                  <span className="text-3xl font-black text-emerald-400">R$ {totalPrice.toFixed(2)}</span>
+                                  <span className={`text-3xl font-black ${isBasicPlan ? 'text-red-400' : 'text-emerald-400'}`}>R$ {totalPrice.toFixed(2)}</span>
                               </div>
                           </div>
 
                           <button 
                             onClick={handleGeneratePix}
-                            className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-3 transform hover:scale-[1.02]"
+                            className={`w-full py-4 font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 transform hover:scale-[1.02] ${isBasicPlan ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-emerald-900/20'}`}
                           >
-                              <QrCode size={20} /> Gerar Pagamento PIX
+                              <QrCode size={20} /> {isBasicPlan ? 'Pagar Preço Alto' : 'Gerar Pagamento PIX'}
                           </button>
+
+                          {/* UPGRADE BUTTON FOR BASIC USERS */}
+                          {isBasicPlan && (
+                              <button 
+                                onClick={handleUpgradeRequest}
+                                className="w-full mt-3 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02] animate-bounce duration-[2000ms]"
+                              >
+                                  <Crown size={20} className="fill-yellow-400 text-yellow-400" />
+                                  Fazer Upgrade por R$ {user.billingCycle === 'yearly' ? '100,00' : '10,00'}
+                              </button>
+                          )}
+
                           <p className="text-center text-[10px] text-slate-500 mt-4">Liberação automática após verificação.</p>
                       </div>
                   </div>
@@ -643,7 +718,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                   // Pix Display
                   <div className="max-w-md mx-auto glass-card p-8 rounded-2xl text-center animate-in zoom-in-95 relative border border-emerald-500/20 shadow-2xl">
                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
-                      <h3 className="text-2xl font-bold text-white mb-2">Pagamento via PIX</h3>
+                      <h3 className="text-2xl font-bold text-white mb-2">{isUpgrading ? 'Upgrade de Plano' : 'Pagamento via PIX'}</h3>
                       <p className="text-slate-400 text-sm mb-6">Escaneie o QR Code ou copie o código abaixo.</p>
                       
                       <div className="bg-white p-4 rounded-2xl inline-block mb-6 shadow-inner">

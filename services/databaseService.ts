@@ -143,6 +143,7 @@ export const DatabaseService = {
         balance: 0,
         essayCredits: 0,
         plan: data.plan || (data.isAdmin ? 'admin' : 'basic'),
+        billingCycle: data.billingCycle || 'monthly', // Persist billing cycle
         xp: 0
       });
       await DatabaseService.syncLeaderboard(uid, data.displayName || 'User', data.photoURL || '', 0);
@@ -356,7 +357,22 @@ export const DatabaseService = {
             const userRef = ref(database, `users/${request.uid}`);
             const userSnap = await get(userRef);
             
-            if (request.type === 'CREDIT' && request.quantityCredits) {
+            // SPECIAL HANDLING FOR UPGRADE
+            if (request.planLabel && request.planLabel.startsWith('UPGRADE:')) {
+                // If it's an upgrade, we update the plan to 'advanced'
+                await update(userRef, { plan: 'advanced' });
+                
+                // Log Transaction
+                const transRef = push(ref(database, `user_transactions/${request.uid}`));
+                await set(transRef, {
+                    id: transRef.key!,
+                    type: 'debit', // Money spent
+                    amount: request.amount,
+                    description: request.planLabel,
+                    timestamp: Date.now(),
+                    currencyType: 'BRL'
+                });
+            } else if (request.type === 'CREDIT' && request.quantityCredits) {
                 const currentCredits = userSnap.val().essayCredits || 0;
                 await update(userRef, { essayCredits: currentCredits + request.quantityCredits });
                 

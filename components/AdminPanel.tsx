@@ -42,6 +42,7 @@ const AdminPanel: React.FC = () => {
   // Import State
   const [importText, setImportText] = useState('');
   const [importCategory, setImportCategory] = useState('regular');
+  const [importType, setImportType] = useState<'question' | 'lesson'>('question'); // NEW STATE
   const [isImporting, setIsImporting] = useState(false);
 
   // Lead Approval State
@@ -252,6 +253,7 @@ const AdminPanel: React.FC = () => {
               displayName: approvingLead.name,
               email: newStudentEmail,
               plan: userPlan,
+              billingCycle: approvingLead.billing as 'monthly' | 'yearly', // Pass billing info
               subscriptionExpiry: expiryDate.toISOString().split('T')[0],
               xp: 0,
               balance: 0,
@@ -275,7 +277,7 @@ const AdminPanel: React.FC = () => {
   };
 
 
-  const handleImportQuestions = async () => {
+  const handleBulkImport = async () => {
       if (!importText.trim()) return alert("Cole o texto para importar.");
       setIsImporting(true);
 
@@ -283,52 +285,99 @@ const AdminPanel: React.FC = () => {
       let successCount = 0;
       let errorCount = 0;
 
-      for (const line of lines) {
-          try {
-              const parts = line.split(':');
-              if (parts.length < 11) {
-                  console.error("Invalid line format:", line);
+      // 1. IMPORT LESSONS
+      if (importType === 'lesson') {
+          for (const line of lines) {
+              try {
+                  const parts = line.split(':');
+                  // FORMAT: ID_MATERIA:TOPICO:TITULO:URL:DURACAO
+                  // URL can be "NULL"
+                  if (parts.length < 5) {
+                      console.error("Invalid lesson format:", line);
+                      errorCount++;
+                      continue;
+                  }
+
+                  const subjectId = normalizeId(parts[0]);
+                  const topic = parts[1].trim();
+                  const title = parts[2].trim();
+                  let urlRaw = parts[3].trim();
+                  const duration = parts[4].trim();
+
+                  // Treat NULL as undefined/empty, so admin can edit later
+                  const videoUrl = (urlRaw.toLowerCase() === 'null' || urlRaw === '') ? undefined : urlRaw;
+
+                  const lesson: Lesson = {
+                      title,
+                      type: 'video',
+                      videoUrl: videoUrl, // Can be undefined
+                      duration: duration,
+                      materials: []
+                  };
+
+                  await DatabaseService.createLesson(subjectId, topic, lesson);
+                  successCount++;
+              } catch (e) {
+                  console.error(e);
                   errorCount++;
-                  continue;
               }
+          }
+      } 
+      // 2. IMPORT QUESTIONS
+      else {
+          for (const line of lines) {
+              try {
+                  const parts = line.split(':');
+                  if (parts.length < 11) {
+                      console.error("Invalid question format:", line);
+                      errorCount++;
+                      continue;
+                  }
 
-              const subjectId = normalizeId(parts[0]); 
-              const topic = parts[1].trim(); 
-              const subtopic = parts[2].trim(); 
-              
-              const correctAnswerRaw = parts[parts.length - 1].trim();
-              const explanation = parts[parts.length - 2].trim();
-              const alt4 = parts[parts.length - 3].trim();
-              const alt3 = parts[parts.length - 4].trim();
-              const alt2 = parts[parts.length - 5].trim();
-              const alt1 = parts[parts.length - 6].trim();
-              const imageUrl = parts[parts.length - 7].trim();
-              
-              const textParts = parts.slice(3, parts.length - 7);
-              const text = textParts.join(':').trim();
+                  const subjectId = normalizeId(parts[0]); 
+                  const topic = parts[1].trim(); 
+                  const subtopic = parts[2].trim(); 
+                  
+                  const correctAnswerRaw = parts[parts.length - 1].trim();
+                  const explanation = parts[parts.length - 2].trim();
+                  const alt4 = parts[parts.length - 3].trim();
+                  const alt3 = parts[parts.length - 4].trim();
+                  const alt2 = parts[parts.length - 5].trim();
+                  const alt1 = parts[parts.length - 6].trim();
+                  const imageUrlRaw = parts[parts.length - 7].trim();
+                  
+                  const textParts = parts.slice(3, parts.length - 7);
+                  const text = textParts.join(':').trim();
 
-              const q: Question = {
-                  text,
-                  imageUrl: imageUrl === 'NULL' || imageUrl === '' ? undefined : imageUrl,
-                  options: [alt1, alt2, alt3, alt4],
-                  correctAnswer: parseInt(correctAnswerRaw) || 0,
-                  difficulty: 'medium', 
-                  explanation: explanation === 'NULL' ? '' : explanation,
-                  subjectId,
-                  topic
-              };
+                  // Robust NULL check for image: If "null" or "NULL" or empty, set to undefined so it's not saved in DB
+                  const imageUrl = (imageUrlRaw.toLowerCase() === 'null' || imageUrlRaw === '') ? undefined : imageUrlRaw;
 
-              await DatabaseService.createQuestion(importCategory, subjectId, topic, subtopic, q);
-              successCount++;
-          } catch (e) {
-              console.error(e);
-              errorCount++;
+                  const q: Question = {
+                      text,
+                      imageUrl: imageUrl, // Will be string or undefined
+                      options: [alt1, alt2, alt3, alt4],
+                      correctAnswer: parseInt(correctAnswerRaw) || 0,
+                      difficulty: 'medium', 
+                      explanation: explanation === 'NULL' ? '' : explanation,
+                      subjectId,
+                      topic
+                  };
+
+                  await DatabaseService.createQuestion(importCategory, subjectId, topic, subtopic, q);
+                  successCount++;
+              } catch (e) {
+                  console.error(e);
+                  errorCount++;
+              }
           }
       }
 
+      // Finalize
       alert(`Importação concluída!\nSucesso: ${successCount}\nErros: ${errorCount}`);
       setImportText('');
       setIsImporting(false);
+      // Reload Config to show new topics created during import
+      fetchConfigData();
   };
 
   const handleEditItem = (item: any, type: 'question' | 'lesson' | 'simulation' | 'subject') => {
@@ -1027,32 +1076,55 @@ const AdminPanel: React.FC = () => {
                   <div className="glass-card p-6 rounded-2xl animate-fade-in">
                       <h3 className="text-xl font-bold text-white mb-4">Importação em Massa</h3>
                       <div className="space-y-4">
-                          {/* ... Import Form ... */}
-                          <div>
-                              <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Categoria de Destino</label>
-                              <select 
-                                  className="w-full glass-input p-3 rounded-xl"
-                                  value={importCategory}
-                                  onChange={e => setImportCategory(e.target.value)}
+                          {/* Selector: Import Type */}
+                          <div className="flex bg-slate-900 border border-white/10 p-1 rounded-xl mb-4">
+                              <button 
+                                onClick={() => setImportType('question')}
+                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${importType === 'question' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
                               >
-                                  <option value="regular">Regular / ENEM</option>
-                                  <option value="military">Militar</option>
-                              </select>
+                                  Importar Questões
+                              </button>
+                              <button 
+                                onClick={() => setImportType('lesson')}
+                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${importType === 'lesson' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                              >
+                                  Importar Aulas
+                              </button>
                           </div>
+
+                          {/* ... Import Form ... */}
+                          {importType === 'question' && (
+                              <div>
+                                  <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Categoria de Destino</label>
+                                  <select 
+                                      className="w-full glass-input p-3 rounded-xl"
+                                      value={importCategory}
+                                      onChange={e => setImportCategory(e.target.value)}
+                                  >
+                                      <option value="regular">Regular / ENEM</option>
+                                      <option value="military">Militar</option>
+                                  </select>
+                              </div>
+                          )}
                           
                           <div>
-                              <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Cole as questões abaixo</label>
-                              <p className="text-[10px] text-slate-500 mb-2">Formato: MATERIA:SUBMATERIA:TOPICO:ENUNCIADO:IMAGEM:ALT1:ALT2:ALT3:ALT4:EXPLAIN:CORRECTANSWER(0-3)</p>
+                              <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Cole os dados abaixo</label>
+                              <p className="text-[10px] text-slate-500 mb-2 font-mono">
+                                  {importType === 'question' 
+                                    ? 'Formato: ID_MATERIA:SUBMATERIA:TOPICO:ENUNCIADO:IMAGEM:ALT1:ALT2:ALT3:ALT4:EXPLAIN:CORRECTANSWER(0-3)' 
+                                    : 'Formato: ID_MATERIA:TOPICO:TITULO:URL:DURACAO (URL pode ser "NULL")'
+                                  }
+                              </p>
                               <textarea 
                                   className="w-full glass-input p-4 rounded-xl min-h-[300px] font-mono text-xs"
-                                  placeholder="COLE AQUI..."
+                                  placeholder={importType === 'question' ? "matematica:Algebra:Logaritmos:Quanto é 2+2?:NULL:1:2:3:4:Simples:3" : "fisica:Cinemática:Aula 1 - Velocidade:NULL:10:00"}
                                   value={importText}
                                   onChange={e => setImportText(e.target.value)}
                               />
                           </div>
 
                           <button 
-                              onClick={handleImportQuestions}
+                              onClick={handleBulkImport}
                               disabled={isImporting || !importText.trim()}
                               className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl"
                           >
@@ -1225,7 +1297,7 @@ const AdminPanel: React.FC = () => {
 
                                                      <select className="w-full glass-input p-3 rounded-lg" value={contentForm.lExTopic} onChange={e => setContentForm({...contentForm, lExTopic: e.target.value})}>
                                                          <option value="">Tópico dos Exercícios</option>
-                                                         {contentForm.lExSubject && topics[contentForm.lExSubject]?.map(t => <option key={t} value={t}>{t}</option>)}
+                                                         {contentForm.lExSubject && topics[contentForm.lExTopic]?.map(t => <option key={t} value={t}>{t}</option>)}
                                                      </select>
 
                                                      {/* Multi-Select Subtopics */}

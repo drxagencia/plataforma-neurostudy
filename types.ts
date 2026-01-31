@@ -57,6 +57,7 @@ export interface User {
 
 export interface UserProfile extends User {
   plan: UserPlan;
+  billingCycle?: 'monthly' | 'yearly'; // Rastreia se o plano atual é mensal ou anual
   subscriptionExpiry: string; // ISO Date string
   balance: number; // Saldo em R$ (IA Chat)
   essayCredits: number; // Créditos de Redação
