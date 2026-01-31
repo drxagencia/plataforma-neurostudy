@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Zap, Trophy, Target, Brain, ChevronRight, Star, 
   Shield, Rocket, Users, Lock, CheckCircle2, PlayCircle, 
   TrendingUp, Sword, Hexagon, Crown, Sparkles, Check, X, Timer, CreditCard, Gift,
-  PenTool, Copy, Skull, Crosshair, ArrowDown, Clock, AlertTriangle, QrCode
+  PenTool, Copy, Skull, Crosshair, ArrowDown, Clock, AlertTriangle, QrCode, Play, Pause, ChevronDown, Unlock
 } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
@@ -28,6 +29,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [activeEnemy, setActiveEnemy] = useState<string | null>(null);
   const [defeatedEnemies, setDefeatedEnemies] = useState<string[]>([]);
   
+  // VSL / VIDEO STATE
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [videoCompleted, setVideoCompleted] = useState(false);
+  const [offerUnlocked, setOfferUnlocked] = useState(false);
+
   // CHECKOUT STATE
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly'); // Default to Yearly
   const [showCheckout, setShowCheckout] = useState(false);
@@ -65,6 +72,42 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       return () => clearInterval(interval);
   }, []);
 
+  // Fake Video Progress Logic
+  useEffect(() => {
+      let timer: any;
+      if (isVideoPlaying && videoProgress < 100) {
+          // VARIABLE SPEED LOGIC
+          let speed = 50; // default interval ms
+          let increment = 0.5;
+
+          if (videoProgress < 30) {
+              // 0-30%: VERY FAST
+              speed = 20; 
+              increment = 1.5;
+          } else if (videoProgress < 50) {
+              // 30-50%: MEDIUM FAST
+              speed = 40;
+              increment = 0.8;
+          } else if (videoProgress < 80) {
+              // 50-80%: NORMAL
+              speed = 80;
+              increment = 0.4;
+          } else {
+              // 80-100%: SLOW
+              speed = 200;
+              increment = 0.2;
+          }
+
+          timer = setTimeout(() => {
+              setVideoProgress(prev => Math.min(prev + increment, 100));
+          }, speed);
+      } else if (videoProgress >= 100) {
+          setVideoCompleted(true);
+          setIsVideoPlaying(false);
+      }
+      return () => clearTimeout(timer);
+  }, [isVideoPlaying, videoProgress]);
+
   const formatTime = (seconds: number) => {
       const h = Math.floor(seconds / 3600);
       const m = Math.floor((seconds % 3600) / 60);
@@ -80,10 +123,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const handleEnemyClick = (enemy: string) => {
       if (defeatedEnemies.includes(enemy)) return;
       setActiveEnemy(enemy);
+      // FASTER ANIMATION (600ms)
       setTimeout(() => {
           setDefeatedEnemies(prev => [...prev, enemy]);
           setActiveEnemy(null);
-      }, 1500); // Animation duration
+      }, 600); 
+  };
+
+  const handleRevealOffer = () => {
+      setOfferUnlocked(true);
+      setTimeout(() => scrollToSection('pricing'), 100);
   };
 
   // --- CHECKOUT LOGIC ---
@@ -206,7 +255,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       </section>
 
       {/* --- STAGE 2: CHOOSE YOUR ENEMY (INTERACTIVE) --- */}
-      <section id="stage-battle" className="py-32 px-4 bg-[#080f1a] relative border-t border-white/5">
+      <section id="stage-battle" className="py-20 px-4 bg-[#080f1a] relative border-t border-white/5">
           <div className="max-w-5xl mx-auto text-center">
               <h2 className="text-3xl md:text-5xl font-black mb-4">ESCOLHA SEU <span className="text-red-500">INIMIGO</span></h2>
               <p className="text-zinc-400 mb-12">Clique nos problemas para eliminá-los com o Método NeuroStudy.</p>
@@ -220,7 +269,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       <div 
                         key={enemy.id}
                         onClick={() => handleEnemyClick(enemy.id)}
-                        className={`relative h-64 rounded-3xl border-2 cursor-pointer transition-all duration-500 flex flex-col items-center justify-center p-6 overflow-hidden group ${
+                        className={`relative h-64 rounded-3xl border-2 cursor-pointer transition-all duration-300 flex flex-col items-center justify-center p-6 overflow-hidden group ${
                             defeatedEnemies.includes(enemy.id) 
                             ? 'bg-emerald-900/20 border-emerald-500/50 scale-95' 
                             : activeEnemy === enemy.id 
@@ -229,7 +278,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                         }`}
                       >
                           {/* Normal State */}
-                          <div className={`transition-opacity duration-300 ${defeatedEnemies.includes(enemy.id) || activeEnemy === enemy.id ? 'opacity-0' : 'opacity-100'}`}>
+                          <div className={`transition-opacity duration-200 ${defeatedEnemies.includes(enemy.id) || activeEnemy === enemy.id ? 'opacity-0' : 'opacity-100'}`}>
                               <enemy.icon size={48} className="text-slate-500 mb-4 mx-auto group-hover:text-red-400 transition-colors" />
                               <h3 className="text-xl font-black text-zinc-300 group-hover:text-white">{enemy.label}</h3>
                               <p className="text-xs text-zinc-500 mt-2 uppercase tracking-widest">Clique para atacar</p>
@@ -241,7 +290,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                           </div>
 
                           {/* Defeated State */}
-                          <div className={`absolute inset-0 flex flex-col items-center justify-center bg-emerald-950/80 backdrop-blur-sm transition-all duration-500 ${defeatedEnemies.includes(enemy.id) ? 'opacity-100 transform scale-100' : 'opacity-0 transform scale-150'}`}>
+                          <div className={`absolute inset-0 flex flex-col items-center justify-center bg-emerald-950/80 backdrop-blur-sm transition-all duration-300 ${defeatedEnemies.includes(enemy.id) ? 'opacity-100 transform scale-100' : 'opacity-0 transform scale-150'}`}>
                               <CheckCircle2 size={48} className="text-emerald-400 mb-2" />
                               <h3 className="text-lg font-bold text-white">ELIMINADO</h3>
                               <p className="text-xs text-emerald-300 font-mono mt-1">
@@ -251,16 +300,122 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       </div>
                   ))}
               </div>
+
+              {/* SEE MORE BUTTON */}
+              <div className="mt-16 animate-in slide-in-from-bottom-8 duration-700">
+                  <button 
+                    onClick={() => scrollToSection('video-section')}
+                    className="flex flex-col items-center gap-2 mx-auto text-slate-400 hover:text-white transition-colors"
+                  >
+                      <span className="text-sm font-bold uppercase tracking-widest">Ver a Solução</span>
+                      <ChevronDown size={24} className="animate-bounce" />
+                  </button>
+              </div>
           </div>
       </section>
 
-      {/* --- STAGE 3: THE ARMORY (PRICING) --- */}
-      <section id="pricing" className="py-32 px-4 relative bg-[#050b14] border-t border-white/5">
+      {/* --- STAGE 3: THE VIDEO (VSL) --- */}
+      <section id="video-section" className="py-32 px-4 relative bg-[#02050a] border-t border-white/5 overflow-hidden">
+          {/* Background FX */}
+          <div className="absolute top-0 left-0 w-full h-full">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[600px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
+          </div>
+
+          <div className="max-w-5xl mx-auto relative z-10 text-center">
+              <div className="inline-block px-4 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold uppercase tracking-widest mb-6">
+                  Vídeo Exclusivo
+              </div>
+              <h2 className="text-4xl md:text-6xl font-black mb-8 leading-tight">
+                  DESCUBRA O <span className="text-indigo-500">SEGREDO</span> DOS<br/>
+                  ESTUDANTES DE ALTA PERFORMANCE
+              </h2>
+
+              {/* VIDEO CONTAINER */}
+              <div className="relative w-full max-w-4xl mx-auto aspect-video rounded-3xl bg-black border border-slate-800 shadow-[0_0_60px_rgba(79,70,229,0.15)] overflow-hidden group">
+                  {/* FAKE VIDEO PLACEHOLDER */}
+                  {!isVideoPlaying && !videoCompleted ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50 backdrop-blur-sm z-20">
+                          <button 
+                            onClick={() => setIsVideoPlaying(true)}
+                            className="w-24 h-24 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md transition-all hover:scale-110 group-hover:shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+                          >
+                              <Play size={40} className="fill-white ml-2 text-white" />
+                          </button>
+                          <p className="mt-4 text-sm font-bold text-white uppercase tracking-widest animate-pulse">Clique para assistir</p>
+                      </div>
+                  ) : videoCompleted ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20 animate-in fade-in duration-500">
+                          <CheckCircle2 size={64} className="text-emerald-500 mb-4" />
+                          <h3 className="text-2xl font-bold text-white mb-2">Vídeo Finalizado</h3>
+                          <p className="text-slate-400 mb-6">Você desbloqueou uma oportunidade única.</p>
+                          <button 
+                            onClick={handleRevealOffer}
+                            className="px-8 py-3 bg-white text-black font-black rounded-full hover:bg-slate-200 transition-colors flex items-center gap-2"
+                          >
+                              CONTINUAR <ArrowDown size={18} />
+                          </button>
+                      </div>
+                  ) : null}
+
+                  {/* FAKE CONTENT (Just an image or pattern) */}
+                  <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
+                      <div className="text-slate-700 font-black text-9xl opacity-10">NEURO</div>
+                  </div>
+
+                  {/* FAKE PROGRESS BAR */}
+                  <div className="absolute bottom-0 left-0 w-full h-2 bg-slate-800">
+                      <div 
+                        className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)] transition-all duration-75 ease-linear"
+                        style={{ width: `${videoProgress}%` }}
+                      />
+                  </div>
+              </div>
+
+              {/* FAKE CONTROLS HINT */}
+              {isVideoPlaying && (
+                  <div className="mt-4 flex justify-between text-xs text-slate-500 font-mono">
+                      <span>{videoProgress < 30 ? 'INTRODUÇÃO' : videoProgress < 80 ? 'CONTEÚDO PRINCIPAL' : 'CONCLUSÃO'}</span>
+                      <span>{Math.round(videoProgress)}%</span>
+                  </div>
+              )}
+          </div>
+      </section>
+
+      {/* --- LIGHTNING OFFER TRIGGER (APPEARS AFTER VIDEO) --- */}
+      {videoCompleted && !offerUnlocked && (
+          <section className="py-12 bg-indigo-600 relative overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-700">
+              <div className="max-w-4xl mx-auto text-center relative z-10 px-4">
+                  <div className="inline-flex items-center gap-2 bg-white/20 border border-white/30 rounded-full px-4 py-1 text-white text-xs font-bold uppercase mb-4 animate-pulse">
+                      <Timer size={14} /> Oferta por tempo limitado
+                  </div>
+                  <h2 className="text-3xl md:text-5xl font-black text-white mb-6">
+                      OFERTA RELÂMPAGO DESBLOQUEADA
+                  </h2>
+                  <p className="text-indigo-100 text-lg mb-8 max-w-2xl mx-auto">
+                      Você assistiu à apresentação e provou que está comprometido. Liberamos uma condição especial exclusiva para você agora.
+                  </p>
+                  <button 
+                    onClick={handleRevealOffer}
+                    className="group relative px-10 py-5 bg-white text-indigo-900 font-black text-xl rounded-full shadow-2xl hover:scale-105 transition-all flex items-center gap-3 mx-auto"
+                  >
+                      <Unlock size={24} className="text-indigo-600" />
+                      QUERO VER A OFERTA
+                  </button>
+              </div>
+              
+              {/* Confetti / BG effects */}
+              <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
+          </section>
+      )}
+
+      {/* --- STAGE 4: THE ARMORY (OFFERS) - HIDDEN UNTIL UNLOCKED --- */}
+      {offerUnlocked && (
+      <section id="pricing" className="py-32 px-4 relative bg-[#050b14] border-t border-white/5 animate-in fade-in slide-in-from-bottom-20 duration-1000">
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
         
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight">LOJA DE <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">ITENS</span></h2>
+            <h2 className="text-4xl md:text-6xl font-black mb-6 tracking-tight">OFERTAS <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">EXCLUSIVAS</span></h2>
             
             {/* BILLING TOGGLE */}
             <div className="inline-flex bg-slate-900 p-1 rounded-2xl border border-white/10 relative">
@@ -372,6 +527,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           </div>
         </div>
       </section>
+      )}
 
       {/* --- CHECKOUT MODAL (RE-ENGINEERED) --- */}
       {showCheckout && (
