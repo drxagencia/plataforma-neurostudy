@@ -8,12 +8,12 @@ export interface Lead {
   amount: number;
   billing: string;
   contact: string;
-  name: string;
+  name: string; // Nome do aluno
   paymentMethod: string;
   planId: string; // 'adv', 'basic', etc
   status: string; // 'pending_pix', 'paid', etc
   timestamp: string; // ISO String
-  name_pix?: string;
+  pixIdentifier?: string; // Nome de quem pagou o PIX
   processed?: boolean; // Internal control
 }
 

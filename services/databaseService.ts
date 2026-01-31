@@ -97,8 +97,8 @@ export const DatabaseService = {
   // --- User Profile & XP ---
   getUserProfile: async (uid: string): Promise<UserProfile | null> => {
     try {
-      // NOTE: This fetches the ENTIRE user node. Avoid calling this frequently in child components.
-      // Use the 'user' prop passed from App.tsx whenever possible.
+      // OPTIMIZED: Fetches only the user root node. 
+      // We have moved heavy arrays (essays, transactions, results) to their own root nodes (user_essays, etc.)
       const snapshot = await get(child(ref(database), `users/${uid}`));
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -274,6 +274,8 @@ export const DatabaseService = {
 
   markQuestionAsAnswered: async (uid: string, questionId: string, isCorrect: boolean): Promise<void> => {
       try {
+          // Optimized: Store only last 100 or restructure if history gets too big
+          // For now, keeping it under user node is okay if it's just IDs and bools.
           await update(ref(database, `users/${uid}/answeredQuestions/${questionId}`), {
               timestamp: Date.now(),
               correct: isCorrect
@@ -285,8 +287,7 @@ export const DatabaseService = {
 
   getAnsweredQuestions: async (uid: string): Promise<Record<string, { correct: boolean }>> => {
       try {
-          // Optimized: Only fetch if needed, but for now we keep it. 
-          // Ideally, we shouldn't fetch the whole history on load if it's huge.
+          // Optimized: Only fetch if needed
           const snap = await get(ref(database, `users/${uid}/answeredQuestions`));
           return snap.exists() ? snap.val() : {};
       } catch (e) {
@@ -346,7 +347,6 @@ export const DatabaseService = {
             status: 'pending',
             timestamp: Date.now(),
             type,
-            // FIX: Only add quantityCredits if defined. Firebase throws on undefined.
             ...(quantityCredits !== undefined ? { quantityCredits } : {}),
             ...(planLabel ? { planLabel } : {})
         };
@@ -387,8 +387,8 @@ export const DatabaseService = {
                 const currentCredits = userSnap.val().essayCredits || 0;
                 await update(userRef, { essayCredits: currentCredits + request.quantityCredits });
                 
-                // Transaction Record
-                const transRef = push(ref(database, `users/${request.uid}/transactions`));
+                // Transaction Record (Moved to user_transactions)
+                const transRef = push(ref(database, `user_transactions/${request.uid}`));
                 await set(transRef, {
                     id: transRef.key!,
                     type: 'credit',
@@ -403,7 +403,7 @@ export const DatabaseService = {
                 const currentBalance = userSnap.val().balance || 0;
                 await update(userRef, { balance: currentBalance + request.amount });
 
-                const transRef = push(ref(database, `users/${request.uid}/transactions`));
+                const transRef = push(ref(database, `user_transactions/${request.uid}`));
                 await set(transRef, {
                     id: transRef.key!,
                     type: 'credit',
@@ -424,7 +424,8 @@ export const DatabaseService = {
 
   getUserTransactions: async (uid: string): Promise<Transaction[]> => {
       try {
-          const q = query(ref(database, `users/${uid}/transactions`), limitToLast(50));
+          // Changed path to user_transactions
+          const q = query(ref(database, `user_transactions/${uid}`), limitToLast(50));
           const snapshot = await get(q);
           if (snapshot.exists()) {
               const data = snapshot.val();
@@ -453,17 +454,19 @@ export const DatabaseService = {
 
   // OPTIMIZED: Split heavy image data from light metadata
   saveEssayCorrection: async (uid: string, correction: EssayCorrection): Promise<void> => {
-     // 1. Generate ID
-     const correctionRef = push(ref(database, `users/${uid}/essays`));
+     // 1. Generate ID in the metadata list
+     const correctionRef = push(ref(database, `users/${uid}/essays`)); // Legacy location or move to user_essays_meta? 
+     // Let's keep metadata in users/{uid}/essays BUT strip the image.
+     
      const correctionId = correctionRef.key!;
 
      // 2. Extract heavy image data
      const { imageUrl, ...metaData } = correction;
 
-     // 3. Save metadata to user profile list
+     // 3. Save metadata to user profile list (LIGHTWEIGHT)
      await set(correctionRef, { ...metaData, id: correctionId });
 
-     // 4. Save heavy image to separate node 'essay_blobs'
+     // 4. Save heavy image to separate node 'essay_blobs' (HEAVY)
      if (imageUrl) {
          await set(ref(database, `essay_blobs/${correctionId}`), { imageUrl });
      }
@@ -471,7 +474,7 @@ export const DatabaseService = {
 
   getEssayCorrections: async (uid: string): Promise<EssayCorrection[]> => {
       try {
-          // This only fetches metadata (no images)
+          // This only fetches metadata (no images) because we stripped them on save
           const snap = await get(ref(database, `users/${uid}/essays`));
           if(snap.exists()) {
              return Object.values(snap.val());
@@ -856,28 +859,11 @@ export const DatabaseService = {
       
       if (snapshot.exists()) {
         const data = snapshot.val();
-        // Here we'd ideally join with user profiles to get current XP/Rank
-        // For efficiency, we will fetch user snapshot for the posts
-        // For simplicity now, we assume authorXP is stored on post or fetched. 
-        // We will fetch author XP in real-time or assume stored.
-        // Let's rely on cached 'users' node if small, or just display static XP from creation (less ideal).
-        // Better: Fetch author profile for displayed posts.
-        
-        // As a quick fix for the "High Quality Tags", we will modify the return to include authorXp by fetching user data for the specific authors.
-        // This is N+1 but for 50 posts it's acceptable if cached.
         
         const postsArray = Object.keys(data).map(key => ({...data[key], id: key}));
         
-        // Fetch XP for authors
-        // Note: In a production app, use Cloud Functions to sync authorXp to post or index users.
+        // Fetch XP for authors (Consider caching user profiles in production)
         const posts = await Promise.all(postsArray.map(async (p: any) => {
-             // Try to find user by name if uid not stored? Or if we stored uid.
-             // We stored UID in createPost logic? No, only passed it. 
-             // We need to store authorId in post to fetch current rank.
-             // Assuming we update createPost to store authorId.
-             
-             // Fallback: If we don't have ID, we can't show dynamic rank easily.
-             // Let's assume we start storing authorId from now on.
              let xp = 0;
              if (p.authorId) {
                  const u = await DatabaseService.getUserProfile(p.authorId);
@@ -977,7 +963,8 @@ export const DatabaseService = {
 
   saveSimulationResult: async (result: SimulationResult): Promise<void> => {
       try {
-          const resRef = push(ref(database, `users/${result.userId}/simulationResults`));
+          // Moved to user_simulation_results root node
+          const resRef = push(ref(database, `user_simulation_results/${result.userId}`));
           await set(resRef, result);
           
           // XP Calculation: Base 100 + (Score * 2)

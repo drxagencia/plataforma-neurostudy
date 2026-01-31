@@ -78,6 +78,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   const handleSelectHistoryItem = async (item: EssayCorrection) => {
       setLoadingDetails(true);
+      // On demand load of image
       if (item.id && !item.imageUrl) {
           const imgUrl = await DatabaseService.getEssayImage(item.id);
           if (imgUrl) item.imageUrl = imgUrl;

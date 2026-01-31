@@ -62,7 +62,8 @@
         --bg-body: #000000;
         --glass-bg: rgba(15, 23, 42, 0.6);
         --glass-border: rgba(255, 255, 255, 0.05);
-        --star-color: #475569;
+        /* UPDATED: White stars for maximum visibility in dark mode */
+        --star-color: #ffffff;
       }
 
       /* Dark Mode (Default) - Deep Universe Background */
@@ -206,8 +207,8 @@
 
       /* Layer 1: Small stars, slower (background) */
       .stars-1 {
-        width: 1px;
-        height: 1px;
+        width: 1.5px; /* Increased size */
+        height: 1.5px;
         background: transparent;
         box-shadow: 
           10vw 10vh var(--star-color), 80vw 5vh var(--star-color), 5vw 85vh var(--star-color), 30vw 15vh var(--star-color), 90vw 60vh var(--star-color),
@@ -215,7 +216,7 @@
           60vw 10vh var(--star-color), 85vw 35vh var(--star-color), 35vw 95vh var(--star-color), 10vw 65vh var(--star-color), 95vw 20vh var(--star-color),
           50vw 50vh var(--star-color), 20vw 30vh var(--star-color), 75vw 80vh var(--star-color), 40vw 10vh var(--star-color), 65vw 45vh var(--star-color);
         animation: animStar 100s linear infinite;
-        opacity: 0.3; /* Dimmer for depth */
+        opacity: 0.6; /* Increased opacity from 0.3 */
       }
 
       /* Layer 2: Medium stars */
@@ -228,27 +229,27 @@
           40vw 40vh var(--star-color), 80vw 30vh var(--star-color), 30vw 90vh var(--star-color), 70vw 50vh var(--star-color),
           50vw 10vh var(--star-color), 15vw 85vh var(--star-color), 85vw 55vh var(--star-color), 35vw 25vh var(--star-color);
         animation: animStar 60s linear infinite;
-        opacity: 0.5;
+        opacity: 0.8; /* Increased opacity from 0.5 */
       }
       .stars-2::after { width: 2px; height: 2px; }
 
       /* Layer 3: Large, brighter stars */
       .stars-3 {
-        width: 2px;
-        height: 2px;
+        width: 3px; /* Increased size from 2px */
+        height: 3px;
         background: transparent;
         box-shadow: 
           50vw 30vh var(--star-color), 10vw 80vh var(--star-color), 85vw 15vh var(--star-color), 25vw 60vh var(--star-color);
         animation: animStar 40s linear infinite;
-        opacity: 0.8;
-        /* Only apply glow filter in Dark Mode */
-        filter: drop-shadow(0 0 2px #6366f1);
+        opacity: 1; /* Max visibility */
+        /* Enhanced Glow in Dark Mode */
+        filter: drop-shadow(0 0 3px white);
       }
       html.light .stars-3 { 
           filter: none; 
-          opacity: 0.6; /* Slightly less intense in light mode */
+          opacity: 0.6; 
       }
-      .stars-3::after { width: 2px; height: 2px; }
+      .stars-3::after { width: 3px; height: 3px; }
 
       @keyframes animStar {
         from { transform: translateY(0); }
