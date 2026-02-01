@@ -29,7 +29,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [defeatedEnemies, setDefeatedEnemies] = useState<string[]>([]);
   
   // VSL / VIDEO STATE
-  const [videoProgress, setVideoProgress] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoCompleted, setVideoCompleted] = useState(false);
   const [offerUnlocked, setOfferUnlocked] = useState(false);
@@ -51,7 +50,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   
   const [loading, setLoading] = useState(false);
 
-  // Timer
+  // Timer (Optimized: Updates only once per second, acceptable)
   useEffect(() => {
       const interval = setInterval(() => {
           setTimeLeft(prev => (prev > 0 ? prev - 1 : 4 * 60 * 60)); 
@@ -59,33 +58,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       return () => clearInterval(interval);
   }, []);
 
-  // Fake Video Progress Logic (Variable Speed)
+  // Video Completion Logic (CSS Driven now, this just handles the final trigger)
   useEffect(() => {
       let timer: any;
-      if (isVideoPlaying && videoProgress < 100) {
-          // VARIABLE SPEED LOGIC
-          let speed = 50; 
-          let increment = 0.5;
-
-          if (videoProgress < 30) {
-              speed = 20; increment = 1.5; // VERY FAST intro
-          } else if (videoProgress < 50) {
-              speed = 40; increment = 0.8; // MEDIUM
-          } else if (videoProgress < 80) {
-              speed = 80; increment = 0.4; // NORMAL
-          } else {
-              speed = 200; increment = 0.2; // SLOW ending
-          }
-
+      if (isVideoPlaying) {
+          // Mock video length: 8 seconds for demo
+          const VIDEO_DURATION = 8000; 
           timer = setTimeout(() => {
-              setVideoProgress(prev => Math.min(prev + increment, 100));
-          }, speed);
-      } else if (videoProgress >= 100) {
-          setVideoCompleted(true);
-          setIsVideoPlaying(false);
+              setVideoCompleted(true);
+              setIsVideoPlaying(false);
+          }, VIDEO_DURATION);
       }
       return () => clearTimeout(timer);
-  }, [isVideoPlaying, videoProgress]);
+  }, [isVideoPlaying]);
 
   const formatTime = (seconds: number) => {
       const h = Math.floor(seconds / 3600);
@@ -180,7 +165,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   return (
     <div className="min-h-screen bg-[#050b14] text-white font-sans overflow-x-hidden selection:bg-emerald-500/30">
       
-      {/* CUSTOM ANIMATIONS */}
+      {/* CUSTOM ANIMATIONS (Optimized) */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
@@ -191,13 +176,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           25% { transform: translateX(-5px) rotate(-5deg); }
           75% { transform: translateX(5px) rotate(5deg); }
         }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
-          50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.5); }
-        }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        .animate-shake { animation: shake 0.4s ease-in-out; }
-        .animate-pulse-glow { animation: pulse-glow 3s infinite; }
+        .animate-float { animation: float 6s ease-in-out infinite; will-change: transform; }
+        .animate-shake { animation: shake 0.4s ease-in-out; will-change: transform; }
         .bg-grid-pattern {
             background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
             background-size: 30px 30px;
@@ -208,7 +188,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       <div className="fixed top-0 left-0 right-0 z-50 bg-[#050b14]/80 backdrop-blur-md border-b border-white/5 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Brain size={24} className="text-emerald-500 animate-pulse" />
+            <Brain size={24} className="text-emerald-500" />
             <span className="font-bold tracking-wider text-lg">Neuro<span className="text-emerald-400">Study</span></span>
           </div>
           <button onClick={onStartGame} className="text-xs font-bold text-zinc-400 hover:text-white uppercase tracking-widest border border-transparent hover:border-white/10 px-3 py-1.5 rounded-lg transition-all">
@@ -221,7 +201,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-4 overflow-hidden pt-20 bg-grid-pattern">
         {/* Background Ambience */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] md:w-[1000px] h-[600px] md:h-[1000px] bg-emerald-500/10 rounded-full blur-[100px] animate-pulse-slow opacity-50" />
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] md:w-[1000px] h-[600px] md:h-[1000px] bg-emerald-500/10 rounded-full blur-[100px] opacity-50" />
         </div>
 
         <div className="text-center z-10 max-w-4xl w-full">
@@ -335,9 +315,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50 backdrop-blur-sm z-20">
                           <button 
                             onClick={() => setIsVideoPlaying(true)}
-                            className="w-20 h-20 md:w-24 md:h-24 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md transition-all hover:scale-110 group-hover:shadow-[0_0_40px_rgba(255,255,255,0.2)] animate-pulse-glow"
+                            className="w-20 h-20 md:w-24 md:h-24 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md transition-all hover:scale-110 group-hover:shadow-[0_0_40px_rgba(255,255,255,0.2)]"
                           >
-                              <Play size={32} md:size={40} className="fill-white ml-1 text-white" />
+                              <Play className="w-8 h-8 md:w-10 md:h-10 fill-white ml-1 text-white" />
                           </button>
                           <p className="mt-4 text-xs md:text-sm font-bold text-white uppercase tracking-widest animate-pulse">Toque para assistir</p>
                       </div>
@@ -360,11 +340,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       <div className="text-slate-700 font-black text-6xl md:text-9xl opacity-10 select-none">NEURO</div>
                   </div>
 
-                  {/* FAKE PROGRESS BAR */}
+                  {/* FAKE PROGRESS BAR - CSS ANIMATED FOR PERFORMANCE */}
                   <div className="absolute bottom-0 left-0 w-full h-1.5 md:h-2 bg-slate-800">
                       <div 
-                        className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)] transition-all duration-75 ease-linear"
-                        style={{ width: `${videoProgress}%` }}
+                        className={`h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]`}
+                        style={{ 
+                            width: isVideoPlaying ? '100%' : '0%',
+                            transition: isVideoPlaying ? 'width 8s linear' : 'none'
+                        }}
                       />
                   </div>
               </div>
@@ -372,8 +355,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               {/* FAKE CONTROLS HINT */}
               {isVideoPlaying && (
                   <div className="mt-4 flex justify-between text-[10px] md:text-xs text-slate-500 font-mono px-2">
-                      <span>{videoProgress < 30 ? 'INTRODUÇÃO' : videoProgress < 80 ? 'CONTEÚDO PRINCIPAL' : 'CONCLUSÃO'}</span>
-                      <span>{Math.round(videoProgress)}%</span>
+                      <span>PROCESSANDO CONTEÚDO...</span>
+                      <span>AO VIVO</span>
                   </div>
               )}
           </div>

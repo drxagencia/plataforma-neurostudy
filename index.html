@@ -142,7 +142,7 @@
       html.light .bg-emerald-600 .text-white,
       html.light .bg-red-600 .text-white,
       html.light .bg-yellow-600 .text-white,
-      html.light .bg-slate-800 .text-white, /* Sometimes buttons use slate-800, keep white text there? No, inverted above. */
+      html.light .bg-slate-800 .text-white, 
       html.light button[class*="bg-indigo-"] .text-white,
       html.light button[class*="bg-emerald-"] .text-white,
       html.light button[class*="bg-red-"] .text-white,
@@ -154,7 +154,6 @@
           color: #ffffff !important;
       }
 
-      /* Fix Glass Inputs in Light Mode */
       html.light .glass-input {
         background: #ffffff;
         border: 1px solid #cbd5e1;
@@ -164,7 +163,7 @@
       html.light .glass-input::placeholder { color: #94a3b8; }
 
       h1, h2, h3, h4, h5, h6 {
-        font-family: 'Outfit', sans-serif; /* Use Outfit for all headers by default */
+        font-family: 'Outfit', sans-serif;
         letter-spacing: -0.025em;
       }
 
@@ -175,7 +174,7 @@
       html.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
       ::-webkit-scrollbar-thumb:hover { background: #334155; }
 
-      /* --- INFINITE RISING STARS ANIMATION --- */
+      /* --- OPTIMIZED INFINITE RISING STARS ANIMATION --- */
       .stars-container {
         position: fixed;
         top: 0;
@@ -185,6 +184,8 @@
         pointer-events: none;
         z-index: 0;
         overflow: hidden;
+        /* Optimization: GPU Layer promotion */
+        transform: translateZ(0); 
       }
 
       .star-layer {
@@ -192,6 +193,8 @@
         top: 0;
         left: 0;
         background: transparent;
+        /* Optimization: Tell browser this will animate */
+        will-change: transform; 
       }
 
       .star-layer::after {
@@ -205,18 +208,19 @@
         box-shadow: inherit;
       }
 
-      /* Layer 1: Small stars, slower (background) */
+      /* Layer 1: Small stars (Reduced count for performance) */
       .stars-1 {
-        width: 1.5px; /* Increased size */
+        width: 1.5px; 
         height: 1.5px;
         background: transparent;
+        /* Significantly reduced shadow count */
         box-shadow: 
-          10vw 10vh var(--star-color), 80vw 5vh var(--star-color), 5vw 85vh var(--star-color), 30vw 15vh var(--star-color), 90vw 60vh var(--star-color),
-          15vw 40vh var(--star-color), 55vw 25vh var(--star-color), 70vw 90vh var(--star-color), 45vw 55vh var(--star-color), 25vw 75vh var(--star-color),
-          60vw 10vh var(--star-color), 85vw 35vh var(--star-color), 35vw 95vh var(--star-color), 10vw 65vh var(--star-color), 95vw 20vh var(--star-color),
-          50vw 50vh var(--star-color), 20vw 30vh var(--star-color), 75vw 80vh var(--star-color), 40vw 10vh var(--star-color), 65vw 45vh var(--star-color);
+          10vw 10vh var(--star-color), 80vw 5vh var(--star-color), 50vw 50vh var(--star-color),
+          30vw 15vh var(--star-color), 90vw 60vh var(--star-color), 15vw 40vh var(--star-color), 
+          55vw 25vh var(--star-color), 70vw 90vh var(--star-color), 25vw 75vh var(--star-color),
+          40vw 10vh var(--star-color);
         animation: animStar 100s linear infinite;
-        opacity: 0.6; /* Increased opacity from 0.3 */
+        opacity: 0.5;
       }
 
       /* Layer 2: Medium stars */
@@ -225,25 +229,23 @@
         height: 2px;
         background: transparent;
         box-shadow: 
-          20vw 20vh var(--star-color), 60vw 80vh var(--star-color), 10vw 60vh var(--star-color), 90vw 10vh var(--star-color),
-          40vw 40vh var(--star-color), 80vw 30vh var(--star-color), 30vw 90vh var(--star-color), 70vw 50vh var(--star-color),
-          50vw 10vh var(--star-color), 15vw 85vh var(--star-color), 85vw 55vh var(--star-color), 35vw 25vh var(--star-color);
+          20vw 20vh var(--star-color), 60vw 80vh var(--star-color), 90vw 10vh var(--star-color),
+          40vw 40vh var(--star-color), 80vw 30vh var(--star-color), 15vw 85vh var(--star-color);
         animation: animStar 60s linear infinite;
-        opacity: 0.8; /* Increased opacity from 0.5 */
+        opacity: 0.7;
       }
       .stars-2::after { width: 2px; height: 2px; }
 
-      /* Layer 3: Large, brighter stars */
+      /* Layer 3: Large, brighter stars (Minimal count) */
       .stars-3 {
-        width: 3px; /* Increased size from 2px */
+        width: 3px; 
         height: 3px;
         background: transparent;
         box-shadow: 
-          50vw 30vh var(--star-color), 10vw 80vh var(--star-color), 85vw 15vh var(--star-color), 25vw 60vh var(--star-color);
+          50vw 30vh var(--star-color), 10vw 80vh var(--star-color), 85vw 15vh var(--star-color);
         animation: animStar 40s linear infinite;
-        opacity: 1; /* Max visibility */
-        /* Enhanced Glow in Dark Mode */
-        filter: drop-shadow(0 0 3px white);
+        opacity: 0.9;
+        filter: drop-shadow(0 0 2px white);
       }
       html.light .stars-3 { 
           filter: none; 
@@ -256,12 +258,14 @@
         to { transform: translateY(-100vh); }
       }
 
-      /* Nebula Glows - Darker and more subtle */
+      /* Nebula Glows - Optimized */
       .nebula-glow {
         position: fixed;
         width: 100vw;
         height: 100vh;
         z-index: -1;
+        /* Using will-change to optimize opacity animation */
+        will-change: opacity, transform;
         background: 
           radial-gradient(circle at 15% 55%, rgba(30, 27, 75, 0.08), transparent 40%),
           radial-gradient(circle at 85% 25%, rgba(49, 46, 129, 0.05), transparent 40%);
@@ -281,10 +285,11 @@
       
       .glass-card {
         background: var(--glass-bg);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        /* Optimized blur: kept moderate. High blur values (>20px) kill performance on weak GPUs */
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         border: 1px solid var(--glass-border);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       }
       
       .glass-input {

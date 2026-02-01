@@ -3,10 +3,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target, Tag } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target, Tag, Megaphone, Copy, AlertTriangle, MousePointerClick, Clock, ShoppingCart } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config' | 'metrics'>('leads');
+  const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config' | 'metrics' | 'traffic'>('leads');
   const [contentTab, setContentTab] = useState<'question' | 'lesson' | 'subject' | 'simulation' | 'import'>('question');
   
   // View Mode: Create New vs Manage Existing
@@ -24,6 +24,9 @@ const AdminPanel: React.FC = () => {
   const [recharges, setRecharges] = useState<RechargeRequest[]>([]);
   const [aiConfig, setAiConfig] = useState<AiConfig | null>(null);
   const [simulations, setSimulations] = useState<Simulation[]>([]);
+  
+  // Traffic Data
+  const [trafficConfig, setTrafficConfig] = useState({ vslScript: '', checkoutLinkMonthly: '', checkoutLinkYearly: '' });
   
   // Metrics Specific
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -144,6 +147,7 @@ const AdminPanel: React.FC = () => {
     setLoading(false);
   };
 
+  // ... (LAZY LOAD effects preserved) ...
   // LAZY LOAD: Users (Only when tab active)
   useEffect(() => {
       if (activeTab === 'users' || activeTab === 'metrics') {
@@ -168,6 +172,13 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
       if (activeTab === 'finance' || activeTab === 'metrics') {
           DatabaseService.getRechargeRequests().then(r => setRecharges(r));
+      }
+  }, [activeTab]);
+
+  // LAZY LOAD: Traffic
+  useEffect(() => {
+      if (activeTab === 'traffic') {
+          DatabaseService.getTrafficSettings().then(t => setTrafficConfig(t));
       }
   }, [activeTab]);
 
@@ -222,7 +233,7 @@ const AdminPanel: React.FC = () => {
       }
   }, [contentForm.subjectId, viewMode, contentTab]);
 
-  // --- ACTIONS ---
+  // --- ACTIONS --- (Preserved all existing actions: normalizeId, handleOpenApproveModal, handleApproveLead, handleBulkImport, handleSaveTraffic, handleEditItem, handleDeleteItem, handleSaveContent, resetForms, addMaterial, removeMaterial, toggleQuestionInSim, toggleSubtopic, handleEditUser, handleSaveUser, handleProcessRecharge)
 
   const normalizeId = (str: string) => {
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -382,6 +393,15 @@ const AdminPanel: React.FC = () => {
       setIsImporting(false);
       // Reload Config to show new topics created during import
       fetchConfigData();
+  };
+
+  const handleSaveTraffic = async () => {
+      try {
+          await DatabaseService.saveTrafficSettings(trafficConfig);
+          alert("Configurações de Tráfego Salvas!");
+      } catch(e) {
+          alert("Erro ao salvar.");
+      }
   };
 
   const handleEditItem = (item: any, type: 'question' | 'lesson' | 'simulation' | 'subject') => {
@@ -896,7 +916,8 @@ const AdminPanel: React.FC = () => {
                 { id: 'metrics', label: 'Métricas', icon: BarChart3 },
                 { id: 'content', label: 'Conteúdo', icon: BookOpen },
                 { id: 'finance', label: 'Financeiro', icon: Wallet },
-                { id: 'config', label: 'Config. IA', icon: SettingsIcon }
+                { id: 'config', label: 'Config. IA', icon: SettingsIcon },
+                { id: 'traffic', label: 'Tráfego', icon: Megaphone }
             ].map(tab => (
                 <button 
                     key={tab.id}
@@ -935,6 +956,153 @@ const AdminPanel: React.FC = () => {
           </div>
       )}
 
+      {/* --- TRAFFIC TAB --- */}
+      {activeTab === 'traffic' && (
+          <div className="space-y-6 animate-fade-in">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Megaphone className="text-indigo-400" /> Roteiro VSL e Links
+              </h3>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Script Editor */}
+                  <div className="lg:col-span-2 space-y-4">
+                      <div className="glass-card p-6 rounded-2xl border border-white/5 h-full flex flex-col">
+                          <div className="flex justify-between items-center mb-4">
+                              <label className="text-xs text-slate-400 font-bold uppercase">Roteiro da VSL (Landing Page)</label>
+                              <button onClick={() => {navigator.clipboard.writeText(trafficConfig.vslScript); alert("Roteiro copiado!");}} className="text-indigo-400 hover:text-white flex items-center gap-1 text-xs font-bold">
+                                  <Copy size={14} /> Copiar
+                              </button>
+                          </div>
+                          <textarea 
+                              className="w-full flex-1 bg-slate-950 border border-white/10 rounded-xl p-4 text-sm font-mono text-slate-300 focus:border-indigo-500 focus:outline-none min-h-[500px]"
+                              value={trafficConfig.vslScript}
+                              onChange={e => setTrafficConfig({...trafficConfig, vslScript: e.target.value})}
+                              placeholder="Cole o roteiro da VSL aqui..."
+                          />
+                      </div>
+                  </div>
+
+                  {/* Settings & Links & Analysis */}
+                  <div className="space-y-6">
+                      <div className="glass-card p-6 rounded-2xl border border-white/5 space-y-4">
+                          <h4 className="font-bold text-white mb-2">Links de Checkout (Kirvano)</h4>
+                          
+                          <div>
+                              <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Link Mensal</label>
+                              <input 
+                                  className="w-full glass-input p-3 rounded-xl text-xs"
+                                  value={trafficConfig.checkoutLinkMonthly}
+                                  onChange={e => setTrafficConfig({...trafficConfig, checkoutLinkMonthly: e.target.value})}
+                                  placeholder="https://kirvano.com/..."
+                              />
+                          </div>
+
+                          <div>
+                              <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Link Anual</label>
+                              <input 
+                                  className="w-full glass-input p-3 rounded-xl text-xs"
+                                  value={trafficConfig.checkoutLinkYearly}
+                                  onChange={e => setTrafficConfig({...trafficConfig, checkoutLinkYearly: e.target.value})}
+                                  placeholder="https://kirvano.com/..."
+                              />
+                          </div>
+
+                          <button 
+                              onClick={handleSaveTraffic}
+                              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl mt-4 flex items-center justify-center gap-2"
+                          >
+                              <Save size={18} /> Salvar Configurações
+                          </button>
+                      </div>
+
+                      {/* Cheatsheet / Tips */}
+                      <div className="glass-card p-6 rounded-2xl border border-indigo-500/20 bg-indigo-900/10">
+                          <h4 className="font-bold text-indigo-300 mb-4 text-sm uppercase">Estrutura de VSL (NeuroStudy)</h4>
+                          <ul className="space-y-3 text-xs text-slate-300">
+                              <li className="flex gap-2">
+                                  <span className="font-bold text-white">00:00</span>
+                                  <span>Hook: Quebrar padrão (Pare de estudar errado).</span>
+                              </li>
+                              <li className="flex gap-2">
+                                  <span className="font-bold text-white">00:45</span>
+                                  <span>Problema: Tédio, ansiedade e método passivo.</span>
+                              </li>
+                              <li className="flex gap-2">
+                                  <span className="font-bold text-white">01:30</span>
+                                  <span>Solução: Gamificação + IA (Dopamina útil).</span>
+                              </li>
+                              <li className="flex gap-2">
+                                  <span className="font-bold text-white">03:00</span>
+                                  <span>Prova: Mostrar plataforma (Rank, Questões).</span>
+                              </li>
+                              <li className="flex gap-2">
+                                  <span className="font-bold text-white">04:00</span>
+                                  <span>Oferta: Comparação de preço (Lanche vs Futuro).</span>
+                              </li>
+                              <li className="flex gap-2">
+                                  <span className="font-bold text-white">05:00</span>
+                                  <span>CTA: Garantia de 7 dias e Escassez.</span>
+                              </li>
+                          </ul>
+                      </div>
+
+                      {/* Analysis Parameters (NEW) */}
+                      <div className="glass-card p-6 rounded-2xl border border-emerald-500/20 bg-emerald-900/10">
+                          <h4 className="font-bold text-emerald-400 mb-4 text-sm uppercase flex items-center gap-2">
+                              <Activity size={16} /> Parâmetros de Análise
+                          </h4>
+                          <div className="space-y-6">
+                              {/* Metrics */}
+                              <div className="space-y-2">
+                                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider flex items-center gap-1"><MousePointerClick size={10}/> Indicadores Base</p>
+                                  <ul className="space-y-2">
+                                      <li className="text-xs text-slate-300 flex items-start gap-1"><div className="w-1 h-1 bg-emerald-500 rounded-full mt-1.5 shrink-0"/><span><strong className="text-white">CPC Bom:</strong> Criativo bom (para e clica).</span></li>
+                                      <li className="text-xs text-slate-300 flex items-start gap-1"><div className="w-1 h-1 bg-emerald-500 rounded-full mt-1.5 shrink-0"/><span><strong className="text-white">CTR Alto:</strong> Ângulo certo (dor/desejo).</span></li>
+                                      <li className="text-xs text-slate-300 flex items-start gap-1"><div className="w-1 h-1 bg-yellow-500 rounded-full mt-1.5 shrink-0"/><span><strong className="text-white">CPM Alto:</strong> Público disputado ou promessa fraca.</span></li>
+                                      <li className="text-xs text-slate-300 flex items-start gap-1"><div className="w-1 h-1 bg-indigo-500 rounded-full mt-1.5 shrink-0"/><span><strong className="text-white">Tempo Vídeo Alto:</strong> Narrativa boa (prende).</span></li>
+                                      <li className="text-xs text-slate-300 flex items-start gap-1"><div className="w-1 h-1 bg-indigo-500 rounded-full mt-1.5 shrink-0"/><span><strong className="text-white">Conversão Alta:</strong> Oferta forte (percepção de valor).</span></li>
+                                      <li className="text-xs text-slate-300 flex items-start gap-1"><div className="w-1 h-1 bg-emerald-500 rounded-full mt-1.5 shrink-0"/><span><strong className="text-white">CAC Bom:</strong> Funil inteiro alinhado.</span></li>
+                                  </ul>
+                              </div>
+
+                              {/* Diagnostics */}
+                              <div className="space-y-2 pt-2 border-t border-white/5">
+                                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider flex items-center gap-1"><AlertTriangle size={10}/> Diagnóstico de Problemas</p>
+                                  <ul className="space-y-2">
+                                      <li className="text-xs text-slate-300">
+                                          <span className="block text-red-300 font-bold text-[10px] mb-0.5">Muitos cliques, pouca venda:</span>
+                                          Problema na VSL/Oferta, não no anúncio.
+                                      </li>
+                                      <li className="text-xs text-slate-300">
+                                          <span className="block text-red-300 font-bold text-[10px] mb-0.5">Poucos cliques:</span>
+                                          Problema no Criativo, não na VSL.
+                                      </li>
+                                      <li className="text-xs text-slate-300">
+                                          <span className="block text-yellow-300 font-bold text-[10px] mb-0.5">Taxa de clique na pág. baixa:</span>
+                                          Quebra de expectativa (Anúncio ≠ VSL).
+                                      </li>
+                                      <li className="text-xs text-slate-300">
+                                          <span className="block text-yellow-300 font-bold text-[10px] mb-0.5">Checkout Abandonado:</span>
+                                          Preço, Confiança ou Fricção.
+                                      </li>
+                                      <li className="text-xs text-slate-300">
+                                          <span className="block text-orange-300 font-bold text-[10px] mb-0.5">ROI Ruim com CPC Bom:</span>
+                                          Oferta Fraca.
+                                      </li>
+                                      <li className="text-xs text-slate-300">
+                                          <span className="block text-orange-300 font-bold text-[10px] mb-0.5">ROI Ruim com Conversão Boa:</span>
+                                          CPC Caro (melhorar criativo).
+                                      </li>
+                                  </ul>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* ... (Leads, Users, Finance Tabs Preserved) ... */}
       {/* --- LEADS TAB --- */}
       {activeTab === 'leads' && (
           <div className="space-y-6">

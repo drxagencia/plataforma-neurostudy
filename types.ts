@@ -1,51 +1,7 @@
-
-export type View = 'dashboard' | 'aulas' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'tutor' | 'ajustes' | 'admin' | 'financeiro' | 'redacao' | 'militares';
+export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes';
 
 export type UserPlan = 'basic' | 'intermediate' | 'advanced' | 'admin';
-
-export interface Lead {
-  id: string;
-  amount: number;
-  billing: string;
-  contact: string;
-  name: string; // Nome do aluno
-  paymentMethod: string;
-  planId: string; // 'adv', 'basic', etc
-  status: string; // 'pending_pix', 'paid', etc
-  timestamp: string; // ISO String
-  pixIdentifier?: string; // Nome de quem pagou o PIX
-  processed?: boolean; // Internal control
-}
-
-export interface Transaction {
-  id: string;
-  type: 'debit' | 'credit';
-  amount: number; // Valor em R$ ou Créditos
-  description: string;
-  timestamp: number;
-  tokensUsed?: number;
-  currencyType?: 'BRL' | 'CREDIT';
-}
-
-export interface RechargeRequest {
-  id: string;
-  uid: string;
-  userDisplayName: string;
-  amount: number;
-  status: 'pending' | 'approved' | 'rejected';
-  timestamp: number;
-  type: 'BRL' | 'CREDIT'; // Distinguish between wallet balance and essay credits
-  quantityCredits?: number; // Only if type is CREDIT
-  planLabel?: string; // NEW: Description for unlimited plans (e.g., "1 Ano Ilimitado")
-}
-
-export interface AiConfig {
-  intermediateLimits: {
-    canUseExplanation: boolean; // "Quer saber pq errou?"
-    canUseChat: boolean;        // Chat livre
-    dailyMessageLimit: number;
-  }
-}
+export type BillingCycle = 'monthly' | 'yearly';
 
 export interface User {
   uid: string;
@@ -57,20 +13,69 @@ export interface User {
 
 export interface UserProfile extends User {
   plan: UserPlan;
-  billingCycle?: 'monthly' | 'yearly'; // Rastreia se o plano atual é mensal ou anual
-  subscriptionExpiry: string; // ISO Date string
-  balance: number; // Saldo em R$ (IA Chat)
-  essayCredits: number; // Créditos de Redação
-  xp: number;
-  lastPostedAt?: number;
-  questionsAnswered?: number;
+  billingCycle?: BillingCycle;
+  subscriptionExpiry?: string;
+  xp?: number;
+  balance: number;
+  essayCredits?: number;
   hoursStudied?: number;
-  theme?: 'dark' | 'light';
-  // Gamification Fields
-  lastLoginDate?: string; // YYYY-MM-DD
+  questionsAnswered?: number;
   loginStreak?: number;
   dailyLikesGiven?: number;
-  lastLikeDate?: string; // YYYY-MM-DD to reset daily likes
+  lastPostedAt?: number;
+  theme?: 'dark' | 'light';
+  essays?: Record<string, EssayCorrection>;
+  transactions?: Record<string, Transaction>;
+}
+
+export interface Subject {
+  id: string;
+  name: string;
+  iconName: string; // Lucide icon name
+  color: string; // Tailwind class
+  category: 'regular' | 'military';
+}
+
+export interface LessonMaterial {
+  title: string;
+  url: string;
+}
+
+export interface LessonTag {
+  text: string;
+  color: string;
+}
+
+export interface ExerciseFilters {
+  category: string;
+  subject: string;
+  topic: string;
+  subtopics?: string[];
+}
+
+export interface Lesson {
+  id?: string;
+  title: string;
+  type: 'video' | 'exercise_block';
+  videoUrl?: string; // YouTube ID or URL
+  duration?: string;
+  materials?: LessonMaterial[];
+  tag?: LessonTag;
+  exerciseFilters?: ExerciseFilters;
+}
+
+export interface Question {
+  id?: string;
+  text: string;
+  imageUrl?: string;
+  options: string[];
+  correctAnswer: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  explanation?: string;
+  subjectId: string;
+  topic: string;
+  subtopic?: string;
+  tag?: LessonTag;
 }
 
 export interface Announcement {
@@ -81,105 +86,50 @@ export interface Announcement {
   ctaText: string;
 }
 
-export interface Subject {
-  id: string;
-  name: string;
-  iconName: string; 
-  color: string;
-  category?: 'regular' | 'military'; // Distinction
-}
-
-export interface ContentTag {
-    text: string;
-    color: 'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orange' | 'pink' | 'indigo' | 'gray';
-}
-
-export interface Question {
-  id?: string;
-  text: string;
-  imageUrl?: string; 
-  options: string[];
-  correctAnswer: number; 
-  difficulty: 'easy' | 'medium' | 'hard';
-  explanation?: string;
-  subjectId?: string; 
-  topic?: string;
-  tag?: ContentTag; // NEW: Optional tag
-}
-
-export interface LessonMaterial {
-  title: string;
-  url: string;
-  type?: 'pdf' | 'link' | 'image';
-}
-
-export interface Lesson {
-  id?: string;
-  title: string;
-  type?: 'video' | 'exercise_block'; // New field to distinguish content type
-  videoUrl?: string; // Optional if type is exercise_block
-  duration?: string;
-  subjectId?: string; 
-  topic?: string;
-  order?: number; // For manual ordering in playlist
-  materials?: LessonMaterial[];
-  tag?: ContentTag; // NEW: Optional tag
-  // Filters for exercise blocks
-  exerciseFilters?: {
-      category: string;
-      subject: string;
-      topic: string;
-      subtopics?: string[]; // Multiple subtopics support
-  }
-}
-
-export interface Reply {
-  id?: string;
+export interface CommunityReply {
   author: string;
   content: string;
   timestamp: number;
-  authorXp?: number; // Snapshot of XP to render rank correctly
 }
 
 export interface CommunityPost {
   id: string;
   authorName: string;
   authorAvatar: string;
-  authorXp?: number; // Snapshot of XP to render rank correctly
+  authorXp?: number;
   content: string;
   timestamp: number;
   likes: number;
-  likedBy?: Record<string, boolean>; // Map of UIDs who liked
-  replies?: Reply[];
+  likedBy?: Record<string, boolean>;
+  replies?: CommunityReply[];
 }
 
 export interface Simulation {
   id: string;
   title: string;
   description: string;
-  questionIds: string[]; // List of Question IDs included in this simulation
   durationMinutes: number;
   type: 'official' | 'training';
   status: 'open' | 'closed' | 'coming_soon';
-  subjects: string[]; // Tags for display
+  subjects?: string[];
+  questionIds?: string[];
+  questionCount?: number;
 }
 
 export interface SimulationResult {
-  id?: string;
   userId: string;
   simulationId: string;
   score: number;
   totalQuestions: number;
   timeSpentSeconds: number;
-  answers: Record<string, boolean>; // QuestionID -> Correct(true/false)
+  answers: Record<string, boolean>;
   timestamp: number;
-  topicPerformance?: Record<string, { correct: number; total: number }>; // Analysis data
+  topicPerformance?: Record<string, { correct: number, total: number }>;
 }
 
-// Enhanced Essay Correction Interface
-export interface CompetencyDetail {
+export interface CompetencyDetails {
     score: number;
-    analysis: string; // Deep analysis of this specific competency
+    analysis?: string;
     positivePoints?: string[];
     negativePoints?: string[];
 }
@@ -187,10 +137,9 @@ export interface CompetencyDetail {
 export interface EssayCorrection {
   id?: string;
   theme: string;
-  imageUrl: string; 
+  imageUrl?: string;
   date: number;
   scoreTotal: number;
-  // Legacy support maps simple scores, but new AI fills detailedCompetencies
   competencies: {
     c1: number;
     c2: number;
@@ -198,27 +147,68 @@ export interface EssayCorrection {
     c4: number;
     c5: number;
   };
-  // Detailed New Structure
   detailedCompetencies?: {
-      c1: CompetencyDetail;
-      c2: CompetencyDetail;
-      c3: CompetencyDetail;
-      c4: CompetencyDetail;
-      c5: CompetencyDetail;
+    c1: CompetencyDetails;
+    c2: CompetencyDetails;
+    c3: CompetencyDetails;
+    c4: CompetencyDetails;
+    c5: CompetencyDetails;
   };
-  // Legacy feedback
-  competencyFeedback?: {
-    c1: string;
-    c2: string;
-    c3: string;
-    c4: string;
-    c5: string;
+  feedback: string;
+  errors?: string[]; // Legacy fallback
+  strengths?: string[];
+  weaknesses?: string[];
+  structuralTips?: string;
+  competencyFeedback?: Record<string, string>; // Legacy fallback
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  contact: string;
+  planId: string;
+  amount: number;
+  billing: 'monthly' | 'yearly';
+  paymentMethod: string;
+  pixIdentifier?: string;
+  timestamp: string;
+  status: 'pending' | 'paid' | 'approved_access' | 'pending_pix';
+  processed?: boolean;
+}
+
+export interface RechargeRequest {
+  id: string;
+  userId: string;
+  userDisplayName: string;
+  amount: number;
+  currencyType: 'BRL' | 'CREDIT';
+  quantityCredits?: number; // if CREDIT
+  type: 'CREDIT' | 'BALANCE'; // Derived from currencyType usually
+  status: 'pending' | 'approved' | 'rejected';
+  timestamp: number;
+  planLabel?: string;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'credit' | 'debit';
+  amount: number;
+  description: string;
+  timestamp: number;
+  tokensUsed?: number;
+  currencyType?: 'BRL' | 'CREDIT';
+}
+
+export interface AiConfig {
+  intermediateLimits: {
+    canUseChat: boolean;
+    canUseExplanation: boolean;
   };
-  feedback: string; // General Analysis / Structural comments
-  errors: string[]; // Specific grammar/logic errors list
-  
-  // New Fields for Rich UI
-  strengths?: string[]; // "O que você dominou"
-  weaknesses?: string[]; // "Onde perdeu pontos"
-  structuralTips?: string; // Specific formatting/structure advice
+}
+
+export interface TrafficConfig {
+    vslScript: string;
+    checkoutLinkMonthly: string;
+    checkoutLinkYearly: string;
+    pixelId?: string;
 }
