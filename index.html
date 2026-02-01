@@ -21,9 +21,6 @@
     fbq('init', '4307606122862550');
     // fbq('track', 'PageView'); REMOVIDO: O rastreamento é controlado manualmente pelo LandingPage.tsx
     </script>
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=4307606122862550&ev=PageView&noscript=1"
-    /></noscript>
     <!-- End Meta Pixel Code -->
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -336,6 +333,12 @@
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
+    <!-- Meta Pixel Code (Noscript) moved to body -->
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=4307606122862550&ev=PageView&noscript=1"
+    /></noscript>
+    <!-- End Meta Pixel Code (Noscript) -->
+    
     <div id="root"></div>
     <!-- Vite entry point -->
     <script type="module" src="/index.tsx"></script>
