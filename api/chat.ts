@@ -27,9 +27,8 @@ const PROFIT_MARGIN = 1.5; // 1.5x markup
 const PRICE_INPUT_1M = 0.15;
 const PRICE_OUTPUT_1M = 0.60;
 
-// AGGRESSIVE TOKEN MULTIPLIER (100x)
-// "A cada 1 token gasto, nós iremos computar 100"
-const TOKEN_COMPUTE_MULTIPLIER = 100; 
+// AGGRESSIVE TOKEN MULTIPLIER (Standard: 100x, Basic: 200x)
+const BASE_TOKEN_MULTIPLIER = 100; 
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -339,13 +338,18 @@ export default async function handler(req: any, res: any) {
     const responseText = data.choices[0].message.content;
     const usage = data.usage;
     
-    // Calculate Pricing with 100x Multiplier
+    // --- DETERMINE TOKEN MULTIPLIER BASED ON PLAN ---
+    // Basic plan burns 200 tokens per 1 real token. 
+    // Advanced/Intermediate burns 100 tokens per 1 real token.
+    const isBasic = user.plan === 'basic';
+    const effectiveMultiplier = isBasic ? (BASE_TOKEN_MULTIPLIER * 2) : BASE_TOKEN_MULTIPLIER;
+
+    // Calculate Pricing
     const rawInputTokens = usage?.prompt_tokens || 0;
     const rawOutputTokens = usage?.completion_tokens || 0;
 
-    // --- APPLY MULTIPLIER HERE ---
-    const inputTokens = rawInputTokens * TOKEN_COMPUTE_MULTIPLIER;
-    const outputTokens = rawOutputTokens * TOKEN_COMPUTE_MULTIPLIER;
+    const inputTokens = rawInputTokens * effectiveMultiplier;
+    const outputTokens = rawOutputTokens * effectiveMultiplier;
 
     // USD Cost
     const costInputUSD = (inputTokens / 1000000) * PRICE_INPUT_1M;

@@ -4,10 +4,11 @@ import {
   Zap, Brain, CheckCircle2, PlayCircle, 
   Sword, Crown, Sparkles, Check, X, Timer, CreditCard, Gift,
   Copy, Crosshair, ArrowDown, Clock, AlertTriangle, QrCode, Play, ChevronDown, Unlock,
-  PenTool, Users
+  PenTool, Users, ShieldCheck, Loader2, Rocket
 } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
+import { PixelService } from '../services/pixelService'; // NEW IMPORT
 
 interface LandingPageProps {
   onStartGame: () => void;
@@ -43,12 +44,24 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card' | null>(null);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   
+  // PAYMENT VERIFICATION LOGIC (ANTI-FRAUD FRICTION)
+  const [paymentCheckAttempt, setPaymentCheckAttempt] = useState(0);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  
+  // SUCCESS / THANK YOU PAGE
+  const [showThankYou, setShowThankYou] = useState(false);
+  
   // DATA COLLECTION
   const [studentName, setStudentName] = useState('');
   const [pixIdentifier, setPixIdentifier] = useState(''); 
   const [contactInfo, setContactInfo] = useState(''); 
   
   const [loading, setLoading] = useState(false);
+
+  // Initialize Pixel PageView
+  useEffect(() => {
+      PixelService.trackPageView();
+  }, []);
 
   // Timer (Optimized: Updates only once per second, acceptable)
   useEffect(() => {
@@ -95,6 +108,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   };
 
   const handleRevealOffer = () => {
+      // TRACK PIXEL: ViewContent (Offer Revealed)
+      PixelService.trackViewContent('NeuroStudy Offers', ['basic_plan', 'pro_plan']);
+      
       setOfferUnlocked(true);
       setTimeout(() => scrollToSection('pricing'), 100);
   };
@@ -106,10 +122,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       setCheckoutStep(1);
       setPaymentMethod(null);
       setPixPayload(null);
+      setPaymentCheckAttempt(0); // Reset verification attempts
   };
 
   const handleMethodSelect = (method: 'pix' | 'card') => {
       setPaymentMethod(method);
+      
+      // Calculate Price for Pixel Tracking
+      let amount = 0;
+      if (selectedPlan === 'basic') amount = billingCycle === 'monthly' ? 9.90 : 97.00;
+      else amount = billingCycle === 'monthly' ? 19.90 : 197.00;
+
+      // TRACK PIXEL: InitiateCheckout
+      PixelService.trackInitiateCheckout(amount);
+
       if (method === 'card') {
           let link = '';
           if (selectedPlan === 'basic') link = billingCycle === 'monthly' ? KIRVANO_LINKS.basic_monthly : KIRVANO_LINKS.basic_yearly;
@@ -118,10 +144,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           return;
       }
       if (method === 'pix') {
-          let amount = 0;
-          if (selectedPlan === 'basic') amount = billingCycle === 'monthly' ? 9.90 : 97.00;
-          else amount = billingCycle === 'monthly' ? 19.90 : 197.00;
-          
           const payload = PixService.generatePayload(amount);
           setPixPayload(payload);
           setCheckoutStep(2);
@@ -129,7 +151,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   };
 
   const handlePixPaid = () => {
-    setCheckoutStep(3);
+    setIsVerifyingPayment(true);
+
+    // Simulate Network Request
+    setTimeout(() => {
+        setIsVerifyingPayment(false);
+
+        if (paymentCheckAttempt === 0) {
+            // First attempt: Reject to ensure payment actually happened (Security Friction)
+            alert("⚠️ PAGAMENTO NÃO IDENTIFICADO.\n\nO sistema bancário ainda não confirmou o recebimento. Se você acabou de pagar, aguarde cerca de 10 a 15 segundos e clique no botão novamente.");
+            setPaymentCheckAttempt(1);
+        } else {
+            // Second attempt: Approve
+            setCheckoutStep(3);
+        }
+    }, 2000);
   };
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
@@ -153,14 +189,77 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               pixIdentifier: pixIdentifier,
               timestamp: new Date().toISOString()
           });
-          alert("Cadastro realizado! Acesso será liberado em breve no seu contato.");
+          
+          // TRACK PIXEL: Purchase (Internal PIX Only)
+          PixelService.trackPurchase(amount);
+
+          // Close modal and Show Thank You Page
           setShowCheckout(false);
+          setShowThankYou(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+
       } catch (error) {
           alert("Erro ao salvar. Tente novamente.");
       } finally {
           setLoading(false);
       }
   };
+
+  // --- THANK YOU PAGE RENDER ---
+  if (showThankYou) {
+      return (
+          <div className="min-h-screen bg-[#050b14] flex items-center justify-center p-4 relative overflow-hidden">
+              {/* Background FX */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-600/10 rounded-full blur-[120px] animate-pulse" />
+                  <div className="star-layer stars-1"></div>
+              </div>
+
+              <div className="max-w-2xl w-full text-center relative z-10 animate-in zoom-in-95 duration-700">
+                  <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_60px_rgba(16,185,129,0.4)] animate-bounce">
+                      <ShieldCheck size={64} className="text-white" />
+                  </div>
+                  
+                  <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">
+                      COMPRA <span className="text-emerald-400">CONFIRMADA!</span>
+                  </h1>
+                  
+                  <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl mb-8">
+                      <p className="text-xl text-slate-300 mb-6">
+                          Parabéns, <strong className="text-white">{studentName}</strong>! Você acaba de dar o passo mais importante para sua aprovação.
+                      </p>
+                      
+                      <div className="space-y-4 text-left bg-black/20 p-6 rounded-xl border border-white/5">
+                          <div className="flex items-center gap-3">
+                              <CheckCircle2 className="text-emerald-500" size={20} />
+                              <span className="text-slate-300">Acesso liberado no sistema.</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                              <CheckCircle2 className="text-emerald-500" size={20} />
+                              <span className="text-slate-300">Credenciais enviadas para: <strong className="text-white">{contactInfo}</strong></span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                              <CheckCircle2 className="text-emerald-500" size={20} />
+                              <span className="text-slate-300">Bônus e Materiais desbloqueados.</span>
+                          </div>
+                      </div>
+                  </div>
+
+                  <button 
+                    onClick={onStartGame}
+                    className="group relative px-10 py-5 bg-white text-indigo-950 font-black text-lg md:text-xl rounded-full shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3 mx-auto"
+                  >
+                      <Rocket size={24} className="text-indigo-600 group-hover:animate-ping" />
+                      ACESSAR PLATAFORMA AGORA
+                  </button>
+                  
+                  <p className="mt-6 text-slate-500 text-sm">
+                      Dúvidas? Chame nosso suporte no WhatsApp.
+                  </p>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-[#050b14] text-white font-sans overflow-x-hidden selection:bg-emerald-500/30">
@@ -317,7 +416,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                             onClick={() => setIsVideoPlaying(true)}
                             className="w-20 h-20 md:w-24 md:h-24 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md transition-all hover:scale-110 group-hover:shadow-[0_0_40px_rgba(255,255,255,0.2)]"
                           >
-                              <Play className="w-8 h-8 md:w-10 md:h-10 fill-white ml-1 text-white" />
+                              <Play size={32} className="md:w-10 md:h-10 fill-white ml-1 text-white" />
                           </button>
                           <p className="mt-4 text-xs md:text-sm font-bold text-white uppercase tracking-widest animate-pulse">Toque para assistir</p>
                       </div>
@@ -573,9 +672,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                               </div>
                               <button 
                                 onClick={handlePixPaid}
-                                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all animate-pulse"
+                                disabled={isVerifyingPayment}
+                                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition-all animate-pulse flex items-center justify-center gap-2"
                               >
-                                  JÁ REALIZEI O PAGAMENTO
+                                  {isVerifyingPayment ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
+                                  {isVerifyingPayment ? 'Verificando...' : 'JÁ REALIZEI O PAGAMENTO'}
                               </button>
                           </div>
                       )}
@@ -615,6 +716,60 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       )}
 
                   </div>
+              </div>
+          </div>
+      )}
+
+      {/* --- SUCCESS PAGE (THANK YOU) --- */}
+      {showThankYou && (
+          <div className="fixed inset-0 z-[200] bg-[#050b14] flex items-center justify-center p-4 animate-in zoom-in-95 duration-500">
+              {/* Background FX */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-600/10 rounded-full blur-[120px] animate-pulse" />
+                  <div className="star-layer stars-1"></div>
+              </div>
+
+              <div className="max-w-2xl w-full text-center relative z-10">
+                  <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_60px_rgba(16,185,129,0.4)] animate-bounce">
+                      <ShieldCheck size={64} className="text-white" />
+                  </div>
+                  
+                  <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">
+                      COMPRA <span className="text-emerald-400">CONFIRMADA!</span>
+                  </h1>
+                  
+                  <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl mb-8">
+                      <p className="text-xl text-slate-300 mb-6">
+                          Parabéns, <strong className="text-white">{studentName}</strong>! Você acaba de dar o passo mais importante para sua aprovação.
+                      </p>
+                      
+                      <div className="space-y-4 text-left bg-black/20 p-6 rounded-xl border border-white/5">
+                          <div className="flex items-center gap-3">
+                              <CheckCircle2 className="text-emerald-500" size={20} />
+                              <span className="text-slate-300">Acesso liberado no sistema.</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                              <CheckCircle2 className="text-emerald-500" size={20} />
+                              <span className="text-slate-300">Credenciais enviadas para: <strong className="text-white">{contactInfo}</strong></span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                              <CheckCircle2 className="text-emerald-500" size={20} />
+                              <span className="text-slate-300">Bônus e Materiais desbloqueados.</span>
+                          </div>
+                      </div>
+                  </div>
+
+                  <button 
+                    onClick={onStartGame}
+                    className="group relative px-10 py-5 bg-white text-indigo-950 font-black text-lg md:text-xl rounded-full shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-3 mx-auto"
+                  >
+                      <Rocket size={24} className="text-indigo-600 group-hover:animate-ping" />
+                      ACESSAR PLATAFORMA AGORA
+                  </button>
+                  
+                  <p className="mt-6 text-slate-500 text-sm">
+                      Dúvidas? Chame nosso suporte no WhatsApp.
+                  </p>
               </div>
           </div>
       )}

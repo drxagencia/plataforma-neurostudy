@@ -255,6 +255,8 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
       setRechargeTab('credits');
   };
 
+  const isBasic = user.plan === 'basic';
+
   return (
     <div className="h-full flex flex-col max-h-[85vh] relative animate-slide-up">
       
@@ -354,8 +356,8 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
             </div>
 
             <form onSubmit={handleSend} className="relative flex-shrink-0">
-                <div className="absolute -top-6 right-0 text-[10px] uppercase tracking-wider font-bold text-indigo-400">
-                    Consumo estimado: ~R$ 0,05 / mensagem
+                <div className={`absolute -top-6 right-0 text-[10px] uppercase tracking-wider font-bold ${isBasic ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {isBasic ? 'Consumo: 2x (Plano Básico)' : 'Consumo: Otimizado (50% OFF)'}
                 </div>
                 <input
                 type="text"

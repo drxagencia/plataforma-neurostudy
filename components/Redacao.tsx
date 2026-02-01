@@ -41,7 +41,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   const isBasicPlan = user.plan === 'basic';
-  const priceMultiplier = isBasicPlan ? 2.5 : 1;
+  // Advanced pays ~3.50 (best). Basic pays ~14.00. Multiplier is 4x.
+  const priceMultiplier = isBasicPlan ? 4 : 1;
 
   useEffect(() => {
     fetchHistory();
@@ -596,6 +597,18 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               <div className="text-center mb-8">
                   <h2 className="text-3xl font-bold text-white mb-2">Pacotes de Correção</h2>
                   <p className="text-slate-400">Escolha a quantidade ideal para sua rotina de estudos.</p>
+                  
+                  {isBasicPlan && (
+                      <div className="mt-4 bg-red-900/20 border border-red-500/40 p-4 rounded-xl inline-block max-w-2xl animate-pulse">
+                          <p className="text-red-300 font-bold text-sm uppercase flex items-center justify-center gap-2">
+                              <AlertTriangle size={16} /> Atenção: Preço Elevado
+                          </p>
+                          <p className="text-slate-300 text-xs mt-1">
+                              Usuários do plano <strong className="text-white uppercase">Basic</strong> pagam até 4x mais caro nos créditos.
+                              <br/>O plano <strong className="text-emerald-400 uppercase">Advanced</strong> tem 80% de desconto (R$ 3,50/un).
+                          </p>
+                      </div>
+                  )}
               </div>
 
               {!showPix ? (
@@ -609,7 +622,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                 <p className="text-slate-400 text-xs mt-1">Para correções pontuais.</p>
                                 <div className="mt-4">
                                     <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 4,00</span>
-                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 10,00</span>}
+                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 16,00</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
@@ -625,7 +638,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                 <p className="text-slate-400 text-xs mt-1">Foco e constância.</p>
                                 <div className="mt-4">
                                     <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 3,75</span>
-                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 9,37</span>}
+                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 15,00</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
@@ -642,7 +655,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                 <p className="text-slate-300 text-xs mt-1">Intensivo reta final.</p>
                                 <div className="mt-4">
                                     <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 3,50</span>
-                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 8,75</span>}
+                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 14,00</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
@@ -660,13 +673,15 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                               <div className="absolute inset-x-0 top-0 bg-red-900/90 p-4 z-20 text-center animate-pulse">
                                   <p className="text-white font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
                                       <AlertTriangle size={14} className="text-yellow-400" />
-                                      Você está pagando 2.5x mais caro
+                                      Você está pagando 4x mais caro
                                   </p>
-                                  <p className="text-[10px] text-red-200 mt-1">Upgrade agora e economize R$ {(totalPrice - (totalPrice / 2.5)).toFixed(2)} nesta compra.</p>
+                                  <p className="text-[10px] text-red-200 mt-1">
+                                      USUÁRIOS ADVANCED TÊM QUASE 80% DE DESCONTO + 50% OFF NO CONSUMO DE IA.
+                                  </p>
                               </div>
                           )}
 
-                          <label className={`text-xs text-slate-400 font-bold uppercase mb-4 block tracking-wider ${isBasicPlan ? 'mt-12' : ''}`}>Calculadora de Investimento</label>
+                          <label className={`text-xs text-slate-400 font-bold uppercase mb-4 block tracking-wider ${isBasicPlan ? 'mt-16' : ''}`}>Calculadora de Investimento</label>
                           
                           <div className="flex items-center gap-2 mb-8">
                               <button onClick={() => setBuyQty(Math.max(1, buyQty - 1))} className="w-12 h-12 bg-slate-800 rounded-xl text-white font-bold hover:bg-slate-700 transition-colors text-xl">-</button>
