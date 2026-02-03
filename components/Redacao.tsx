@@ -41,7 +41,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   const isBasicPlan = user.plan === 'basic';
-  // Advanced pays ~3.50 (best). Basic pays ~14.00. Multiplier is 4x.
   const priceMultiplier = isBasicPlan ? 4 : 1;
 
   useEffect(() => {
@@ -85,13 +84,10 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   const handleSelectHistoryItem = async (item: EssayCorrection) => {
       setLoadingDetails(true);
-      // On demand load of image
-      if (item.id && !item.imageUrl) {
-          const imgUrl = await DatabaseService.getEssayImage(item.id);
-          if (imgUrl) item.imageUrl = imgUrl;
-      }
+      // NOTE: We do NOT fetch image anymore. History is text-only to save data.
+      // If the user wants to see the essay image, they can't. This is by design for optimization.
       setCurrentResult(item);
-      setExpandedCompetency('c1'); // Auto expand first
+      setExpandedCompetency('c1');
       setLoadingDetails(false);
       setView('result');
   };
@@ -112,10 +108,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       if (!auth.currentUser) return;
       setIsUpgrading(true);
       
-      // Calculate difference
-      let upgradeCost = 10; // Default Monthly Diff (19.90 - 9.90)
+      let upgradeCost = 10;
       if (user.billingCycle === 'yearly') {
-          upgradeCost = 100; // Yearly Diff (197 - 97)
+          upgradeCost = 100;
       }
 
       try {
@@ -179,11 +174,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   };
 
   const handleCorrectionSubmit = async () => {
-      // 1. Credit Check
       const availableCredits = typeof user.essayCredits === 'number' ? user.essayCredits : 0;
       if (availableCredits <= 0) {
           setNotification({ type: 'error', message: "Sem créditos suficientes para enviar a redação." });
-          // Optional: redirect to buy screen after delay?
           setTimeout(() => setView('buy'), 1500);
           return;
       }
@@ -197,13 +190,14 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       setView('scanning');
 
       try {
+          // Send to AI (which doesn't save to DB, just processes)
           const res = await fetch('/api/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   mode: 'essay-correction',
                   message: theme,
-                  image: image,
+                  image: image, // Send base64 to API
                   uid: auth.currentUser.uid
               })
           });
@@ -217,7 +211,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           let cleanJson = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
 
-          // SAFE PARSING HELPERS
           const parseScore = (val: any) => {
             const num = Number(val?.score ?? val);
             return isNaN(num) ? 0 : num;
@@ -229,18 +222,16 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           const c4Score = parseScore(parsed.c4);
           const c5Score = parseScore(parsed.c5);
           
-          const calculatedTotal = c1Score + c2Score + c3Score + c4Score + c5Score;
-          
-          // Force use of calculatedTotal to avoid AI math errors (AI often hallucinates the total)
-          const finalTotal = calculatedTotal;
+          const finalTotal = c1Score + c2Score + c3Score + c4Score + c5Score;
 
           const result: EssayCorrection = {
               theme,
-              imageUrl: image,
+              // IMPORTANT: We do NOT set imageUrl here for saving.
+              // We pass `imageUrl: null` implicitly by omitting it or explicit below.
+              imageUrl: null, 
               date: Date.now(),
               scoreTotal: finalTotal,
               competencies: { c1: c1Score, c2: c2Score, c3: c3Score, c4: c4Score, c5: c5Score },
-              // Rich Data
               detailedCompetencies: {
                   c1: parsed.c1,
                   c2: parsed.c2,
@@ -249,30 +240,37 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                   c5: parsed.c5
               },
               feedback: parsed.general_feedback || parsed.feedback || "Análise concluída.",
-              errors: parsed.weaknesses || parsed.errors || [], // Map generic weaknesses to errors list for fallback
+              errors: parsed.weaknesses || parsed.errors || [],
               strengths: parsed.strengths || [],
               weaknesses: parsed.weaknesses || [],
               structuralTips: parsed.structural_tips || ""
           };
 
+          // Save METADATA ONLY (Text)
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
-          // XP Awards
           await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_CORRECTION');
           if (finalTotal > 800) {
               await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_GOOD_SCORE_BONUS');
           }
 
-          // Fix: Explicitly cast essayCredits to number
           const currentCredits = Number(user.essayCredits || 0);
           onUpdateUser({
               ...user,
               essayCredits: Math.max(0, currentCredits - 1)
           });
 
-          setCurrentResult(result);
+          // Show result with image temporarily (from local state), but don't save it
+          // We attach the local image to currentResult for display purposes only
+          setCurrentResult({ ...result, imageUrl: image }); 
+          
           setExpandedCompetency('c1');
           setView('result');
+          
+          // Clear image from memory immediately after setting result to display
+          // Actually, we need it for display. 
+          // But effectively we are NOT saving it to DB.
+          
           fetchHistory();
 
       } catch (e: any) {
@@ -359,24 +357,21 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 pb-20">
               {renderNotification()}
               
-              {/* Header with Close */}
               <div className="flex items-center justify-between">
                   <h2 className="text-3xl font-bold text-white flex items-center gap-3">
                       <Sparkles size={28} className="text-indigo-400" />
                       Análise da Redação
                   </h2>
-                  <button onClick={() => setView('home')} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors text-white">
+                  <button onClick={() => { setView('home'); setImage(null); }} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors text-white">
                       <X size={24}/>
                   </button>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Left Column: Score Hero & Quick Stats */}
+                  {/* Left Column */}
                   <div className="space-y-6">
-                      {/* Main Score Card */}
                       <div className="glass-card p-10 rounded-3xl text-center relative overflow-hidden border border-indigo-500/20 shadow-[0_0_40px_rgba(99,102,241,0.1)]">
                           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
-                          <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent" />
                           
                           <p className="text-slate-400 font-bold text-sm uppercase tracking-widest relative z-10">Nota Final</p>
                           <div className={`text-8xl font-black mt-4 mb-2 tracking-tighter relative z-10 ${getScoreColor(currentResult.scoreTotal)}`}>
@@ -387,51 +382,17 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                           </div>
                       </div>
 
-                      {/* Strengths & Weaknesses Summary Cards */}
-                      {currentResult.strengths && currentResult.strengths.length > 0 && (
-                          <div className="glass-card p-6 rounded-2xl border-l-4 border-l-emerald-500 bg-emerald-900/5">
-                              <h4 className="font-bold text-emerald-300 mb-3 flex items-center gap-2 text-sm uppercase"><ThumbsUp size={16}/> Pontos Fortes</h4>
-                              <ul className="space-y-2">
-                                  {currentResult.strengths.slice(0, 3).map((s, i) => (
-                                      <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
-                                          <Check size={14} className="text-emerald-500 mt-1 flex-shrink-0" />
-                                          {s}
-                                      </li>
-                                  ))}
-                              </ul>
-                          </div>
-                      )}
-
-                      {(currentResult.weaknesses && currentResult.weaknesses.length > 0) && (
-                          <div className="glass-card p-6 rounded-2xl border-l-4 border-l-red-500 bg-red-900/5">
-                              <h4 className="font-bold text-red-300 mb-3 flex items-center gap-2 text-sm uppercase"><TrendingDown size={16}/> Pontos de Atenção</h4>
-                              <ul className="space-y-2">
-                                  {currentResult.weaknesses.slice(0, 3).map((w, i) => (
-                                      <li key={i} className="text-sm text-slate-300 flex items-start gap-2">
-                                          <AlertTriangle size={14} className="text-red-500 mt-1 flex-shrink-0" />
-                                          {w}
-                                      </li>
-                                  ))}
-                              </ul>
-                          </div>
-                      )}
-
-                      {/* Structural Tips */}
-                      {currentResult.structuralTips && (
-                          <div className="glass-card p-6 rounded-2xl border border-indigo-500/20 bg-indigo-900/5">
-                              <h4 className="font-bold text-indigo-300 mb-2 text-sm uppercase flex items-center gap-2"><Layers size={16}/> Dica Estrutural</h4>
-                              <p className="text-slate-300 text-sm leading-relaxed">{currentResult.structuralTips}</p>
+                      {/* Info Alert about Image */}
+                      {!currentResult.imageUrl && (
+                          <div className="bg-slate-900/50 border border-white/10 p-4 rounded-xl text-center">
+                              <p className="text-xs text-slate-500">A imagem da redação não é salva para otimizar o sistema. Apenas a análise permanece no histórico.</p>
                           </div>
                       )}
                   </div>
 
-                  {/* Middle & Right: Detailed Competency Breakdown */}
+                  {/* Details Column */}
                   <div className="lg:col-span-2 space-y-6">
-                      <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-bold text-white">Detalhamento por Competência</h3>
-                          <div className="h-px flex-1 bg-white/10" />
-                      </div>
-
+                      {/* Competencies */}
                       <div className="space-y-4">
                           {['c1', 'c2', 'c3', 'c4', 'c5'].map((key) => {
                               const score = currentResult.competencies[key as keyof typeof currentResult.competencies];
@@ -441,7 +402,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
                               return (
                                   <div key={key} className={`glass-card rounded-2xl transition-all duration-300 border ${isExpanded ? 'border-indigo-500/40 bg-indigo-900/10' : 'border-white/5 hover:bg-white/5'}`}>
-                                      {/* Header / Summary Line */}
                                       <div 
                                         onClick={() => setExpandedCompetency(isExpanded ? null : key)}
                                         className="p-5 flex items-center gap-4 cursor-pointer"
@@ -455,55 +415,20 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                                   <h4 className={`font-bold text-sm uppercase ${isExpanded ? 'text-white' : 'text-slate-300'}`}>{COMPETENCY_LABELS[key]}</h4>
                                                   <span className={`font-mono font-bold text-lg ${score >= 160 ? 'text-emerald-400' : score >= 120 ? 'text-indigo-300' : 'text-yellow-400'}`}>{score} <span className="text-slate-600 text-xs">/ 200</span></span>
                                               </div>
-                                              {/* Mini Bar */}
                                               <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden w-full">
                                                   <div className={`h-full ${getBarColor(score)} transition-all duration-1000`} style={{width: `${(score/200)*100}%`}} />
                                               </div>
                                           </div>
-                                          
                                           <ChevronRight size={20} className={`text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                       </div>
 
-                                      {/* Expanded Details */}
                                       {isExpanded && (
                                           <div className="px-5 pb-6 pt-0 border-t border-white/5 animate-in fade-in slide-in-from-top-1">
-                                              {/* Main Analysis */}
                                               <div className="mt-4 mb-4">
                                                   <p className="text-slate-200 leading-relaxed text-sm">
-                                                      {details?.analysis || (currentResult.competencyFeedback as any)?.[key] || "Sem análise detalhada disponível."}
+                                                      {details?.analysis || "Sem análise detalhada."}
                                                   </p>
                                               </div>
-
-                                              {/* Specific Positives/Negatives (New Structure) */}
-                                              {details && (
-                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                                      {details.positivePoints && details.positivePoints.length > 0 && (
-                                                          <div className="bg-emerald-900/10 p-3 rounded-xl border border-emerald-500/10">
-                                                              <p className="text-xs font-bold text-emerald-400 uppercase mb-2 flex items-center gap-1"><ThumbsUp size={12}/> Mandou Bem</p>
-                                                              <ul className="space-y-1">
-                                                                  {details.positivePoints.map((p, i) => (
-                                                                      <li key={i} className="text-xs text-emerald-100/70 flex items-start gap-1.5">
-                                                                          <span className="mt-1 w-1 h-1 bg-emerald-500 rounded-full flex-shrink-0" /> {p}
-                                                                      </li>
-                                                                  ))}
-                                                              </ul>
-                                                          </div>
-                                                      )}
-                                                      
-                                                      {details.negativePoints && details.negativePoints.length > 0 && (
-                                                          <div className="bg-red-900/10 p-3 rounded-xl border border-red-500/10">
-                                                              <p className="text-xs font-bold text-red-400 uppercase mb-2 flex items-center gap-1"><AlertCircle size={12}/> Atenção</p>
-                                                              <ul className="space-y-1">
-                                                                  {details.negativePoints.map((p, i) => (
-                                                                      <li key={i} className="text-xs text-red-100/70 flex items-start gap-1.5">
-                                                                          <span className="mt-1 w-1 h-1 bg-red-500 rounded-full flex-shrink-0" /> {p}
-                                                                      </li>
-                                                                  ))}
-                                                              </ul>
-                                                          </div>
-                                                      )}
-                                                  </div>
-                                              )}
                                           </div>
                                       )}
                                   </div>
@@ -511,12 +436,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                           })}
                       </div>
 
-                      {/* General Feedback Card */}
                       <div className="glass-card p-6 rounded-2xl bg-indigo-950/20 border border-indigo-500/10">
                           <h3 className="font-bold text-white mb-3 text-lg">Parecer Geral</h3>
-                          <p className="text-slate-300 leading-relaxed text-sm italic">
-                              "{currentResult.feedback}"
-                          </p>
+                          <p className="text-slate-300 leading-relaxed text-sm italic">"{currentResult.feedback}"</p>
                       </div>
                   </div>
               </div>
@@ -558,14 +480,14 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                           <>
                             <UploadCloud size={40} className="text-indigo-500 mb-2 group-hover:scale-110 transition-transform" />
                             <p className="font-bold text-white">Clique para enviar foto</p>
-                            <p className="text-xs text-slate-500">A imagem deve estar nítida e iluminada.</p>
+                            <p className="text-xs text-slate-500">A imagem não será salva (apenas processada).</p>
                           </>
                       )}
                   </div>
 
                   <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl">
                       <label className="text-xs text-yellow-200 font-bold uppercase mb-1 block">Confirmação de Segurança</label>
-                      <p className="text-xs text-yellow-500/80 mb-2">Ao confirmar, 1 crédito será descontado. Essa ação é irreversível.</p>
+                      <p className="text-xs text-yellow-500/80 mb-2">Ao confirmar, 1 crédito será descontado.</p>
                       <input 
                         className="w-full bg-slate-900 border border-yellow-500/30 p-2 rounded-lg text-white text-sm placeholder:text-slate-600 focus:border-yellow-500/60 focus:outline-none" 
                         placeholder="Digite CONFIRMAR"
@@ -667,8 +589,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
                       {/* Right: Interactive Calculator */}
                       <div className="glass-card p-8 rounded-3xl border-t-4 border-t-indigo-500 bg-slate-900/80 shadow-2xl relative overflow-hidden">
-                          
-                          {/* WARNING BANNER FOR BASIC USERS */}
                           {isBasicPlan && (
                               <div className="absolute inset-x-0 top-0 bg-red-900/90 p-4 z-20 text-center animate-pulse">
                                   <p className="text-white font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
@@ -715,7 +635,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                               <QrCode size={20} /> {isBasicPlan ? 'Pagar Preço Alto' : 'Gerar Pagamento PIX'}
                           </button>
 
-                          {/* UPGRADE BUTTON FOR BASIC USERS */}
                           {isBasicPlan && (
                               <button 
                                 onClick={handleUpgradeRequest}
@@ -730,7 +649,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                       </div>
                   </div>
               ) : (
-                  // Pix Display
                   <div className="max-w-md mx-auto glass-card p-8 rounded-2xl text-center animate-in zoom-in-95 relative border border-emerald-500/20 shadow-2xl">
                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
                       <h3 className="text-2xl font-bold text-white mb-2">{isUpgrading ? 'Upgrade de Plano' : 'Pagamento via PIX'}</h3>
@@ -783,14 +701,13 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
         </div>
       </div>
 
-      {/* Action Card */}
       <div className="relative overflow-hidden rounded-3xl glass-card p-8 flex flex-col md:flex-row items-center justify-between gap-8 border-indigo-500/30 group">
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] group-hover:bg-indigo-600/30 transition-all duration-700" />
           
           <div className="relative z-10 max-w-lg">
               <h3 className="text-2xl font-bold text-white mb-2">Envie sua redação agora</h3>
               <p className="text-slate-300 mb-6">
-                  Tire uma foto nítida do seu texto manuscrito. Nossa IA analisa a caligrafia e corrige em segundos baseada nos critérios oficiais.
+                  Tire uma foto nítida do seu texto manuscrito. Nossa IA analisa a caligrafia e corrige em segundos. <span className="text-xs text-yellow-400 block mt-1">*A imagem é processada e descartada instantaneamente para sua segurança.</span>
               </p>
               <button 
                 onClick={() => {
@@ -818,7 +735,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           </div>
       </div>
 
-      {/* History */}
       <div>
           <h3 className="text-xl font-bold text-white mb-4">Histórico de Correções</h3>
           <div className="space-y-3">

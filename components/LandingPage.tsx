@@ -4,7 +4,7 @@ import {
   Zap, Brain, CheckCircle2, PlayCircle, 
   Sword, Crown, Sparkles, Check, X, Timer, CreditCard, Gift,
   Copy, Crosshair, ArrowDown, Clock, AlertTriangle, QrCode, Play, ChevronDown, Unlock,
-  PenTool, Users, ShieldCheck, Loader2, Rocket
+  PenTool, Users, ShieldCheck, Loader2, Rocket, ArrowRight
 } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
@@ -30,8 +30,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [defeatedEnemies, setDefeatedEnemies] = useState<string[]>([]);
   
   // VSL / VIDEO STATE
+  const VIDEO_DURATION = 20000; // Increased to 20s for better pacing
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoCompleted, setVideoCompleted] = useState(false);
+  const [showMidCta, setShowMidCta] = useState(false); // New State for mid-video button
   const [offerUnlocked, setOfferUnlocked] = useState(false);
 
   // CHECKOUT STATE
@@ -71,18 +73,28 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       return () => clearInterval(interval);
   }, []);
 
-  // Video Completion Logic (CSS Driven now, this just handles the final trigger)
+  // Video Logic: Completion & Mid-point Trigger
   useEffect(() => {
-      let timer: any;
+      let finishTimer: any;
+      let midTimer: any;
+
       if (isVideoPlaying) {
-          // Mock video length: 8 seconds for demo
-          const VIDEO_DURATION = 8000; 
-          timer = setTimeout(() => {
+          // 1. Mid-point Timer (Exactly halfway)
+          midTimer = setTimeout(() => {
+              setShowMidCta(true);
+          }, VIDEO_DURATION / 2);
+
+          // 2. Completion Timer
+          finishTimer = setTimeout(() => {
               setVideoCompleted(true);
               setIsVideoPlaying(false);
+              // Note: We don't hide MidCta here, it just gets covered by the completion overlay naturally
           }, VIDEO_DURATION);
       }
-      return () => clearTimeout(timer);
+      return () => { 
+          clearTimeout(finishTimer);
+          clearTimeout(midTimer);
+      };
   }, [isVideoPlaying]);
 
   const formatTime = (seconds: number) => {
@@ -439,13 +451,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       <div className="text-slate-700 font-black text-6xl md:text-9xl opacity-10 select-none">NEURO</div>
                   </div>
 
-                  {/* FAKE PROGRESS BAR - CSS ANIMATED FOR PERFORMANCE */}
+                  {/* MID-VIDEO CTA BUTTON (APPEARS HALF-WAY) */}
+                  {isVideoPlaying && showMidCta && !videoCompleted && (
+                      <div className="absolute bottom-16 right-4 md:right-8 z-30 animate-in slide-in-from-right fade-in duration-700">
+                          <button 
+                            onClick={handleRevealOffer}
+                            className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-2xl flex items-center gap-2 transition-all hover:scale-105"
+                          >
+                              Ver Oferta Agora <ArrowRight size={16} />
+                          </button>
+                      </div>
+                  )}
+
+                  {/* FAKE PROGRESS BAR - REALISTIC PHYSICS */}
+                  {/* Using custom bezier for "Fast Start -> Medium -> Very Slow End" feel */}
                   <div className="absolute bottom-0 left-0 w-full h-1.5 md:h-2 bg-slate-800">
                       <div 
                         className={`h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]`}
                         style={{ 
                             width: isVideoPlaying ? '100%' : '0%',
-                            transition: isVideoPlaying ? 'width 8s linear' : 'none'
+                            transition: isVideoPlaying ? `width ${VIDEO_DURATION}ms cubic-bezier(0.1, 0.6, 0.4, 1)` : 'none'
                         }}
                       />
                   </div>

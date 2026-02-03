@@ -1,6 +1,6 @@
 
 import * as firebaseApp from "firebase/app";
-import { getAuth } from "firebase/auth";
+import * as firebaseAuth from "firebase/auth";
 import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
@@ -14,20 +14,17 @@ const firebaseConfig = {
   measurementId: "G-CFYSRSFF0V"
 };
 
-// Use firebaseApp.initializeApp to handle potential type definition mismatches
-const app = firebaseApp.initializeApp(firebaseConfig);
+// Use named initializeApp. Check if app already initialized to avoid hot-reload errors.
+const app = firebaseApp.getApps().length > 0 ? firebaseApp.getApp() : firebaseApp.initializeApp(firebaseConfig);
 
-// Initialize a SECONDARY app instance.
-// This is critical for the Admin Panel "Create User" feature.
-// It allows us to use createUserWithEmailAndPassword without logging out the current Admin.
-let secondaryApp;
+// Initialize a SECONDARY app instance for Admin User Creation.
+let secondaryApp: firebaseApp.FirebaseApp;
 try {
-    secondaryApp = firebaseApp.initializeApp(firebaseConfig, "SecondaryApp");
-} catch (e) {
-    // If already initialized (hot reload), get existing
     secondaryApp = firebaseApp.getApp("SecondaryApp");
+} catch (e) {
+    secondaryApp = firebaseApp.initializeApp(firebaseConfig, "SecondaryApp");
 }
 
-export const auth = getAuth(app);
-export const secondaryAuth = getAuth(secondaryApp); // Export secondary auth
+export const auth = firebaseAuth.getAuth(app);
+export const secondaryAuth = firebaseAuth.getAuth(secondaryApp); // Export secondary auth
 export const database = getDatabase(app);

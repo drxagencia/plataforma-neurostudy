@@ -1,19 +1,18 @@
-
 {
   "announcements": {
-    "announcement_01": {
-      "id": "announcement_01",
+    "ann_01": {
+      "id": "ann_01",
       "title": "Super Revisão ENEM 2025",
-      "description": "Acesse o cronograma completo da reta final.",
-      "image": "https://picsum.photos/seed/enem/800/400",
+      "description": "Cronograma intensivo de 30 dias para a reta final.",
+      "image": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=1000",
       "ctaText": "Ver Cronograma"
     },
-    "announcement_02": {
-      "id": "announcement_02",
-      "title": "Novo Módulo de Redação",
-      "description": "Aprenda a estruturar sua nota 1000 com IA.",
-      "image": "https://picsum.photos/seed/writing/800/400",
-      "ctaText": "Começar Agora"
+    "ann_02": {
+      "id": "ann_02",
+      "title": "Novo Módulo Militar",
+      "description": "Conteúdo exclusivo para ESA e ESPCEX disponível.",
+      "image": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=1000",
+      "ctaText": "Acessar Agora"
     }
   },
   "subjects": {
@@ -21,203 +20,287 @@
     "fisica": { "id": "fisica", "name": "Física", "iconName": "Zap", "color": "text-yellow-400", "category": "regular" },
     "quimica": { "id": "quimica", "name": "Química", "iconName": "Beaker", "color": "text-purple-400", "category": "regular" },
     "biologia": { "id": "biologia", "name": "Biologia", "iconName": "Microscope", "color": "text-green-400", "category": "regular" },
-    "literatura": { "id": "literatura", "name": "Literatura", "iconName": "BookOpen", "color": "text-pink-400", "category": "regular" },
-    "gramatica": { "id": "gramatica", "name": "Gramática", "iconName": "PenTool", "color": "text-red-400", "category": "regular" },
     "historia": { "id": "historia", "name": "História", "iconName": "ScrollText", "color": "text-orange-400", "category": "regular" },
     "geografia": { "id": "geografia", "name": "Geografia", "iconName": "Map", "color": "text-emerald-400", "category": "regular" },
-    "filosofia": { "id": "filosofia", "name": "Filosofia/Soc.", "iconName": "Scale", "color": "text-indigo-400", "category": "regular" },
+    "portugues": { "id": "portugues", "name": "Português", "iconName": "PenTool", "color": "text-red-400", "category": "regular" },
     "ingles": { "id": "ingles", "name": "Inglês", "iconName": "Languages", "color": "text-cyan-400", "category": "regular" },
-    "espanhol": { "id": "espanhol", "name": "Espanhol", "iconName": "MessageCircle", "color": "text-rose-400", "category": "regular" },
-    "interpretacao": { "id": "interpretacao", "name": "Interpretação", "iconName": "BrainCircuit", "color": "text-teal-400", "category": "regular" },
     "esa": { "id": "esa", "name": "ESA", "iconName": "Target", "color": "text-emerald-600", "category": "military" },
     "espcex": { "id": "espcex", "name": "ESPCEX", "iconName": "Sword", "color": "text-emerald-800", "category": "military" }
   },
   "topics": {
-    "fisica": ["Cinemática", "Dinâmica", "Eletrodinâmica", "Termodinâmica", "Óptica"],
-    "matematica": ["Álgebra", "Geometria Plana", "Geometria Espacial", "Trigonometria", "Estatística"],
-    "quimica": ["Química Geral", "Físico-Química", "Química Orgânica", "Atomística"],
-    "esa": ["Matemática Militar", "História do Brasil", "Geografia do Brasil"]
+    "matematica": {
+      "Funções": true,
+      "Geometria Plana": true,
+      "Logaritmos": true
+    },
+    "fisica": {
+      "Cinemática": true,
+      "Dinâmica": true,
+      "Eletrodinâmica": true
+    },
+    "historia": {
+      "Brasil Colônia": true,
+      "Era Vargas": true
+    },
+    "esa": {
+      "Matemática Militar": true,
+      "História do Brasil": true
+    }
   },
   "subtopics": {
-    "Cinemática": ["Movimento Uniforme", "Movimento Uniformemente Variado", "Vetores", "Lançamento Oblíquo"],
-    "Dinâmica": ["Leis de Newton", "Força de Atrito", "Trabalho e Energia", "Impulso"],
-    "Álgebra": ["Funções", "Logaritmos", "Matrizes", "Polinômios"],
-    "Matemática Militar": ["Logaritmos", "Análise Combinatória", "Probabilidade"]
-  },
-  "posts": {
-    "-Nt123abc": {
-      "id": "-Nt123abc",
-      "authorName": "Ana Silva",
-      "authorAvatar": "https://picsum.photos/seed/u1/100",
-      "content": "Alguém tem resumo de Eletroquímica pra compartilhar? Tô travada na parte de pilhas 🔋",
-      "timestamp": 1709800000000,
-      "likes": 12,
-      "likedBy": { "user_abc": true, "user_def": true }
+    "Funções": {
+      "Função Afim": true,
+      "Função Quadrática": true,
+      "Gráficos": true
     },
-    "-Nt123def": {
-      "id": "-Nt123def",
-      "authorName": "Carlos Mendes",
-      "authorAvatar": "https://picsum.photos/seed/u2/100",
-      "content": "Acabei de fazer o simulado de Humanas. A questão sobre Revolução Industrial tava bem difícil, o que acharam?",
-      "timestamp": 1709790000000,
-      "likes": 24,
-      "likedBy": { "user_xyz": true }
-    }
-  },
-  "simulations": {
-    "sim_001": {
-      "id": "sim_001",
-      "title": "Simulado Nacional ENEM 2025",
-      "description": "Prova completa com 90 questões e redação. Teste oficial.",
-      "questionCount": 90,
-      "durationMinutes": 300,
-      "type": "official",
-      "status": "open",
-      "questionIds": ["-KeyQ1", "-KeyQ2", "-KeyQ3", "-KeyQ4"],
-      "subjects": ["matematica", "humanas", "natureza", "linguagens"]
+    "Cinemática": {
+      "MRU": true,
+      "MRUV": true,
+      "Queda Livre": true
     },
-    "sim_002": {
-      "id": "sim_002",
-      "title": "Mini-Simulado de Exatas",
-      "description": "Foco em Matemática e Física.",
-      "questionCount": 45,
-      "durationMinutes": 120,
-      "type": "training",
-      "status": "closed",
-      "questionIds": ["-KeyQ1", "-KeyQ4"],
-      "subjects": ["matematica", "fisica"]
-    },
-    "sim_003": {
-      "id": "sim_003",
-      "title": "Simulado FUVEST 1ª Fase",
-      "description": "Modelo específico da USP.",
-      "questionCount": 90,
-      "durationMinutes": 300,
-      "type": "training",
-      "status": "coming_soon",
-      "subjects": ["geral"]
-    }
-  },
-  "users": {
-    "admin_uid_placeholder": {
-      "uid": "admin_uid_placeholder",
-      "displayName": "Admin Master",
-      "email": "master@admin.com",
-      "photoURL": "",
-      "plan": "admin",
-      "balance": 100.00,
-      "essayCredits": 50,
-      "subscriptionExpiry": "2030-01-01",
-      "isAdmin": true,
-      "xp": 5000,
-      "questionsAnswered": 150
-    },
-    "student_uid_placeholder": {
-      "uid": "student_uid_placeholder",
-      "displayName": "Estudante Demo",
-      "email": "aluno@email.com",
-      "photoURL": "",
-      "plan": "basic",
-      "balance": 0,
-      "essayCredits": 0,
-      "subscriptionExpiry": "2024-12-31",
-      "xp": 120,
-      "questionsAnswered": 12
-    }
-  },
-  "leaderboard": {
-    "admin_uid_placeholder": {
-        "displayName": "Admin Master",
-        "photoURL": "",
-        "xp": 5000
-    },
-    "student_uid_placeholder": {
-        "displayName": "Estudante Demo",
-        "photoURL": "",
-        "xp": 120
+    "Matemática Militar": {
+      "Logaritmos Avançados": true,
+      "Combinatória": true
     }
   },
   "lessons": {
     "fisica": {
       "Cinemática": {
-        "l1": {
-          "id": "l1",
-          "title": "Introdução aos Vetores",
+        "l_001": {
+          "id": "l_001",
+          "title": "Introdução ao Movimento Uniforme",
+          "type": "video",
+          "videoUrl": "https://www.youtube.com/watch?v=ivLEa0rWxfM",
+          "duration": "12:30",
+          "order": 0,
+          "tag": { "text": "Essencial", "color": "indigo" }
+        },
+        "l_002": {
+          "id": "l_002",
+          "title": "Velocidade Média e Escalar",
+          "type": "video",
           "videoUrl": "https://www.youtube.com/watch?v=6J1WbK0Xy0g",
-          "duration": "15:00",
-          "materials": []
+          "duration": "15:45",
+          "order": 1
+        },
+        "l_003": {
+          "id": "l_003",
+          "title": "Exercícios de Fixação: Cinemática",
+          "type": "exercise_block",
+          "order": 2,
+          "exerciseFilters": {
+            "category": "regular",
+            "subject": "fisica",
+            "topic": "Cinemática",
+            "subtopics": ["MRU", "MRUV"]
+          },
+          "tag": { "text": "Prática", "color": "emerald" }
+        }
+      }
+    },
+    "matematica": {
+      "Funções": {
+        "l_004": {
+          "id": "l_004",
+          "title": "O que é uma Função?",
+          "type": "video",
+          "videoUrl": "https://www.youtube.com/watch?v=-2ZfS9R27R8",
+          "duration": "10:00",
+          "order": 0
         }
       }
     }
   },
   "questions": {
     "regular": {
-        "fisica": {
-          "Cinemática": {
-            "Movimento Uniforme": {
-                "-KeyQ1": {
-                  "text": "Um carro percorre uma estrada reta com velocidade constante de 72 km/h. Qual a distância percorrida em 10 segundos?",
-                  "options": ["100 m", "200 m", "300 m", "400 m"],
-                  "correctAnswer": 1,
-                  "difficulty": "easy",
-                  "explanation": "Primeiro converta 72 km/h para m/s dividindo por 3,6 = 20 m/s. Distância = Velocidade x Tempo. D = 20 * 10 = 200m."
-                },
-                "-KeyQ2": {
-                  "text": "Dois móveis A e B partem simultaneamente de um mesmo ponto, com velocidades constantes de 10m/s e 15m/s, mesma direção e sentido. Após 20s, qual a distância entre eles?",
-                  "options": ["50 m", "100 m", "200 m", "150 m"],
-                  "correctAnswer": 1,
-                  "difficulty": "medium",
-                  "explanation": "Velocidade relativa = 15 - 10 = 5m/s. Distância = 5m/s * 20s = 100m."
-                }
+      "fisica": {
+        "Cinemática": {
+          "MRU": {
+            "q_001": {
+              "id": "q_001",
+              "subjectId": "fisica",
+              "topic": "Cinemática",
+              "subtopic": "MRU",
+              "text": "Um carro percorre uma estrada reta com velocidade constante de 72 km/h. Qual a distância percorrida em 10 segundos?",
+              "options": ["100 m", "200 m", "300 m", "400 m"],
+              "correctAnswer": 1,
+              "difficulty": "easy",
+              "explanation": "Converta 72 km/h para m/s dividindo por 3,6 = 20 m/s. Distância = V x T = 20 * 10 = 200m.",
+              "tag": { "text": "ENEM 2022", "color": "blue" }
             },
-            "Vetores": {
-                "-KeyQ3": {
-                    "text": "Dois vetores de módulos 3u e 4u formam um ângulo de 90º entre si. Qual o módulo do vetor resultante?",
-                    "options": ["5u", "7u", "1u", "12u"],
-                    "correctAnswer": 0,
-                    "difficulty": "easy",
-                    "explanation": "Teorema de Pitágoras: R² = 3² + 4² = 9 + 16 = 25. R = 5."
-                }
+            "q_002": {
+              "id": "q_002",
+              "subjectId": "fisica",
+              "topic": "Cinemática",
+              "subtopic": "MRU",
+              "text": "Dois móveis A e B partem simultaneamente, com velocidades constantes de 10 m/s e 15 m/s na mesma direção. Após 20s, qual a distância entre eles?",
+              "options": ["50 m", "100 m", "150 m", "200 m"],
+              "correctAnswer": 1,
+              "difficulty": "medium",
+              "explanation": "Velocidade relativa = 15 - 10 = 5 m/s. Distância = 5 * 20 = 100m."
             }
           }
-        },
-        "matematica": {
-            "Álgebra": {
-                "Funções": {
-                    "-KeyQ4": {
-                        "text": "Dada a função f(x) = 2x - 3, qual o valor de f(5)?",
-                        "options": ["5", "7", "8", "10"],
-                        "correctAnswer": 1,
-                        "difficulty": "easy",
-                        "explanation": "f(5) = 2(5) - 3 = 10 - 3 = 7."
-                    }
-                }
-            }
         }
+      },
+      "matematica": {
+        "Funções": {
+          "Função Afim": {
+            "q_003": {
+              "id": "q_003",
+              "subjectId": "matematica",
+              "topic": "Funções",
+              "subtopic": "Função Afim",
+              "text": "Dada f(x) = 2x - 5, calcule f(3).",
+              "options": ["0", "1", "2", "3"],
+              "correctAnswer": 1,
+              "difficulty": "easy",
+              "explanation": "f(3) = 2(3) - 5 = 6 - 5 = 1."
+            }
+          }
+        }
+      }
     },
     "military": {
-        "esa": {
-            "Matemática Militar": {
-                "Logaritmos": {
-                    "-KeyQ5": {
-                        "text": "Se log2(x) = 5, qual o valor de x?",
-                        "options": ["10", "25", "32", "64"],
-                        "correctAnswer": 2,
-                        "difficulty": "medium",
-                        "explanation": "Definição de logaritmo: 2^5 = x. x = 32."
-                    }
-                }
+      "esa": {
+        "Matemática Militar": {
+          "Logaritmos Avançados": {
+            "q_mil_01": {
+              "id": "q_mil_01",
+              "subjectId": "esa",
+              "topic": "Matemática Militar",
+              "subtopic": "Logaritmos Avançados",
+              "text": "Se log2(x) = 5, determine x.",
+              "options": ["10", "25", "32", "64"],
+              "correctAnswer": 2,
+              "difficulty": "medium",
+              "explanation": "2 elevado a 5 é igual a 32.",
+              "tag": { "text": "ESA 2023", "color": "emerald" }
             }
+          }
         }
+      }
+    }
+  },
+  "community_posts": {
+    "post_01": {
+      "id": "post_01",
+      "authorName": "Ana Silva",
+      "authorAvatar": "https://ui-avatars.com/api/?name=Ana+Silva&background=6366f1&color=fff",
+      "authorXp": 12500,
+      "content": "Alguém tem um resumo bom sobre Era Vargas? Estou travada nas leis trabalhistas.",
+      "timestamp": 1715000000000,
+      "likes": 5,
+      "likedBy": { "user_xyz": true }
+    },
+    "post_02": {
+      "id": "post_02",
+      "authorName": "Carlos Admin",
+      "authorAvatar": "https://ui-avatars.com/api/?name=Carlos&background=10b981&color=fff",
+      "authorXp": 55000,
+      "content": "Dica rápida: Em questões de Física, sempre verifiquem as unidades antes de calcular! 🚨 km/h ≠ m/s.",
+      "timestamp": 1715100000000,
+      "likes": 42,
+      "replies": [
+        { "author": "João", "content": "Salvou minha vida!", "timestamp": 1715105000000 }
+      ]
+    }
+  },
+  "simulations": {
+    "sim_01": {
+      "id": "sim_01",
+      "title": "Simulado Oficial #1",
+      "description": "Prova completa focada em exatas e natureza.",
+      "durationMinutes": 90,
+      "type": "official",
+      "status": "open",
+      "questionIds": ["q_001", "q_002", "q_003"],
+      "questionCount": 3,
+      "subjects": ["fisica", "matematica"]
+    },
+    "sim_02": {
+      "id": "sim_02",
+      "title": "Treino Rápido: Cinemática",
+      "description": "Teste seus conhecimentos básicos de movimento.",
+      "durationMinutes": 20,
+      "type": "training",
+      "status": "open",
+      "questionIds": ["q_001", "q_002"],
+      "questionCount": 2,
+      "subjects": ["fisica"]
+    }
+  },
+  "users": {
+    "admin_placeholder": {
+      "uid": "admin_placeholder",
+      "displayName": "Admin Master",
+      "email": "admin@neurostudy.com",
+      "plan": "admin",
+      "xp": 99999,
+      "balance": 1000,
+      "essayCredits": 999,
+      "theme": "dark"
+    },
+    "student_placeholder": {
+      "uid": "student_placeholder",
+      "displayName": "Estudante Demo",
+      "email": "aluno@email.com",
+      "plan": "basic",
+      "xp": 1500,
+      "balance": 0,
+      "essayCredits": 1,
+      "theme": "dark",
+      "questionsAnswered": 42,
+      "loginStreak": 5
+    }
+  },
+  "user_essays": {
+    "student_placeholder": {
+      "essay_01": {
+        "id": "essay_01",
+        "theme": "Desafios da Educação no Brasil",
+        "date": 1714500000000,
+        "scoreTotal": 840,
+        "feedback": "Boa argumentação, mas atenção à crase.",
+        "competencies": { "c1": 120, "c2": 200, "c3": 160, "c4": 160, "c5": 200 },
+        "imageUrl": null
+      }
+    }
+  },
+  "user_transactions": {
+    "student_placeholder": {
+      "trans_01": {
+        "id": "trans_01",
+        "type": "debit",
+        "amount": 0.05,
+        "description": "NeuroAI (Chat)",
+        "timestamp": 1715200000000,
+        "currencyType": "BRL"
+      }
+    }
+  },
+  "leads": {
+    "lead_01": {
+      "id": "lead_01",
+      "name": "Novo Aluno Interessado",
+      "contact": "1199999999",
+      "planId": "PRO_YEARLY",
+      "amount": 197.00,
+      "billing": "yearly",
+      "status": "pending_pix",
+      "timestamp": "2024-05-20T10:00:00Z"
     }
   },
   "config": {
     "ai": {
       "intermediateLimits": {
         "canUseChat": false,
-        "canUseExplanation": true,
-        "dailyMessageLimit": 10
+        "canUseExplanation": true
       }
+    },
+    "traffic": {
+      "vslScript": "",
+      "checkoutLinkMonthly": "",
+      "checkoutLinkYearly": ""
     }
   }
 }

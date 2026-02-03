@@ -1,3 +1,4 @@
+
 export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes';
 
 export type UserPlan = 'basic' | 'intermediate' | 'advanced' | 'admin';
@@ -24,8 +25,8 @@ export interface UserProfile extends User {
   dailyLikesGiven?: number;
   lastPostedAt?: number;
   theme?: 'dark' | 'light';
-  essays?: Record<string, EssayCorrection>;
-  transactions?: Record<string, Transaction>;
+  // REMOVED HEAVY OBJECTS FROM MAIN PROFILE FETCH
+  // essays and transactions are now fetched on demand from separate root nodes
 }
 
 export interface Subject {
@@ -137,7 +138,7 @@ export interface CompetencyDetails {
 export interface EssayCorrection {
   id?: string;
   theme: string;
-  imageUrl?: string;
+  imageUrl?: string; // NOTE: In DB list, this will be null/id. In UI detail, it's the blob.
   date: number;
   scoreTotal: number;
   competencies: {

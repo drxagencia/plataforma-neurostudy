@@ -1,16 +1,10 @@
 
-import { 
-  signInWithEmailAndPassword, 
-  signOut as firebaseSignOut, 
-  updateProfile as firebaseUpdateProfile,
-  createUserWithEmailAndPassword,
-  User as FirebaseUser
-} from "firebase/auth";
+import * as firebaseAuth from "firebase/auth";
 import { auth, secondaryAuth } from "./firebaseConfig";
 import { User } from '../types';
 
 // Helper to map Firebase User to our App User type
-export const mapUser = (firebaseUser: FirebaseUser): User => {
+export const mapUser = (firebaseUser: firebaseAuth.User): User => {
   const email = firebaseUser.email || '';
   const isAdmin = email.endsWith('@admin.com');
 
@@ -26,7 +20,7 @@ export const mapUser = (firebaseUser: FirebaseUser): User => {
 export const AuthService = {
   login: async (email: string, password: string): Promise<User> => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await firebaseAuth.signInWithEmailAndPassword(auth, email, password);
       return mapUser(userCredential.user);
     } catch (error: any) {
       console.error("Auth Error:", error);
@@ -37,12 +31,12 @@ export const AuthService = {
   // NEW: Register a student using Secondary Auth (prevents Admin logout)
   registerStudent: async (email: string, password: string, displayName: string): Promise<string> => {
       try {
-          const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+          const userCredential = await firebaseAuth.createUserWithEmailAndPassword(secondaryAuth, email, password);
           // Set display name immediately
-          await firebaseUpdateProfile(userCredential.user, { displayName });
+          await firebaseAuth.updateProfile(userCredential.user, { displayName });
           
           // Important: Sign out the secondary auth immediately so it doesn't interfere with state
-          await firebaseSignOut(secondaryAuth);
+          await firebaseAuth.signOut(secondaryAuth);
           
           return userCredential.user.uid;
       } catch (error: any) {
@@ -56,7 +50,7 @@ export const AuthService = {
 
   logout: async (): Promise<void> => {
     try {
-      await firebaseSignOut(auth);
+      await firebaseAuth.signOut(auth);
     } catch (error) {
       console.error("Logout Error:", error);
     }
@@ -66,7 +60,7 @@ export const AuthService = {
     if (!auth.currentUser) throw new Error("No user logged in");
     
     try {
-      await firebaseUpdateProfile(auth.currentUser, {
+      await firebaseAuth.updateProfile(auth.currentUser, {
         displayName: updates.displayName,
         photoURL: updates.photoURL
       });

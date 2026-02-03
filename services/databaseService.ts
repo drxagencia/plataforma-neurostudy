@@ -1,3 +1,4 @@
+
 import { 
   ref, 
   get, 
@@ -7,10 +8,7 @@ import {
   remove, 
   query, 
   orderByChild, 
-  limitToLast, 
-  equalTo, 
-  startAt, 
-  endAt 
+  limitToLast
 } from "firebase/database";
 import { database } from "./firebaseConfig";
 import { 
@@ -30,6 +28,12 @@ import {
     TrafficConfig
 } from "../types";
 import { XP_VALUES } from "../constants";
+
+// HELPER: Validate not base64
+const isBase64Image = (str?: string) => {
+    if (!str) return false;
+    return str.trim().startsWith('data:image');
+};
 
 export const DatabaseService = {
   // --- SUBJECTS & LESSONS ---
@@ -63,14 +67,12 @@ export const DatabaseService = {
       try {
           const snapshot = await get(ref(database, `lessons/${subjectId}`));
           if (snapshot.exists()) {
-              // Convert object to array if needed and sort by order
               const data = snapshot.val();
               const result: Record<string, Lesson[]> = {};
               
               Object.keys(data).forEach(topic => {
                   const lessonsObj = data[topic];
                   const lessonsArr = Object.values(lessonsObj) as Lesson[];
-                  // If 'order' field exists, sort by it. Otherwise basic sort.
                   result[topic] = lessonsArr.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
               });
               return result;
@@ -91,7 +93,6 @@ export const DatabaseService = {
   },
 
   createLessonWithOrder: async (subjectId: string, topic: string, lesson: Lesson, targetIndex: number): Promise<void> => {
-      // 1. Get current lessons in topic
       const topicRef = ref(database, `lessons/${subjectId}/${topic}`);
       const snapshot = await get(topicRef);
       
@@ -101,7 +102,6 @@ export const DatabaseService = {
           lessons = Object.values(data).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
       }
 
-      // 2. Insert new lesson
       const newRef = push(topicRef);
       const newLessonWithId = { ...lesson, id: newRef.key };
 
@@ -111,11 +111,9 @@ export const DatabaseService = {
           lessons.splice(targetIndex, 0, newLessonWithId);
       }
 
-      // 3. Re-index all
       const updates: any = {};
       lessons.forEach((l, idx) => {
           updates[`${l.id}/order`] = idx;
-          // Also ensure full object is saved if it's the new one
           if (l.id === newRef.key) {
               updates[`${l.id}`] = { ...l, order: idx };
           }
@@ -132,36 +130,23 @@ export const DatabaseService = {
           
           if (snapshot.exists()) {
               const data = snapshot.val();
-              // Flatten if structure is deep or just get values
-              // Structure: questions/category/subject/topic/subtopic/questionId
-              // OR questions/category/subject/topic/questionId (if no subtopic provided in some architectures)
-              
               let questions: Question[] = [];
               
               Object.keys(data).forEach(subKey => {
                   const subItem = data[subKey];
-                  
-                  // Check if subItem is a question (has 'text') or a subtopic container
                   if (subItem.text) {
-                      // It's a question directly under topic (legacy or simple structure)
-                      // Filter by subtopic if requested? Usually subtopic is a folder level.
-                      if (!subtopic || subItem.subtopic === subtopic) {
-                          questions.push(subItem);
-                      }
+                      if (!subtopic || subItem.subtopic === subtopic) questions.push(subItem);
                   } else {
-                      // It's likely a subtopic folder
                       if (!subtopic || subKey === subtopic) {
                           const subQuestions = Object.values(subItem) as Question[];
                           questions = questions.concat(subQuestions);
                       }
                   }
               });
-              
               return questions;
           }
           return [];
       } catch (e) {
-          console.error(e);
           return [];
       }
   },
@@ -169,8 +154,6 @@ export const DatabaseService = {
   getQuestionsFromSubtopics: async (category: string, subjectId: string, topic: string, subtopics: string[]): Promise<Question[]> => {
       try {
            const allQuestions: Question[] = [];
-           // Fetch all for topic first to minimize requests, or fetch individually
-           // Let's fetch the topic and filter in memory
            const path = `questions/${category}/${subjectId}/${topic}`;
            const snapshot = await get(ref(database, path));
            
@@ -190,16 +173,19 @@ export const DatabaseService = {
   },
 
   createQuestion: async (category: string, subjectId: string, topic: string, subtopic: string, question: Question): Promise<void> => {
+      // SECURITY CHECK: PREVENT BASE64 IMAGES IN QUESTIONS
+      if (isBase64Image(question.imageUrl)) {
+          throw new Error("Imagens devem ser URLs externas (não cole imagens direto).");
+      }
+
       const path = `questions/${category}/${subjectId}/${topic}/${subtopic}`;
       const newRef = push(ref(database, path));
       await set(newRef, { ...question, id: newRef.key, subjectId, topic, subtopic });
       
-      // Update Filters Metadata
-      await update(ref(database, `topics/${subjectId}`), { [topic]: true }); // Store topic exists
-      await update(ref(database, `subtopics/${topic}`), { [subtopic]: true }); // Store subtopic exists
+      await update(ref(database, `topics/${subjectId}`), { [topic]: true }); 
+      await update(ref(database, `subtopics/${topic}`), { [subtopic]: true }); 
   },
   
-  // Helpers for Config/Filters
   getTopics: async (): Promise<Record<string, string[]>> => {
       const snap = await get(ref(database, 'topics'));
       if(snap.exists()) {
@@ -246,45 +232,10 @@ export const DatabaseService = {
   },
   
   getQuestionsByIds: async (ids: string[]): Promise<Question[]> => {
-      // In a NoSQL real scenario we might need to know the path.
-      // Assuming we have a global index or we search. 
-      // Optimized Approach: Keep a `questions_index` { id: path } in DB. 
-      // Fallback: This function might be slow if we iterate all. 
-      // FOR NOW: Let's assume we can't efficiently get by ID without path. 
-      // But Simulations store IDs.
-      // Solution: We should scan or maintain an index. 
-      // Simplification: Fetching specific paths if possible, else scan.
-      
-      // NOTE: For this codebase to work robustly, we'll implement a 'scan' via known subjects.
-      // Ideally, `createQuestion` should save to `question_index/${id}` = path.
-      
-      // Let's implement the retrieval assuming `question_index` doesn't exist yet but we need it.
-      // We will traverse all subjects/topics (Caching strategy recommended in real app).
-      // Since this is for a specific user request, we'll try to rely on the fact that 
-      // questions are usually fetched by topic.
-      // IF IDs are passed, we assume we might need to search.
-      
-      // Hack for Prototype: We won't implement full scan. We will assume simulation provides enough context 
-      // OR we just return empty if not found easily.
-      // Better: Create `questions_flat` or similar.
-      
-      // Let's assume for this fix, we won't fix the architecture issue fully but provide the method signature.
       return [];
   },
 
   // --- USER PROFILE ---
-  getUserProfile: async (uid: string): Promise<UserProfile | null> => {
-    try {
-      const snapshot = await get(ref(database, `users/${uid}`));
-      if (snapshot.exists()) {
-        return { uid, ...snapshot.val() };
-      }
-      return null;
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-      return null;
-    }
-  },
   
   ensureUserProfile: async (uid: string, defaultData: Partial<UserProfile>): Promise<UserProfile> => {
       const userRef = ref(database, `users/${uid}`);
@@ -302,8 +253,22 @@ export const DatabaseService = {
           return { uid, ...newUser } as UserProfile;
       }
       
-      // Merge defaults if missing fields
       const existing = snapshot.val();
+      
+      // Cleanup legacy heavy fields if they exist
+      if (existing.essays || existing.essay_images) {
+          await update(userRef, { essays: null, essay_images: null });
+          delete existing.essays;
+          delete existing.essay_images;
+      }
+
+      // SECURITY: If we detect a Base64 photoURL in the profile, wipe it.
+      if (isBase64Image(existing.photoURL)) {
+          const cleanPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(existing.displayName || 'User')}&background=random`;
+          await update(userRef, { photoURL: cleanPhoto });
+          existing.photoURL = cleanPhoto;
+      }
+
       if (existing.plan === undefined || existing.balance === undefined) {
            const updated = {
                ...existing,
@@ -317,7 +282,24 @@ export const DatabaseService = {
       return { uid, ...existing };
   },
 
+  getUserProfile: async (uid: string): Promise<UserProfile | null> => {
+    try {
+      const snapshot = await get(ref(database, `users/${uid}`));
+      if (snapshot.exists()) {
+        return { uid, ...snapshot.val() };
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  },
+
   saveUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
+      // SECURITY CHECK
+      if (isBase64Image(data.photoURL)) {
+          // Replace with generated if user tries to save base64
+          data.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.displayName || 'User')}`;
+      }
       await update(ref(database, `users/${uid}`), data);
   },
 
@@ -326,15 +308,10 @@ export const DatabaseService = {
   },
 
   updateUserPlan: async (uid: string, plan: UserPlan, expiry: string): Promise<void> => {
-    try {
-      const userRef = ref(database, `users/${uid}`);
-      await update(userRef, {
+      await update(ref(database, `users/${uid}`), {
         plan: plan,
         subscriptionExpiry: expiry
       });
-    } catch (error) {
-      throw error;
-    }
   },
 
   getUsersPaginated: async (limit: number): Promise<UserProfile[]> => {
@@ -356,16 +333,10 @@ export const DatabaseService = {
       if (snap.exists()) {
           const currentXp = snap.val().xp || 0;
           await update(userRef, { xp: currentXp + xpAmount });
-          
-          // Trigger global callback if configured? 
-          // For now, we update the DB and the client listener (onValue) or local state handles UI.
-          if (DatabaseService._xpCallback) {
-              DatabaseService._xpCallback(xpAmount, actionType);
-          }
+          if (DatabaseService._xpCallback) DatabaseService._xpCallback(xpAmount, actionType);
       }
   },
   
-  // Callback registry for XP Toast
   _xpCallback: null as ((amount: number, reason: string) => void) | null,
   onXpEarned: (callback: (amount: number, reason: string) => void) => {
       DatabaseService._xpCallback = callback;
@@ -380,7 +351,6 @@ export const DatabaseService = {
 
   markLessonComplete: async (uid: string, lessonId: string): Promise<void> => {
       await update(ref(database, `users/${uid}/completedLessons`), { [lessonId]: true });
-      // Increment hours studied (mock calculation: 30 mins per lesson)
       const userRef = ref(database, `users/${uid}`);
       const snap = await get(userRef);
       const hours = snap.val()?.hoursStudied || 0;
@@ -409,6 +379,12 @@ export const DatabaseService = {
       const snap = await get(q);
       if (snap.exists()) {
           const users = Object.values(snap.val()) as UserProfile[];
+          // Clean heavy photos on the fly to prevent app crash if dirty data exists
+          users.forEach(u => {
+              if (isBase64Image(u.photoURL)) {
+                  u.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.displayName)}&background=random`;
+              }
+          });
           return users.sort((a, b) => (b.xp || 0) - (a.xp || 0));
       }
       return [];
@@ -420,13 +396,23 @@ export const DatabaseService = {
       const snap = await get(q);
       if (snap.exists()) {
           const posts = Object.values(snap.val()) as CommunityPost[];
+          // Sanitize heavy avatars on read
+          posts.forEach(p => {
+              if (isBase64Image(p.authorAvatar)) {
+                  p.authorAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.authorName)}&background=random`;
+              }
+          });
           return posts.sort((a, b) => b.timestamp - a.timestamp);
       }
       return [];
   },
 
   createPost: async (post: Partial<CommunityPost>, uid: string): Promise<void> => {
-      // Check last post time
+      // SECURITY: Replace avatar if it's base64
+      if (isBase64Image(post.authorAvatar)) {
+          post.authorAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(post.authorName || 'User')}`;
+      }
+
       const userRef = ref(database, `users/${uid}`);
       const userSnap = await get(userRef);
       const lastPosted = userSnap.val()?.lastPostedAt || 0;
@@ -438,7 +424,6 @@ export const DatabaseService = {
 
       const newRef = push(ref(database, 'community_posts'));
       await set(newRef, { ...post, id: newRef.key });
-      
       await update(userRef, { lastPostedAt: Date.now() });
   },
 
@@ -454,7 +439,6 @@ export const DatabaseService = {
               await update(postRef, { likes: likes - 1, [`likedBy/${uid}`]: null });
           } else {
               await update(postRef, { likes: likes + 1, [`likedBy/${uid}`]: true });
-              // Reward liker? Maybe capped
               DatabaseService.processXpAction(uid, 'LIKE_COMMENT');
           }
       }
@@ -481,9 +465,9 @@ export const DatabaseService = {
   },
 
   saveSimulationResult: async (result: SimulationResult): Promise<void> => {
-      const newRef = push(ref(database, `users/${result.userId}/simulation_results`));
+      const newRef = push(ref(database, `user_simulations/${result.userId}`));
       await set(newRef, result);
-      // Award XP
+      
       const xpBase = XP_VALUES.SIMULATION_FINISH;
       const xpBonus = result.score * 2;
       const userRef = ref(database, `users/${result.userId}`);
@@ -551,8 +535,7 @@ export const DatabaseService = {
               await update(userRef, { balance: current + req.amount });
           }
           
-          // Log transaction
-          const transRef = push(ref(database, `users/${req.userId}/transactions`));
+          const transRef = push(ref(database, `user_transactions/${req.userId}`));
           await set(transRef, {
               id: transRef.key,
               type: 'credit',
@@ -570,7 +553,6 @@ export const DatabaseService = {
       return { intermediateLimits: { canUseChat: false, canUseExplanation: true } };
   },
 
-  // --- TRAFFIC SETTINGS ---
   getTrafficSettings: async (): Promise<TrafficConfig> => {
       try {
           const snapshot = await get(ref(database, 'config/traffic'));
@@ -584,42 +566,53 @@ export const DatabaseService = {
   },
 
   saveTrafficSettings: async (settings: TrafficConfig): Promise<void> => {
-      try {
-          await update(ref(database, 'config/traffic'), settings);
-      } catch (e) {
-          throw e;
-      }
+      await update(ref(database, 'config/traffic'), settings);
   },
 
-  // --- GENERIC PATH OPS ---
   deletePath: async (path: string): Promise<void> => {
       await remove(ref(database, path));
   },
 
   updatePath: async (path: string, data: any): Promise<void> => {
+      // Prevent updates with Base64 images
+      if (isBase64Image(data.imageUrl) || isBase64Image(data.photoURL)) {
+          throw new Error("Imagens Base64 bloqueadas.");
+      }
       await update(ref(database, path), data);
   },
 
-  // --- ESSAY ---
+  // --- ESSAY HANDLING (METADATA ONLY) ---
+  
   getEssayCorrections: async (uid: string): Promise<EssayCorrection[]> => {
-      const snap = await get(ref(database, `users/${uid}/essays`));
-      if (snap.exists()) return Object.values(snap.val());
-      return [];
+      const snap = await get(ref(database, `user_essays/${uid}`));
+      let essays: EssayCorrection[] = [];
+      if (snap.exists()) {
+          essays = Object.values(snap.val());
+      } 
+      return essays;
   },
 
-  getEssayImage: async (essayId: string): Promise<string | null> => {
-      // In a real app this might be in Storage. Here assuming Base64 in Realtime DB (not recommended for prod but fits structure)
-      // Or it might be stored inside the essay object already.
-      return null;
-  },
+  // Deleted getEssayImage to prevent heavy loads.
 
   saveEssayCorrection: async (uid: string, correction: EssayCorrection): Promise<void> => {
-      const newRef = push(ref(database, `users/${uid}/essays`));
-      await set(newRef, { ...correction, id: newRef.key });
+      // Create ID
+      const newRef = push(ref(database, `user_essays/${uid}`)); 
+      const essayId = newRef.key;
+      
+      if (!essayId) throw new Error("ID gen failed");
+
+      // STRICTLY DELETE IMAGE DATA BEFORE SAVING
+      const cleanCorrection = { 
+          ...correction, 
+          id: essayId, 
+          imageUrl: null // Never save the blob
+      };
+      
+      await set(newRef, cleanCorrection);
   },
 
   getUserTransactions: async (uid: string): Promise<Transaction[]> => {
-      const snap = await get(ref(database, `users/${uid}/transactions`));
+      const snap = await get(ref(database, `user_transactions/${uid}`));
       if (snap.exists()) return (Object.values(snap.val()) as Transaction[]).reverse();
       return [];
   }

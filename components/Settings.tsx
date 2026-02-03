@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserProfile } from '../types';
+import { UserProfile } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Camera, Save, Loader2, CheckCircle, Moon, Sun, Palette, Trophy, Shield, Star, Lock } from 'lucide-react';
+import { Save, Loader2, CheckCircle, Moon, Sun, Palette, Trophy, Shield, Star, Lock, RefreshCw, User } from 'lucide-react';
 import { RANKS, getRank, getNextRank } from '../constants';
 
 interface SettingsProps {
@@ -25,28 +25,19 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
     ? ((user.xp - currentRank.minXp) / (nextRank.minXp - currentRank.minXp)) * 100 
     : 100;
 
-  // Sync local state when user prop updates
   useEffect(() => {
     setDisplayName(user.displayName);
     setPhotoURL(user.photoURL || '');
-    // Fallback if user had midnight stored previously
     const theme = user.theme === 'light' ? 'light' : 'dark';
     setSelectedTheme(theme);
   }, [user]);
 
-  // Apply theme preview immediately
   const handleThemeChange = (theme: 'dark' | 'light') => {
-      // Force Dark Mode Only for now
-      if (theme === 'light') return;
-
+      if (theme === 'light') return; // Locked to dark for now
       setSelectedTheme(theme);
-      
       const root = document.documentElement;
-      
-      // Reset
       root.classList.remove('light');
       root.classList.remove('dark');
-      
       root.classList.add(theme);
   };
 
@@ -54,12 +45,16 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
     setIsSaving(true);
     setSuccess(false);
     try {
+      // Security Check: Ensure NO Base64 makes it to the DB
+      if (photoURL && photoURL.startsWith('data:')) {
+          alert("Erro de segurança: Imagens pesadas não permitidas. Gere um novo avatar.");
+          setIsSaving(false);
+          return;
+      }
+
       // 1. Update Firebase Auth 
       const authUpdates: { displayName?: string; photoURL?: string } = { displayName };
-      
-      if (photoURL && !photoURL.startsWith('data:image')) {
-          authUpdates.photoURL = photoURL;
-      }
+      if (photoURL) authUpdates.photoURL = photoURL;
 
       const updatedAuthUser = await AuthService.updateProfile(user, authUpdates);
 
@@ -67,10 +62,9 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
       await DatabaseService.saveUserProfile(user.uid, {
         displayName,
         photoURL,
-        theme: 'dark' // Force save as dark for consistency
+        theme: 'dark'
       });
 
-      // Merge updated User fields back into UserProfile
       const updatedProfile: UserProfile = { 
           ...user, 
           ...updatedAuthUser, 
@@ -83,26 +77,26 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
       setTimeout(() => setSuccess(false), 3000);
     } catch (e) {
       console.error("Failed to update", e);
-      alert("Erro ao salvar perfil. Tente uma imagem menor.");
+      alert("Erro ao salvar perfil.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-       const file = e.target.files[0];
-       if (file.size > 500000) {
-           alert("A imagem deve ter no máximo 500KB.");
-           return;
-       }
+  const handleGenerateAvatar = () => {
+      // Uses UI Avatars (Lightweight URL) instead of uploading an image
+      const randomColor = Math.floor(Math.random()*16777215).toString(16);
+      const newUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=${randomColor}&color=fff&size=128&bold=true`;
+      setPhotoURL(newUrl);
+  };
 
-       const reader = new FileReader();
-       reader.onloadend = () => {
-           setPhotoURL(reader.result as string);
-       };
-       reader.readAsDataURL(file);
-    }
+  const handleResetToGoogle = () => {
+      // Revert to Google Photo (if available) or generic
+      if (user.photoURL && !user.photoURL.startsWith('data:')) {
+          setPhotoURL(user.photoURL);
+      } else {
+          setPhotoURL(`https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=6366f1&color=fff`);
+      }
   };
 
   return (
@@ -117,30 +111,29 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
           <div className="bg-slate-900/50 border border-white/5 rounded-2xl p-8 space-y-8 h-fit">
             
             {/* Profile Picture */}
-            <div className="flex items-center gap-6">
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-slate-700 group-hover:border-indigo-500 transition-colors bg-slate-800">
+            <div className="flex flex-col items-center gap-6">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-700 bg-slate-800 shadow-xl relative">
                   {photoURL ? (
-                    <img 
-                      src={photoURL} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-slate-500">
+                    <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-slate-500">
                         {displayName.charAt(0)}
                     </div>
                   )}
-                </div>
-                <label className="absolute bottom-0 right-0 p-2 bg-indigo-600 rounded-full text-white cursor-pointer hover:bg-indigo-500 shadow-lg transition-transform hover:scale-110">
-                  <Camera size={16} />
-                  <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
-                </label>
               </div>
-              <div>
-                <h3 className="text-white font-medium">Foto de Perfil</h3>
-                <p className="text-sm text-slate-500">A imagem será salva no banco de dados.</p>
+              
+              <div className="flex gap-2">
+                  <button 
+                    onClick={handleGenerateAvatar}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 border border-white/10 transition-colors"
+                  >
+                      <RefreshCw size={14} /> Gerar Novo
+                  </button>
+                  {/* Removing Upload Button to prevent Base64 storage */}
               </div>
+              <p className="text-[10px] text-slate-500 text-center max-w-xs">
+                  Para economizar dados e manter a plataforma rápida, utilizamos avatares gerados automaticamente ou sua foto do Google. Uploads manuais estão desativados.
+              </p>
             </div>
 
             {/* Name Input */}

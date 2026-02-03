@@ -21,7 +21,7 @@ import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
+import * as firebaseAuth from 'firebase/auth';
 import { Zap } from 'lucide-react';
 import { getRank } from './constants';
 
@@ -115,7 +115,7 @@ const App: React.FC = () => {
 
   // Auth Persistence & DB Structure Enforcement
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = firebaseAuth.onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const mappedUser = mapUser(firebaseUser);
         

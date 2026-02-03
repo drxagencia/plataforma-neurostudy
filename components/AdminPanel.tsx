@@ -365,7 +365,13 @@ const AdminPanel: React.FC = () => {
                   const text = textParts.join(':').trim();
 
                   // Robust NULL check for image: If "null" or "NULL" or empty, set to undefined so it's not saved in DB
-                  const imageUrl = (imageUrlRaw.toLowerCase() === 'null' || imageUrlRaw === '') ? undefined : imageUrlRaw;
+                  let imageUrl = (imageUrlRaw.toLowerCase() === 'null' || imageUrlRaw === '') ? undefined : imageUrlRaw;
+                  
+                  // CHECK FOR BASE64
+                  if (imageUrl && imageUrl.startsWith('data:')) {
+                      console.warn("Base64 image skipped in import:", text);
+                      imageUrl = undefined;
+                  }
 
                   const q: Question = {
                       text,
@@ -484,6 +490,10 @@ const AdminPanel: React.FC = () => {
              let updateData: any = {};
              
              if (contentTab === 'question') {
+                if (contentForm.qImageUrl && contentForm.qImageUrl.startsWith('data:')) {
+                    alert("ERRO CRÍTICO: Imagens coladas (Base64) estão proibidas. Use uma URL externa.");
+                    return;
+                }
                 updateData = {
                     text: contentForm.qText,
                     imageUrl: contentForm.qImageUrl,
@@ -583,6 +593,12 @@ const AdminPanel: React.FC = () => {
                   alert("Preencha o Enunciado e o Subtópico para manter a organização.");
                   return;
               }
+              
+              if (contentForm.qImageUrl && contentForm.qImageUrl.startsWith('data:')) {
+                  alert("ERRO CRÍTICO: Imagens coladas (Base64) estão proibidas. Use uma URL externa.");
+                  return;
+              }
+
               const newQuestion: Question = {
                   text: contentForm.qText,
                   imageUrl: contentForm.qImageUrl || "", 
