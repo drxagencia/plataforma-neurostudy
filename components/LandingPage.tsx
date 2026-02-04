@@ -90,15 +90,11 @@ const Countdown = () => {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   // State de Navegação (Slide Vertical)
-  const [currentStep, setCurrentStep] = useState(0); // 0: Hero, 1: Enemies, 2: VSL, 3: LeadForm, 4: Pricing
+  const [currentStep, setCurrentStep] = useState(0); // 0: Hero, 1: Enemies, 2: VSL, 3: Pricing
   
   // VSL Logic
   const [showEarlyOffer, setShowEarlyOffer] = useState(false);
   const [showFinalOffer, setShowFinalOffer] = useState(false);
-
-  // Lead Form
-  const [leadForm, setLeadForm] = useState({ name: '', email: '', whatsapp: '' });
-  const [isLeadLoading, setIsLeadLoading] = useState(false);
 
   // Pricing / Checkout Logic
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
@@ -125,34 +121,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   };
 
   // --- ACTIONS ---
-
-  const handleLeadSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!leadForm.name || !leadForm.email || !leadForm.whatsapp) return alert("Preencha todos os campos.");
-      
-      setIsLeadLoading(true);
-      try {
-          // Save Lead
-          await DatabaseService.createLead({
-              name: leadForm.name,
-              contact: leadForm.whatsapp, // Storing email in contact or custom field, mapping simplistic for now
-              planId: 'pending_selection',
-              amount: 0,
-              billing: 'monthly',
-              paymentMethod: 'pending',
-              timestamp: new Date().toISOString(),
-              status: 'pending'
-          });
-          // Move to Pricing
-          scrollToStep(4);
-      } catch (err) {
-          console.error(err);
-          // Fallback allow
-          scrollToStep(4);
-      } finally {
-          setIsLeadLoading(false);
-      }
-  };
 
   const handleCheckout = (plan: 'basic' | 'advanced', method: 'pix' | 'card') => {
       // Prices Logic
@@ -336,74 +304,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               </div>
           </section>
 
-          {/* === TELA 4: CAPTURA DE DADOS === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-black">
-              <div className="max-w-md w-full glass-card p-8 rounded-3xl border border-indigo-500/20 shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/20 rounded-full blur-[50px]" />
-                  
-                  <div className="text-center mb-8 relative z-10">
-                      <h2 className="text-3xl font-black text-white mb-2">IDENTIFIQUE-SE</h2>
-                      <p className="text-slate-400 text-sm">Precisamos dos seus dados para configurar sua conta NeuroStudy.</p>
-                  </div>
-
-                  <form onSubmit={handleLeadSubmit} className="space-y-4 relative z-10">
-                      <div>
-                          <label className="text-xs text-slate-500 uppercase font-bold ml-1 mb-1 block">Nome Completo</label>
-                          <div className="relative">
-                              <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                              <input 
-                                required
-                                value={leadForm.name}
-                                onChange={e => setLeadForm({...leadForm, name: e.target.value})}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-xl py-4 pl-12 pr-4 text-white focus:border-indigo-500 outline-none transition-colors"
-                                placeholder="Seu nome"
-                              />
-                          </div>
-                      </div>
-                      <div>
-                          <label className="text-xs text-slate-500 uppercase font-bold ml-1 mb-1 block">Email Principal</label>
-                          <div className="relative">
-                              <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                              <input 
-                                required
-                                type="email"
-                                value={leadForm.email}
-                                onChange={e => setLeadForm({...leadForm, email: e.target.value})}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-xl py-4 pl-12 pr-4 text-white focus:border-indigo-500 outline-none transition-colors"
-                                placeholder="seu@email.com"
-                              />
-                          </div>
-                      </div>
-                      <div>
-                          <label className="text-xs text-slate-500 uppercase font-bold ml-1 mb-1 block">WhatsApp</label>
-                          <div className="relative">
-                              <Smartphone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                              <input 
-                                required
-                                value={leadForm.whatsapp}
-                                onChange={e => setLeadForm({...leadForm, whatsapp: e.target.value})}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-xl py-4 pl-12 pr-4 text-white focus:border-indigo-500 outline-none transition-colors"
-                                placeholder="(00) 00000-0000"
-                              />
-                          </div>
-                      </div>
-
-                      <button 
-                        type="submit"
-                        disabled={isLeadLoading}
-                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-lg shadow-lg flex items-center justify-center gap-2 mt-4 transition-all"
-                      >
-                          {isLeadLoading ? 'Processando...' : 'CONTINUAR'} <ArrowRight size={20} />
-                      </button>
-                  </form>
-                  
-                  <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-600">
-                      <Lock size={12} /> Seus dados estão criptografados.
-                  </div>
-              </div>
-          </section>
-
-          {/* === TELA 5: CHECKOUT / PREÇOS === */}
+          {/* === TELA 4: CHECKOUT / PREÇOS (MOVED UP) === */}
           <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-slate-950">
               <div className="max-w-6xl w-full relative">
                   {/* Header de Escassez */}
