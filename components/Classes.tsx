@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { Subject, Lesson, View, UserProfile } from '../types';
@@ -188,15 +189,18 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
       // Context Engineering
       let systemPrompt = "";
       let userQuery = "";
+      let actionLabel = "NeuroTutor: Dúvida Aula";
 
       const contextHeader = `[CONTEXTO DA AULA]\nTítulo: ${selectedLesson.title}\nTópico: ${selectedTopic}\nMatéria: ${selectedSubject?.name}`;
 
       if (actionType === 'mindmap') {
           userQuery = "Crie um MAPA MENTAL esquematizado desta aula.";
           systemPrompt = `${contextHeader}\n\nVocê é um especialista em Aprendizagem Acelerada. Crie um mapa mental usando Markdown (listas com indentação - ou *). Use EMOJIS para categorizar. Seja hierárquico e visual.`;
+          actionLabel = "NeuroTutor: Mapa Mental";
       } else if (actionType === 'summary') {
           userQuery = "Gere um RESUMO DE ALTA PERFORMANCE focado no ENEM.";
           systemPrompt = `${contextHeader}\n\nVocê é um Professor Sênior de Cursinho. Crie um resumo 'direto ao ponto'. Use negrito para conceitos chave. Liste 'O que cai no ENEM' no final.`;
+          actionLabel = "NeuroTutor: Resumo Aula";
       } else {
           userQuery = tutorInput;
           systemPrompt = `${contextHeader}\n\nResponda como um Tutor de Elite. Seja detalhista, use exemplos, analogias e formatação rica.`;
@@ -210,7 +214,8 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
 
       try {
           // Use AiService which now calls Client-side GenAI directly
-          const responseText = await AiService.sendMessage(userQuery, newHistory);
+          // Pass actionLabel for history
+          const responseText = await AiService.sendMessage(userQuery, newHistory, actionLabel);
 
           setTutorHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: responseText }]);
           await updateBalanceLocally();

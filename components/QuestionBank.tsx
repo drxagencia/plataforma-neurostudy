@@ -244,7 +244,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
 
       setIsExplaining(true);
       try {
-          const text = await AiService.explainError(currentQ.text, wrongTxt, correctTxt);
+          const contextLabel = `Ajuda: Questão ${currentQ.topic}`;
+          const text = await AiService.explainError(currentQ.text, wrongTxt, correctTxt, contextLabel);
           setAiExplanation(text);
           handleUpdateBalance(); 
       } catch (e: any) {

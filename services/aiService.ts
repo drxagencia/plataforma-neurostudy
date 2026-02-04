@@ -50,7 +50,7 @@ const getUserData = async (uid: string) => {
 };
 
 export const AiService = {
-  sendMessage: async (message: string, history: ChatMessage[]): Promise<string> => {
+  sendMessage: async (message: string, history: ChatMessage[], actionLabel: string = 'NeuroAI Tutor'): Promise<string> => {
     if (!auth.currentUser) throw new Error("User not authenticated");
     const uid = auth.currentUser.uid;
 
@@ -113,10 +113,10 @@ export const AiService = {
           id: transRef.key,
           type: 'debit',
           amount: cost,
-          description: `NeuroAI (${totalTokens} tokens)`,
+          description: actionLabel, // Use specific label, e.g. "NeuroTutor: Resumo"
           timestamp: Date.now(),
           currencyType: 'BRL',
-          tokensUsed: totalTokens
+          tokensUsed: totalTokens // Kept for analytics but not shown in description
       });
 
       return responseText;
@@ -127,7 +127,7 @@ export const AiService = {
     }
   },
 
-  explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string): Promise<string> => {
+  explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string, contextLabel: string = 'Ajuda: Questão'): Promise<string> => {
     if (!auth.currentUser) throw new Error("User not authenticated");
     const uid = auth.currentUser.uid;
 
@@ -171,7 +171,7 @@ INSTRUÇÃO: Compare a alternativa incorreta com a correta. Explique onde está 
           id: transRef.key,
           type: 'debit',
           amount: cost,
-          description: `NeuroAI Explicação (${totalTokens} toks)`,
+          description: contextLabel,
           timestamp: Date.now(),
           currencyType: 'BRL',
           tokensUsed: totalTokens

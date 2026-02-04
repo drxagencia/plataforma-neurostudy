@@ -124,7 +124,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
 
     try {
       // Need to pass UID for balance check in backend
-      const responseText = await AiService.sendMessage(userMsg.content, messages);
+      const responseText = await AiService.sendMessage(userMsg.content, messages, "NeuroAI Tutor");
       
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -415,8 +415,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                       <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
                           {transactions.map(t => {
                               const isDebit = t.type === 'debit';
-                              const multiplier = isDebit ? (isBasic ? 200 : 100) : 1;
-                              const displayAmount = t.amount * multiplier;
+                              const displayAmount = t.amount;
 
                               return (
                               <div key={t.id} className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
@@ -439,7 +438,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
 
           {/* BEAUTIFUL RECHARGE MODAL OVERLAY */}
           {showRecharge && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300 p-4">
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300 p-4">
               <div className="bg-[#0f172a] border border-indigo-500/20 rounded-3xl p-8 w-full max-w-2xl shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
                   {/* Decorative Glows */}
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
