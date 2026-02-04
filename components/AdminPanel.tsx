@@ -148,7 +148,6 @@ const AdminPanel: React.FC = () => {
     setLoading(false);
   };
 
-  // ... (LAZY LOAD effects preserved) ...
   // LAZY LOAD: Users (Only when tab active)
   useEffect(() => {
       if (activeTab === 'users' || activeTab === 'metrics') {
@@ -233,8 +232,6 @@ const AdminPanel: React.FC = () => {
           setCreateModeExistingLessons([]);
       }
   }, [contentForm.subjectId, viewMode, contentTab]);
-
-  // --- ACTIONS --- (Preserved all existing actions: normalizeId, handleOpenApproveModal, handleApproveLead, handleBulkImport, handleSaveTraffic, handleEditItem, handleDeleteItem, handleSaveContent, resetForms, addMaterial, removeMaterial, toggleQuestionInSim, toggleSubtopic, handleEditUser, handleSaveUser, handleProcessRecharge)
 
   const normalizeId = (str: string) => {
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -763,11 +760,59 @@ const AdminPanel: React.FC = () => {
       : [];
 
   return (
-    // ... (Outer UI omitted for brevity, logic follows same structure)
     <div className="space-y-6 animate-slide-up pb-20 relative">
       
-      {/* ... (Approving Lead and Edit User Modals preserved) ... */}
-      {/* ... (Header preserved) ... */}
+      {/* APPROVAL MODAL */}
+      {approvingLead && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+              <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl w-full max-w-md animate-in zoom-in-95">
+                  <h3 className="text-xl font-bold text-white mb-4">Aprovar: {approvingLead.name}</h3>
+                  <div className="space-y-3 mb-6">
+                      <input 
+                        placeholder="Email para Login" 
+                        className="w-full glass-input p-3 rounded-lg"
+                        value={newStudentEmail}
+                        onChange={e => setNewStudentEmail(e.target.value)}
+                      />
+                      <input 
+                        placeholder="Senha Provisória" 
+                        className="w-full glass-input p-3 rounded-lg"
+                        value={newStudentPassword}
+                        onChange={e => setNewStudentPassword(e.target.value)}
+                      />
+                      <p className="text-xs text-slate-500">Info do Pagamento: {approvingLead.contact}</p>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                      <button onClick={() => setApprovingLead(null)} className="text-slate-400 hover:text-white px-3">Cancelar</button>
+                      <button onClick={handleApproveLead} disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                          {loading ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle size={16}/>}
+                          Criar Conta
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* HEADER */}
+      <div className="flex justify-between items-end mb-6">
+          <div>
+              <h2 className="text-3xl font-bold text-white mb-2">Painel Administrativo</h2>
+              <p className="text-slate-400">Controle total da plataforma.</p>
+          </div>
+      </div>
+
+      {/* NAVIGATION TABS */}
+      <div className="flex gap-4 border-b border-white/10 pb-1 overflow-x-auto mb-6">
+          {['leads', 'users', 'content', 'finance', 'config', 'metrics', 'traffic'].map((tab) => (
+              <button 
+                key={tab}
+                onClick={() => setActiveTab(tab as any)}
+                className={`px-4 py-2 font-bold text-sm uppercase tracking-wider transition-colors ${activeTab === tab ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-slate-500 hover:text-white'}`}
+              >
+                  {tab}
+              </button>
+          ))}
+      </div>
 
       {/* --- CONTENT TAB --- */}
       {activeTab === 'content' && (
@@ -781,8 +826,46 @@ const AdminPanel: React.FC = () => {
                   <button onClick={() => {setContentTab('import'); setViewMode('create'); setIsEditing(false);}} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors whitespace-nowrap ${contentTab === 'import' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500'}`}><Upload size={18} /> Importar</button>
               </div>
 
-              {/* ... (Toggle Create/Manage preserved) ... */}
-              {/* ... (Import Tab preserved) ... */}
+              {/* View Toggle */}
+              {contentTab !== 'import' && (
+                  <div className="flex justify-end gap-2 mb-4">
+                      <button onClick={() => setViewMode('create')} className={`px-4 py-2 rounded-lg text-sm font-bold ${viewMode === 'create' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Criar Novo</button>
+                      <button onClick={() => setViewMode('manage')} className={`px-4 py-2 rounded-lg text-sm font-bold ${viewMode === 'manage' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Gerenciar</button>
+                  </div>
+              )}
+
+              {/* --- IMPORT TAB --- */}
+              {contentTab === 'import' && (
+                  <div className="glass-card p-6 rounded-2xl">
+                      <h3 className="font-bold text-white mb-4">Importação em Massa</h3>
+                      <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                              <select className="glass-input p-3 rounded-lg" value={importCategory} onChange={e => setImportCategory(e.target.value)}>
+                                  <option value="regular">Regular</option>
+                                  <option value="military">Militar</option>
+                              </select>
+                              <select className="glass-input p-3 rounded-lg" value={importType} onChange={e => setImportType(e.target.value as any)}>
+                                  <option value="question">Questões</option>
+                                  <option value="lesson">Aulas</option>
+                              </select>
+                          </div>
+                          <textarea 
+                            className="w-full h-64 glass-input p-4 rounded-xl font-mono text-xs" 
+                            placeholder={importType === 'question' ? "ID_MATERIA:TOPICO:SUBTOPICO:ENUNCIADO:IMG_URL:A:B:C:D:EXPLICAÇÃO:CORRETA_INDEX" : "ID_MATERIA:TOPICO:TITULO:URL:DURACAO"}
+                            value={importText}
+                            onChange={e => setImportText(e.target.value)}
+                          />
+                          <p className="text-xs text-slate-500">
+                              {importType === 'question' 
+                                ? "Formato: ID:TOPICO:SUBTOPICO:TEXTO:IMG(ou NULL):OPT1:OPT2:OPT3:OPT4:EXPL:INDEX(0-3)" 
+                                : "Formato: ID:TOPICO:TITULO:URL(ou NULL):DURACAO"}
+                          </p>
+                          <button onClick={handleBulkImport} disabled={isImporting} className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                              {isImporting ? <Loader2 className="animate-spin" /> : <Upload size={18}/>} Importar
+                          </button>
+                      </div>
+                  </div>
+              )}
 
               {/* --- VIEW MODE: CREATE / EDIT --- */}
               {viewMode === 'create' && contentTab !== 'import' && (
@@ -790,14 +873,70 @@ const AdminPanel: React.FC = () => {
                       <div className="lg:col-span-2 space-y-6">
                           <div className={`glass-card p-6 rounded-2xl ${isEditing ? 'border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.1)]' : ''}`}>
                              
-                             {/* ... (Subject Form preserved) ... */}
+                             {/* Subject Form */}
+                             {contentTab === 'subject' && (
+                                 <div className="space-y-4">
+                                     <input className="w-full glass-input p-3 rounded-lg" placeholder="Nome da Matéria" value={contentForm.sName} onChange={e => setContentForm({...contentForm, sName: e.target.value})} />
+                                     <div className="grid grid-cols-2 gap-4">
+                                         <select className="glass-input p-3 rounded-lg" value={contentForm.sIcon} onChange={e => setContentForm({...contentForm, sIcon: e.target.value})}>
+                                             <option value="BookOpen">BookOpen</option>
+                                             <option value="Calculator">Calculator</option>
+                                             <option value="Beaker">Beaker</option>
+                                             <option value="Microscope">Microscope</option>
+                                             <option value="Globe">Globe</option>
+                                             <option value="Zap">Zap (Física)</option>
+                                             <option value="Target">Target (Militar)</option>
+                                         </select>
+                                         <select className="glass-input p-3 rounded-lg" value={contentForm.sColor} onChange={e => setContentForm({...contentForm, sColor: e.target.value})}>
+                                             <option value="text-blue-400">Azul</option>
+                                             <option value="text-red-400">Vermelho</option>
+                                             <option value="text-green-400">Verde</option>
+                                             <option value="text-yellow-400">Amarelo</option>
+                                             <option value="text-purple-400">Roxo</option>
+                                         </select>
+                                     </div>
+                                     <select className="w-full glass-input p-3 rounded-lg" value={contentForm.sCategory} onChange={e => setContentForm({...contentForm, sCategory: e.target.value})}>
+                                         <option value="regular">Regular</option>
+                                         <option value="military">Militar</option>
+                                     </select>
+                                 </div>
+                             )}
                              
                              {contentTab !== 'subject' && (
                                   <div className="space-y-4">
-                                      {/* ... (Simulation Form preserved) ... */}
+                                      {/* Simulation Form */}
+                                      {contentTab === 'simulation' && (
+                                          <div className="space-y-4">
+                                              <input className="w-full glass-input p-3 rounded-lg" placeholder="Título do Simulado" value={simForm.title} onChange={e => setSimForm({...simForm, title: e.target.value})} />
+                                              <textarea className="w-full glass-input p-3 rounded-lg" placeholder="Descrição" value={simForm.description} onChange={e => setSimForm({...simForm, description: e.target.value})} />
+                                              <div className="grid grid-cols-2 gap-4">
+                                                  <input type="number" className="glass-input p-3 rounded-lg" placeholder="Duração (min)" value={simForm.duration} onChange={e => setSimForm({...simForm, duration: parseInt(e.target.value)})} />
+                                                  <select className="glass-input p-3 rounded-lg" value={simForm.status} onChange={e => setSimForm({...simForm, status: e.target.value})}>
+                                                      <option value="open">Aberto</option>
+                                                      <option value="closed">Fechado</option>
+                                                      <option value="coming_soon">Em Breve</option>
+                                                  </select>
+                                              </div>
+                                              <div className="p-4 bg-slate-900 rounded-xl border border-white/10">
+                                                  <p className="text-xs text-slate-400 mb-2">Selecione questões na lista ao lado.</p>
+                                                  <p className="text-emerald-400 font-bold">{simForm.selectedQuestionIds.length} Questões selecionadas</p>
+                                              </div>
+                                          </div>
+                                      )}
 
                                       {/* Tag Input for Lessons and Questions */}
-                                      {/* ... (Tag input preserved) ... */}
+                                      {(contentTab === 'lesson' || contentTab === 'question') && (
+                                          <div className="flex gap-2">
+                                              <input className="flex-1 glass-input p-3 rounded-lg text-sm" placeholder="Tag (Opcional, ex: REVISÃO)" value={contentForm.tagText} onChange={e => setContentForm({...contentForm, tagText: e.target.value})} />
+                                              <select className="glass-input p-3 rounded-lg text-sm w-32" value={contentForm.tagColor} onChange={e => setContentForm({...contentForm, tagColor: e.target.value})}>
+                                                  <option value="indigo">Indigo</option>
+                                                  <option value="emerald">Verde</option>
+                                                  <option value="red">Vermelho</option>
+                                                  <option value="yellow">Amarelo</option>
+                                                  <option value="blue">Azul</option>
+                                              </select>
+                                          </div>
+                                      )}
 
                                       {contentTab === 'question' && (
                                         <div className="space-y-4">
@@ -834,7 +973,22 @@ const AdminPanel: React.FC = () => {
                                             </datalist>
                                             
                                             <textarea className="w-full glass-input p-4 rounded-xl min-h-[100px]" placeholder="Enunciado..." value={contentForm.qText} onChange={e => setContentForm({...contentForm, qText: e.target.value})} />
-                                            {/* ... (rest of question form) ... */}
+                                            <input className="w-full glass-input p-3 rounded-lg" placeholder="URL da Imagem (Opcional - NÃO USAR BASE64)" value={contentForm.qImageUrl} onChange={e => setContentForm({...contentForm, qImageUrl: e.target.value})} />
+                                            
+                                            <div className="space-y-2">
+                                                {contentForm.qOptions.map((opt, i) => (
+                                                    <div key={i} className="flex gap-2 items-center">
+                                                        <input type="radio" name="correct" checked={contentForm.qCorrect === i} onChange={() => setContentForm({...contentForm, qCorrect: i})} />
+                                                        <input className="flex-1 glass-input p-2 rounded-lg text-sm" placeholder={`Alternativa ${i+1}`} value={opt} onChange={e => {
+                                                            const newOpts = [...contentForm.qOptions];
+                                                            newOpts[i] = e.target.value;
+                                                            setContentForm({...contentForm, qOptions: newOpts});
+                                                        }} />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            <textarea className="w-full glass-input p-3 rounded-lg text-sm" placeholder="Explicação do Gabarito" value={contentForm.qExplanation} onChange={e => setContentForm({...contentForm, qExplanation: e.target.value})} />
                                         </div>
                                      )}
 
@@ -873,6 +1027,24 @@ const AdminPanel: React.FC = () => {
                                                  <>
                                                      <input className="w-full glass-input p-3 rounded-lg" placeholder="URL YouTube" value={contentForm.lUrl} onChange={e => setContentForm({...contentForm, lUrl: e.target.value})} />
                                                      <input className="w-full glass-input p-3 rounded-lg" placeholder="Duração" value={contentForm.lDuration} onChange={e => setContentForm({...contentForm, lDuration: e.target.value})} />
+                                                     
+                                                     {/* Materials */}
+                                                     <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                                                         <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Materiais</label>
+                                                         <div className="flex gap-2 mb-2">
+                                                             <input className="flex-1 glass-input p-2 text-sm rounded" placeholder="Título" value={currentMaterial.title} onChange={e => setCurrentMaterial({...currentMaterial, title: e.target.value})} />
+                                                             <input className="flex-1 glass-input p-2 text-sm rounded" placeholder="URL" value={currentMaterial.url} onChange={e => setCurrentMaterial({...currentMaterial, url: e.target.value})} />
+                                                             <button onClick={addMaterial} className="p-2 bg-emerald-600 text-white rounded"><Plus size={16}/></button>
+                                                         </div>
+                                                         <div className="space-y-1">
+                                                             {materials.map((m, i) => (
+                                                                 <div key={i} className="flex justify-between items-center text-sm p-2 bg-white/5 rounded">
+                                                                     <span>{m.title}</span>
+                                                                     <button onClick={() => removeMaterial(i)} className="text-red-400"><X size={14}/></button>
+                                                                 </div>
+                                                             ))}
+                                                         </div>
+                                                     </div>
                                                  </>
                                              ) : (
                                                  <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5 space-y-3">
@@ -919,7 +1091,26 @@ const AdminPanel: React.FC = () => {
                                                  </div>
                                              )}
 
-                                             {/* ... (Positioning preserved) ... */}
+                                             {/* Positioning - Insert After... */}
+                                             {!isEditing && (
+                                                 <div className="bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                                                     <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Posição (Ordem)</label>
+                                                     <select 
+                                                        className="w-full glass-input p-3 rounded-lg text-sm"
+                                                        value={contentForm.lInsertAfterId}
+                                                        onChange={e => setContentForm({...contentForm, lInsertAfterId: e.target.value})}
+                                                     >
+                                                         <option value="end">Ao Final (Padrão)</option>
+                                                         <option value="start">No Início</option>
+                                                         {createModeExistingLessons
+                                                            .filter(item => item.topic === contentForm.topicName)
+                                                            .map(item => (
+                                                                <option key={item.lesson.id} value={item.lesson.id}>Após: {item.lesson.title}</option>
+                                                            ))
+                                                         }
+                                                     </select>
+                                                 </div>
+                                             )}
                                          </div>
                                      )}
                                   </div>
@@ -930,13 +1121,246 @@ const AdminPanel: React.FC = () => {
                               </button>
                           </div>
                       </div>
+
+                      {/* Right Panel: Preview or List for Create Mode */}
+                      <div className="space-y-6">
+                          {/* If Simulation, show question picker logic */}
+                          {contentTab === 'simulation' && (
+                              <div className="glass-card p-6 rounded-2xl h-full flex flex-col">
+                                  <h3 className="font-bold text-white mb-4">Adicionar Questões</h3>
+                                  <div className="grid grid-cols-2 gap-2 mb-4">
+                                      <select className="glass-input p-2 rounded text-xs" value={simFilter.subject} onChange={e => setSimFilter({...simFilter, subject: e.target.value})}>
+                                          <option value="">Matéria</option>
+                                          {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                      </select>
+                                      <select className="glass-input p-2 rounded text-xs" value={simFilter.topic} onChange={e => setSimFilter({...simFilter, topic: e.target.value})}>
+                                          <option value="">Tópico</option>
+                                          {simFilter.subject && topics[simFilter.subject]?.map(t => <option key={t} value={t}>{t}</option>)}
+                                      </select>
+                                  </div>
+                                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+                                      {filteredQuestions.map((q, i) => (
+                                          <div key={i} onClick={() => q.id && toggleQuestionInSim(q.id)} className={`p-2 rounded border cursor-pointer text-xs ${simForm.selectedQuestionIds.includes(q.id!) ? 'bg-emerald-900/30 border-emerald-500 text-white' : 'bg-slate-900 border-white/5 text-slate-400'}`}>
+                                              <p className="line-clamp-2">{q.text}</p>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          )}
+                          {/* If not sim, just show info */}
+                          {contentTab !== 'simulation' && (
+                              <div className="glass-card p-6 rounded-2xl bg-indigo-900/10 border-indigo-500/20 text-center">
+                                  <p className="text-indigo-300 text-sm">Preencha o formulário para adicionar conteúdo ao banco de dados.</p>
+                              </div>
+                          )}
+                      </div>
                   </div>
               )}
 
-              {/* ... (Manage Views preserved) ... */}
+              {/* --- VIEW MODE: MANAGE --- */}
+              {viewMode === 'manage' && contentTab !== 'import' && (
+                  <div className="space-y-6 animate-fade-in">
+                      {/* Filter Bar */}
+                      <div className="glass-card p-4 rounded-xl flex gap-4 flex-wrap">
+                          {contentTab === 'question' && (
+                              <select className="glass-input p-2 rounded-lg text-sm" value={manageQCategory} onChange={e => setManageQCategory(e.target.value)}>
+                                  <option value="regular">Regular</option>
+                                  <option value="military">Militar</option>
+                              </select>
+                          )}
+                          {(contentTab === 'question' || contentTab === 'lesson') && (
+                              <>
+                                <select className="glass-input p-2 rounded-lg text-sm" value={contentTab === 'question' ? manageQSubject : manageLessonSubject} onChange={e => contentTab === 'question' ? setManageQSubject(e.target.value) : setManageLessonSubject(e.target.value)}>
+                                    <option value="">Matéria</option>
+                                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                                <select className="glass-input p-2 rounded-lg text-sm" value={contentTab === 'question' ? manageQTopic : manageLessonTopic} onChange={e => contentTab === 'question' ? setManageQTopic(e.target.value) : setManageLessonTopic(e.target.value)}>
+                                    <option value="">Tópico</option>
+                                    {topics[contentTab === 'question' ? manageQSubject : manageLessonSubject]?.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                              </>
+                          )}
+                      </div>
+
+                      {/* List */}
+                      <div className="space-y-2">
+                          {contentTab === 'question' && filteredQuestions.map((q, i) => (
+                              <div key={i} className="glass-card p-4 rounded-xl flex justify-between items-center group">
+                                  <p className="text-sm text-slate-300 line-clamp-1 flex-1">{q.text}</p>
+                                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => handleEditItem(q, 'question')} className="p-2 bg-blue-600 rounded text-white"><Pencil size={14}/></button>
+                                      <button onClick={() => handleDeleteItem(q.path)} className="p-2 bg-red-600 rounded text-white"><Trash2 size={14}/></button>
+                                  </div>
+                              </div>
+                          ))}
+                          {contentTab === 'lesson' && topicLessons.map((l, i) => (
+                              <div key={i} className="glass-card p-4 rounded-xl flex justify-between items-center group">
+                                  <span className="text-white text-sm font-bold">{i+1}. {l.title}</span>
+                                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => handleEditItem(l, 'lesson')} className="p-2 bg-blue-600 rounded text-white"><Pencil size={14}/></button>
+                                      <button onClick={() => handleDeleteItem(`lessons/${manageLessonSubject}/${manageLessonTopic}/${l.id}`)} className="p-2 bg-red-600 rounded text-white"><Trash2 size={14}/></button>
+                                  </div>
+                              </div>
+                          ))}
+                          {contentTab === 'simulation' && simulations.map(s => (
+                              <div key={s.id} className="glass-card p-4 rounded-xl flex justify-between items-center group">
+                                  <div>
+                                      <p className="text-white font-bold">{s.title}</p>
+                                      <p className="text-xs text-slate-500">{s.status}</p>
+                                  </div>
+                                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => handleEditItem(s, 'simulation')} className="p-2 bg-blue-600 rounded text-white"><Pencil size={14}/></button>
+                                      <button onClick={() => handleDeleteItem(`simulations/${s.id}`)} className="p-2 bg-red-600 rounded text-white"><Trash2 size={14}/></button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              )}
           </div>
       )}
-      {/* ... (Rest of Tabs preserved) ... */}
+
+      {/* --- LEADS TAB --- */}
+      {activeTab === 'leads' && (
+          <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {leads.map(lead => (
+                      <div key={lead.id} className="glass-card p-5 rounded-2xl border-l-4 border-l-indigo-500 hover:bg-slate-900/60 transition-all">
+                          <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-bold text-white">{lead.name}</h4>
+                              {lead.processed ? <CheckCircle size={16} className="text-emerald-500"/> : <Clock size={16} className="text-yellow-500"/>}
+                          </div>
+                          <p className="text-xs text-slate-400 mb-1">{lead.planId} • {lead.billing}</p>
+                          <p className="text-xs text-slate-500 mb-4">{new Date(lead.timestamp).toLocaleDateString()}</p>
+                          
+                          <div className="flex justify-between items-center">
+                              <span className="text-emerald-400 font-bold">R$ {lead.amount}</span>
+                              {!lead.processed && (
+                                  <button onClick={() => handleOpenApproveModal(lead)} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-500">
+                                      Aprovar
+                                  </button>
+                              )}
+                          </div>
+                      </div>
+                  ))}
+                  {leads.length === 0 && <p className="text-slate-500">Nenhum lead encontrado.</p>}
+              </div>
+          </div>
+      )}
+
+      {/* --- USERS TAB --- */}
+      {activeTab === 'users' && (
+          <div className="space-y-6">
+              <div className="flex gap-4 mb-4">
+                  <div className="bg-slate-900 p-4 rounded-xl border border-white/5">
+                      <p className="text-xs text-slate-500 uppercase">Total Usuários</p>
+                      <p className="text-2xl font-bold text-white">{users.length}</p>
+                  </div>
+              </div>
+              <div className="glass-card rounded-2xl overflow-hidden">
+                  <table className="w-full text-left text-sm text-slate-400">
+                      <thead className="bg-slate-900 text-xs uppercase font-bold text-slate-500">
+                          <tr>
+                              <th className="p-4">Nome</th>
+                              <th className="p-4">Email</th>
+                              <th className="p-4">Plano</th>
+                              <th className="p-4">XP</th>
+                              <th className="p-4">Ações</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                          {users.map(u => (
+                              <tr key={u.uid} className="hover:bg-slate-800/50">
+                                  <td className="p-4 text-white font-medium">{u.displayName}</td>
+                                  <td className="p-4">{u.email}</td>
+                                  <td className="p-4">
+                                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${u.plan === 'advanced' ? 'bg-purple-900/30 text-purple-400' : 'bg-slate-800 text-slate-400'}`}>
+                                          {u.plan}
+                                      </span>
+                                  </td>
+                                  <td className="p-4 font-mono">{u.xp}</td>
+                                  <td className="p-4">
+                                      <button onClick={() => handleEditUser(u)} className="p-2 hover:bg-white/10 rounded"><Pencil size={14}/></button>
+                                  </td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      )}
+
+      {/* --- FINANCE TAB --- */}
+      {activeTab === 'finance' && (
+          <div className="space-y-6">
+              <div className="glass-card rounded-2xl overflow-hidden">
+                  <div className="p-4 border-b border-white/5 bg-slate-900/50">
+                      <h3 className="font-bold text-white">Solicitações de Recarga</h3>
+                  </div>
+                  <table className="w-full text-left text-sm text-slate-400">
+                      <thead className="bg-slate-900 text-xs uppercase font-bold text-slate-500">
+                          <tr>
+                              <th className="p-4">Usuário</th>
+                              <th className="p-4">Valor</th>
+                              <th className="p-4">Tipo</th>
+                              <th className="p-4">Status</th>
+                              <th className="p-4">Ações</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                          {recharges.map(r => (
+                              <tr key={r.id}>
+                                  <td className="p-4 text-white">{r.userDisplayName}</td>
+                                  <td className="p-4 font-bold text-emerald-400">R$ {r.amount}</td>
+                                  <td className="p-4 text-xs">{r.currencyType === 'CREDIT' ? 'Créditos Redação' : 'Saldo IA'}</td>
+                                  <td className="p-4">
+                                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${r.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : r.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                          {r.status}
+                                      </span>
+                                  </td>
+                                  <td className="p-4 flex gap-2">
+                                      {r.status === 'pending' && (
+                                          <>
+                                              <button onClick={() => handleProcessRecharge(r.id, 'approved')} className="p-1.5 bg-emerald-600 rounded text-white hover:bg-emerald-500"><CheckCircle size={14}/></button>
+                                              <button onClick={() => handleProcessRecharge(r.id, 'rejected')} className="p-1.5 bg-red-600 rounded text-white hover:bg-red-500"><XCircle size={14}/></button>
+                                          </>
+                                      )}
+                                  </td>
+                              </tr>
+                          ))}
+                          {recharges.length === 0 && <tr><td colSpan={5} className="p-8 text-center">Nenhuma solicitação pendente.</td></tr>}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      )}
+
+      {/* --- CONFIG / TRAFFIC TAB --- */}
+      {(activeTab === 'config' || activeTab === 'traffic') && (
+          <div className="max-w-2xl">
+              <div className="glass-card p-6 rounded-2xl space-y-6">
+                  <h3 className="font-bold text-white mb-4">Configurações de Tráfego & Checkout</h3>
+                  
+                  <div>
+                      <label className="text-xs text-slate-400 uppercase font-bold block mb-1">Script VSL (Embed)</label>
+                      <textarea className="w-full glass-input p-3 rounded-xl h-32 font-mono text-xs" value={trafficConfig.vslScript} onChange={e => setTrafficConfig({...trafficConfig, vslScript: e.target.value})} placeholder="<iframe>...</iframe>" />
+                  </div>
+
+                  <div>
+                      <label className="text-xs text-slate-400 uppercase font-bold block mb-1">Link Checkout Mensal</label>
+                      <input className="w-full glass-input p-3 rounded-xl" value={trafficConfig.checkoutLinkMonthly} onChange={e => setTrafficConfig({...trafficConfig, checkoutLinkMonthly: e.target.value})} placeholder="https://..." />
+                  </div>
+
+                  <div>
+                      <label className="text-xs text-slate-400 uppercase font-bold block mb-1">Link Checkout Anual</label>
+                      <input className="w-full glass-input p-3 rounded-xl" value={trafficConfig.checkoutLinkYearly} onChange={e => setTrafficConfig({...trafficConfig, checkoutLinkYearly: e.target.value})} placeholder="https://..." />
+                  </div>
+
+                  <button onClick={handleSaveTraffic} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold">Salvar Configurações</button>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 };

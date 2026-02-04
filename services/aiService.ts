@@ -12,6 +12,12 @@ export interface ChatMessage {
 // Models - Using the cheapest capable model
 const OPENAI_MODEL = "gpt-4o-mini";
 
+// Pricing Configuration (BRL per Token)
+// gpt-4o-mini is approx $0.15 / 1M tokens input. 
+// We set a base margin. 
+// 0.00002 BRL per token approx covers costs + margin.
+const BASE_COST_PER_TOKEN = 0.00002; 
+
 // Helper: Get API Key safely for Vite Environment
 const getApiKey = () => {
     return (import.meta as any).env?.VITE_OPENAI_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : '') || '';
@@ -35,45 +41,25 @@ const getAiInstance = () => {
     return aiInstance;
 };
 
-// Helper to check/deduct balance
-const checkAndDeductBalance = async (uid: string, amount: number, description: string) => {
+// Helper to get user plan and balance
+const getUserData = async (uid: string) => {
     const userRef = ref(database, `users/${uid}`);
     const snap = await get(userRef);
     if (!snap.exists()) throw new Error("User not found");
-    
-    const userData = snap.val();
-    const currentBalance = userData.balance || 0;
-
-    if (currentBalance < amount) {
-        throw new Error("402: Saldo insuficiente");
-    }
-
-    const newBalance = currentBalance - amount;
-    await update(userRef, { balance: newBalance });
-
-    const transRef = push(ref(database, `user_transactions/${uid}`));
-    await set(transRef, {
-        id: transRef.key,
-        type: 'debit',
-        amount: amount,
-        description: description,
-        timestamp: Date.now(),
-        currencyType: 'BRL'
-    });
+    return snap.val();
 };
 
 export const AiService = {
   sendMessage: async (message: string, history: ChatMessage[]): Promise<string> => {
     if (!auth.currentUser) throw new Error("User not authenticated");
-
-    // NEW RAW COST: 0.0002
-    // Multiplied by 100 (Advanced) = R$ 0.02 displayed
-    // Multiplied by 200 (Basic) = R$ 0.04 displayed
-    const COST = 0.0002; 
+    const uid = auth.currentUser.uid;
 
     try {
-      // 1. Check Balance
-      await checkAndDeductBalance(auth.currentUser.uid, COST, "NeuroAI (Chat)");
+      // 1. Get User Data for Plan Check (Optimistic check before call)
+      const userData = await getUserData(uid);
+      if (userData.balance <= 0.001) {
+          throw new Error("402: Saldo insuficiente");
+      }
 
       // 2. Call OpenAI
       const ai = getAiInstance();
@@ -85,7 +71,6 @@ export const AiService = {
           content: h.content
       })) as OpenAI.Chat.ChatCompletionMessageParam[];
 
-      // Add system message at the start
       const messages = [
           { role: 'system', content: systemInstruction },
           ...openaiHistory,
@@ -97,7 +82,44 @@ export const AiService = {
           messages: messages,
       });
 
-      return completion.choices[0]?.message?.content || "Sem resposta.";
+      const responseText = completion.choices[0]?.message?.content || "Sem resposta.";
+      
+      // 3. Calculate Token Usage & Cost
+      const usage = completion.usage;
+      const totalTokens = usage?.total_tokens || 0;
+      
+      // Dynamic Pricing Rule
+      // Basic Plan: Pays 2x multiplier
+      // Advanced/Intermediate/Admin: Pays 1x multiplier
+      const isBasic = userData.plan === 'basic';
+      const multiplier = isBasic ? 2 : 1;
+      
+      const cost = totalTokens * BASE_COST_PER_TOKEN * multiplier;
+
+      // 4. Deduct Balance (Atomic-like update)
+      // Re-fetch strictly to ensure no race condition on balance (simplified here)
+      const currentBalance = userData.balance || 0;
+      
+      if (currentBalance < cost) {
+          // Edge case: ran out during generation
+          await update(ref(database, `users/${uid}`), { balance: 0 });
+      } else {
+          await update(ref(database, `users/${uid}`), { balance: currentBalance - cost });
+      }
+
+      // 5. Log Transaction
+      const transRef = push(ref(database, `user_transactions/${uid}`));
+      await set(transRef, {
+          id: transRef.key,
+          type: 'debit',
+          amount: cost,
+          description: `NeuroAI (${totalTokens} tokens)`,
+          timestamp: Date.now(),
+          currencyType: 'BRL',
+          tokensUsed: totalTokens
+      });
+
+      return responseText;
 
     } catch (error: any) {
       console.error("AI Service Error:", error);
@@ -107,15 +129,12 @@ export const AiService = {
 
   explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string): Promise<string> => {
     if (!auth.currentUser) throw new Error("User not authenticated");
-
-    // Explanation Raw Cost (Slightly higher)
-    const COST = 0.0005; 
+    const uid = auth.currentUser.uid;
 
     try {
-      // 1. Check Balance
-      await checkAndDeductBalance(auth.currentUser.uid, COST, "NeuroAI (Explicação)");
+      const userData = await getUserData(uid);
+      if (userData.balance <= 0.001) throw new Error("402: Saldo insuficiente");
 
-      // 2. Call OpenAI
       const ai = getAiInstance();
       const prompt = `
 [DADOS DA QUESTÃO]
@@ -135,7 +154,30 @@ INSTRUÇÃO: Compare a alternativa incorreta com a correta. Explique onde está 
           messages: [{ role: 'user', content: prompt }],
       });
 
-      return completion.choices[0]?.message?.content || "Não foi possível gerar a explicação.";
+      const responseText = completion.choices[0]?.message?.content || "Não foi possível gerar a explicação.";
+
+      // Billing for explanation
+      const usage = completion.usage;
+      const totalTokens = usage?.total_tokens || 0;
+      const isBasic = userData.plan === 'basic';
+      const multiplier = isBasic ? 2 : 1;
+      const cost = totalTokens * BASE_COST_PER_TOKEN * multiplier;
+
+      const currentBalance = userData.balance || 0;
+      await update(ref(database, `users/${uid}`), { balance: Math.max(0, currentBalance - cost) });
+
+      const transRef = push(ref(database, `user_transactions/${uid}`));
+      await set(transRef, {
+          id: transRef.key,
+          type: 'debit',
+          amount: cost,
+          description: `NeuroAI Explicação (${totalTokens} toks)`,
+          timestamp: Date.now(),
+          currencyType: 'BRL',
+          tokensUsed: totalTokens
+      });
+
+      return responseText;
 
     } catch (error) {
       console.error("AI Explanation Error:", error);
