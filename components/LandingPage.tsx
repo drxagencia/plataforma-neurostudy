@@ -8,31 +8,25 @@ interface LandingPageProps {
   onStartGame: () => void;
 }
 
-// --- FAKE PROGRESS BAR COMPONENT (PSYCHOLOGICAL HACK) ---
+// --- FAKE PROGRESS BAR COMPONENT ---
 const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onFinish: () => void }) => {
-    const [progress, setProgress] = useState(75); // Começa em 75% para dar sensação de quase lá
+    const [progress, setProgress] = useState(75);
 
     useEffect(() => {
-        const totalDuration = 25000; // 25 segundos simulados para o restante
+        const totalDuration = 25000;
         const intervalTime = 100;
         const steps = totalDuration / intervalTime;
         let currentStep = 0;
 
         const interval = setInterval(() => {
             currentStep++;
-            
-            // Simula desaceleração no final (Paradoxo de Zenão visual)
             setProgress(prev => {
-                if (prev >= 98.5) return 98.5; // Trava visualmente no finalzinho
-                // Avança bem devagar pois já começou em 75%
+                if (prev >= 98.5) return 98.5;
                 const increment = (99 - prev) / 150; 
                 return prev + increment;
             });
 
-            // Triggers
-            if (currentStep === Math.floor(steps / 2)) {
-                onHalfTime();
-            }
+            if (currentStep === Math.floor(steps / 2)) onHalfTime();
             if (currentStep >= steps) {
                 onFinish();
                 clearInterval(interval);
@@ -44,19 +38,15 @@ const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onF
 
     return (
         <div className="w-full">
-            <div className="flex justify-between text-[10px] text-indigo-300 font-bold mb-1 uppercase tracking-wider px-1">
-                <span className="flex items-center gap-1"><Lock size={10} /> Sincronizando Conhecimento...</span>
-                <span className="animate-pulse text-red-400">Não feche a página</span>
+            <div className="flex justify-between text-[10px] text-zinc-400 font-bold mb-1 uppercase tracking-wider px-1">
+                <span className="flex items-center gap-1"><Lock size={10} /> Descriptografando Método...</span>
+                <span className="animate-pulse text-white">Não feche a janela</span>
             </div>
-            <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-white/10 shadow-inner relative group cursor-not-allowed">
+            <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-white/20 shadow-inner relative group cursor-not-allowed">
                 <div 
-                    className="h-full bg-blue-600 relative transition-all duration-100 ease-linear"
+                    className="h-full bg-white relative transition-all duration-100 ease-linear shadow-[0_0_10px_white]"
                     style={{ width: `${progress}%` }}
                 >
-                    <div className="absolute right-0 top-0 bottom-0 w-2 bg-blue-400 blur-[2px] animate-pulse" />
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white drop-shadow-md tracking-widest opacity-90 uppercase z-10">
-                    Renderizando Módulo Secreto... {Math.floor(progress)}%
                 </div>
             </div>
         </div>
@@ -64,9 +54,12 @@ const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onF
 };
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
-  // State de Navegação (Slide Vertical)
-  const [currentStep, setCurrentStep] = useState(0); // 0: Hero, 1: Enemies, 2: VSL, 3: Pricing
-  
+  // Refs para rolagem suave
+  const heroRef = useRef<HTMLDivElement>(null);
+  const enemiesRef = useRef<HTMLDivElement>(null);
+  const vslRef = useRef<HTMLDivElement>(null);
+  const pricingRef = useRef<HTMLDivElement>(null);
+
   // VSL Logic
   const [showEarlyOffer, setShowEarlyOffer] = useState(false);
   const [showFinalOffer, setShowFinalOffer] = useState(false);
@@ -81,24 +74,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [config, setConfig] = useState<TrafficConfig>({ vslScript: '', checkoutLinkMonthly: '', checkoutLinkYearly: '' });
 
   useEffect(() => {
-    // Load config (though we will largely ignore config links for price hardcoding as requested, but keep for card links fallback)
     DatabaseService.getTrafficSettings().then(setConfig);
-
-    // Fake ticker
     const interval = setInterval(() => {
         setPurchasedCount(prev => prev + Math.floor(Math.random() * 3));
     }, 15000);
     return () => clearInterval(interval);
   }, []);
 
-  const scrollToStep = (step: number) => {
-      setCurrentStep(step);
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
+      ref.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   // --- ACTIONS ---
-
   const handleCheckout = (plan: 'basic' | 'advanced', method: 'pix' | 'card') => {
-      // Prices Logic
       let price = 0;
       if (plan === 'basic') {
           price = billingCycle === 'monthly' ? 9.90 : 97.00;
@@ -107,14 +95,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       }
 
       if (method === 'card') {
-          // Open Kirvano Link (Use config or placeholders if empty)
-          // Since we changed prices, the config links might be old, but we adhere to logic:
           const link = billingCycle === 'yearly' ? config.checkoutLinkYearly : config.checkoutLinkMonthly;
-          // Fallback if config empty
           const finalLink = link || "https://kirvano.com"; 
           window.open(finalLink, '_blank');
       } else {
-          // PIX Generation
           try {
               const payload = PixService.generatePayload(price);
               setPixPayload(payload);
@@ -127,86 +111,86 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   };
 
   return (
-    <div className="h-screen w-screen bg-slate-950 text-white font-sans overflow-hidden relative selection:bg-indigo-500/30">
+    <div className="min-h-screen w-full bg-black text-white font-sans overflow-y-auto overflow-x-hidden relative selection:bg-white selection:text-black scroll-smooth">
       
-      {/* Background (Fixed & Visible Everywhere) */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-          {/* Deep Space Gradient Base */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(30,27,75,0.8),#020617_80%)]" />
-          
-          {/* Stars Layers */}
+      {/* Overrides for Star Visibility */}
+      <style>{`
+        :root { --star-color: #ffffff !important; }
+        .nebula-glow { opacity: 0.15 !important; background-image: none !important; } /* Reduce purple fog to almost nothing */
+        .star-layer { opacity: 1 !important; }
+      `}</style>
+
+      {/* Background Fixado (Visível em toda a rolagem) */}
+      <div className="fixed inset-0 z-0 pointer-events-none bg-black">
           <div className="star-layer stars-1"></div>
           <div className="star-layer stars-2"></div>
-          
-          {/* Nebula Glows */}
-          <div className="nebula-glow fixed inset-0"></div>
+          <div className="star-layer stars-3"></div>
       </div>
 
-      {/* --- MAIN SLIDER CONTAINER --- */}
-      <div 
-        className="h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.65,0,0.35,1)] relative z-10"
-        style={{ transform: `translateY(-${currentStep * 100}vh)` }}
-      >
+      <div className="relative z-10">
 
           {/* === TELA 1: HERO === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-transparent">
+          <section ref={heroRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-transparent">
               <div className="absolute top-10 flex flex-col items-center animate-in fade-in duration-1000">
-                 <div className="w-16 h-16 bg-indigo-600/20 rounded-2xl flex items-center justify-center border border-indigo-500/50 mb-4 shadow-[0_0_30px_rgba(99,102,241,0.3)] animate-pulse-slow">
-                     <BrainCircuit size={40} className="text-indigo-400" />
+                 <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/20 mb-4 shadow-[0_0_30px_rgba(255,255,255,0.1)] animate-pulse-slow">
+                     <BrainCircuit size={40} className="text-white" />
                  </div>
-                 <h3 className="text-indigo-300 font-bold tracking-[0.3em] text-xs uppercase">NeuroStudy OS</h3>
+                 <h3 className="text-zinc-400 font-bold tracking-[0.3em] text-xs uppercase">NeuroStudy OS</h3>
               </div>
 
               <div className="text-center space-y-8 max-w-4xl z-10">
-                  <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500 drop-shadow-[0_0_35px_rgba(255,255,255,0.2)] animate-in zoom-in-50 duration-1000">
+                  <h1 className="text-6xl md:text-9xl font-black tracking-tighter text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.3)] animate-in zoom-in-50 duration-1000">
                       READY PLAYER ONE?
                   </h1>
-                  <p className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto leading-relaxed font-light">
+                  <p className="text-xl md:text-2xl text-zinc-400 max-w-2xl mx-auto leading-relaxed font-light">
                       Você está prestes a entrar no <strong className="text-white">único sistema</strong> capaz de hackear sua aprovação no ENEM em tempo recorde.
                   </p>
                   
                   <div className="pt-8">
-                      {/* Novo Botão Press Start (No Bounce, Hover Effect) */}
                       <button 
-                        onClick={() => scrollToStep(1)}
-                        className="group relative px-12 py-5 bg-transparent overflow-hidden rounded-none border border-indigo-500/50 transition-all duration-300 hover:border-indigo-400 hover:shadow-[0_0_40px_rgba(99,102,241,0.5)]"
+                        onClick={() => scrollToSection(enemiesRef)}
+                        className="group relative px-12 py-5 bg-transparent overflow-hidden rounded-none border border-white/30 transition-all duration-300 hover:border-white hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]"
                       >
-                          <div className="absolute inset-0 bg-indigo-600/0 group-hover:bg-indigo-600/20 transition-all duration-300 skew-x-12 scale-150 origin-left" />
+                          <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 skew-x-12 scale-150 origin-left" />
                           <div className="relative flex items-center gap-4 text-2xl font-black text-white tracking-[0.2em] uppercase group-hover:tracking-[0.3em] transition-all duration-300">
-                              <Play size={24} className="fill-white group-hover:text-indigo-300 transition-colors" />
+                              <Play size={24} className="fill-white group-hover:text-white transition-colors" />
                               PRESS START
                           </div>
                       </button>
                   </div>
               </div>
+              
+              <div className="absolute bottom-10 animate-bounce text-zinc-600">
+                  <ChevronDown size={32} />
+              </div>
           </section>
 
           {/* === TELA 2: INIMIGOS === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-black/40 backdrop-blur-sm">
+          <section ref={enemiesRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/40 backdrop-blur-sm">
               <div className="max-w-6xl mx-auto w-full">
-                  <div className="text-center mb-12">
-                      <span className="text-red-500 font-bold tracking-widest uppercase text-sm mb-2 block animate-pulse">Warning: Threats Detected</span>
+                  <div className="text-center mb-16">
+                      <span className="text-white font-mono font-bold tracking-widest uppercase text-sm mb-4 block animate-pulse border border-white/20 inline-block px-4 py-1 rounded">System Alert: Threats Detected</span>
                       <h2 className="text-4xl md:text-6xl font-black text-white mb-4">ESCOLHA SEUS INIMIGOS</h2>
-                      <p className="text-slate-400">Quais destes "Monstros" estão drenando seu XP diário?</p>
+                      <p className="text-zinc-400">Quais destes "Monstros" estão drenando seu XP diário?</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
                       {[
-                          { title: "Procrastinação", lvl: "LVL 99 BOSS", icon: <Timer size={40} />, desc: "Rouba 4h do seu dia rolando feed.", color: "red" },
-                          { title: "Ansiedade", lvl: "Elite Mob", icon: <AlertTriangle size={40} />, desc: "Causa debuff de 'Branco' na hora da prova.", color: "orange" },
-                          { title: "Desorganização", lvl: "Common Mob", icon: <Swords size={40} />, desc: "Impede você de saber o que estudar hoje.", color: "yellow" }
+                          { title: "Procrastinação", lvl: "LVL 99 BOSS", icon: <Timer size={40} />, desc: "Rouba 4h do seu dia rolando feed.", color: "text-white" },
+                          { title: "Ansiedade", lvl: "Elite Mob", icon: <AlertTriangle size={40} />, desc: "Causa debuff de 'Branco' na hora da prova.", color: "text-zinc-300" },
+                          { title: "Desorganização", lvl: "Common Mob", icon: <Swords size={40} />, desc: "Impede você de saber o que estudar hoje.", color: "text-zinc-400" }
                       ].map((enemy, idx) => (
-                          <div key={idx} className="group relative bg-slate-900/50 border border-white/10 p-8 rounded-2xl hover:bg-red-950/20 hover:border-red-500/50 transition-all duration-500 cursor-crosshair">
-                              <div className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-1 rounded bg-${enemy.color}-500/20 text-${enemy.color}-400 border border-${enemy.color}-500/30`}>
+                          <div key={idx} className="group relative bg-black/60 border border-white/10 p-8 rounded-2xl hover:bg-white/5 hover:border-white/40 transition-all duration-500 cursor-crosshair">
+                              <div className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-1 rounded bg-white/10 text-white border border-white/20`}>
                                   {enemy.lvl}
                               </div>
-                              <div className={`mb-6 text-${enemy.color}-500 group-hover:scale-110 transition-transform duration-300`}>
+                              <div className={`mb-6 text-white group-hover:scale-110 transition-transform duration-300`}>
                                   {enemy.icon}
                               </div>
-                              <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-red-400 transition-colors">{enemy.title}</h3>
-                              <p className="text-slate-400 text-sm">{enemy.desc}</p>
-                              <div className="mt-6 w-12 h-1 bg-slate-800 rounded-full overflow-hidden">
-                                  <div className={`h-full bg-${enemy.color}-500 w-[90%]`}></div>
+                              <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-zinc-200 transition-colors">{enemy.title}</h3>
+                              <p className="text-zinc-500 text-sm group-hover:text-zinc-400">{enemy.desc}</p>
+                              <div className="mt-6 w-12 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                  <div className={`h-full bg-white w-[90%] shadow-[0_0_10px_white]`}></div>
                               </div>
                           </div>
                       ))}
@@ -214,8 +198,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
                   <div className="text-center">
                       <button 
-                        onClick={() => scrollToStep(2)}
-                        className="px-10 py-4 bg-red-600 hover:bg-red-500 text-white font-black text-xl rounded-xl shadow-[0_0_40px_rgba(220,38,38,0.4)] hover:scale-105 transition-all flex items-center gap-3 mx-auto uppercase tracking-wide"
+                        onClick={() => scrollToSection(vslRef)}
+                        className="px-10 py-4 bg-white text-black font-black text-xl rounded-xl shadow-[0_0_40px_rgba(255,255,255,0.2)] hover:scale-105 transition-all flex items-center gap-3 mx-auto uppercase tracking-wide hover:bg-zinc-200"
                       >
                           <Swords size={24} />
                           Enfrentar Agora
@@ -224,25 +208,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               </div>
           </section>
 
-          {/* === TELA 3: VSL & TIMER === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-slate-950/60 backdrop-blur-md">
+          {/* === TELA 3: VSL === */}
+          <section ref={vslRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/50 backdrop-blur-md">
               <div className="max-w-5xl w-full">
-                  <div className="bg-slate-900/80 rounded-3xl border border-indigo-500/30 shadow-[0_0_100px_rgba(79,70,229,0.15)] backdrop-blur-xl relative overflow-hidden">
-                      {/* Monitor Header */}
-                      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-slate-950/50">
+                  <div className="bg-black/80 rounded-3xl border border-white/20 shadow-[0_0_100px_rgba(255,255,255,0.05)] backdrop-blur-xl relative overflow-hidden">
+                      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-zinc-900/50">
                           <div className="flex gap-1.5">
-                              <div className="w-3 h-3 rounded-full bg-red-500/50" />
-                              <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                              <div className="w-3 h-3 rounded-full bg-green-500/50" />
+                              <div className="w-3 h-3 rounded-full bg-zinc-600" />
+                              <div className="w-3 h-3 rounded-full bg-zinc-600" />
+                              <div className="w-3 h-3 rounded-full bg-zinc-600" />
                           </div>
-                          <div className="flex-1 text-center text-xs font-mono text-slate-500">SECRET_WEAPON_FILE.mp4</div>
+                          <div className="flex-1 text-center text-xs font-mono text-zinc-500">SECRET_WEAPON_FILE.mp4</div>
                       </div>
 
-                      {/* Video Container (No bottom rounding) */}
                       <div className="relative aspect-video bg-black rounded-none overflow-hidden group">
                           <video 
                             src="/video.mp4" 
-                            className="w-full h-full object-cover" 
+                            className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" 
                             controls 
                             controlsList="nodownload"
                             poster="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=2000&auto=format&fit=crop"
@@ -251,8 +233,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                           </video>
                       </div>
 
-                      {/* FAKE PROGRESS BAR (GLUED TO PLAYER) */}
-                      <div className="bg-slate-950 p-4 border-t border-white/5">
+                      <div className="bg-black p-4 border-t border-white/10">
                           <FakeProgressBar 
                             onHalfTime={() => setShowEarlyOffer(true)} 
                             onFinish={() => setShowFinalOffer(true)} 
@@ -260,23 +241,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       </div>
                   </div>
 
-                  {/* Dynamic CTAs (Below Monitor) */}
-                  <div className="mt-8 text-center h-24 relative flex flex-col items-center justify-center">
+                  <div className="mt-10 text-center h-24 relative flex flex-col items-center justify-center">
                       {showFinalOffer ? (
                           <div className="animate-in zoom-in-50 duration-500 w-full">
                               <button 
-                                onClick={() => scrollToStep(3)}
-                                className="w-full md:w-auto px-12 py-5 bg-emerald-500 hover:bg-emerald-400 text-white font-black text-2xl rounded-xl shadow-[0_0_60px_rgba(16,185,129,0.6)] hover:scale-105 transition-all animate-pulse-slow flex items-center justify-center gap-3 mx-auto uppercase tracking-widest border border-emerald-400/50"
+                                onClick={() => scrollToSection(pricingRef)}
+                                className="w-full md:w-auto px-12 py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-2xl rounded-xl shadow-[0_0_60px_rgba(16,185,129,0.4)] hover:scale-105 transition-all animate-pulse-slow flex items-center justify-center gap-3 mx-auto uppercase tracking-widest border border-emerald-400/50"
                               >
                                   <Rocket size={28} className="fill-white" />
                                   LIBERAR ACESSO AGORA
                               </button>
-                              <p className="text-xs text-slate-500 mt-2">O vídeo acabou. Sua oportunidade começou.</p>
+                              <p className="text-xs text-zinc-500 mt-3 font-mono">O vídeo acabou. Sua oportunidade começou.</p>
                           </div>
                       ) : showEarlyOffer && (
                           <button 
-                            onClick={() => scrollToStep(3)}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-6 py-3 rounded-lg text-sm font-bold animate-in fade-in transition-all flex items-center gap-2 border border-white/5 hover:border-white/20"
+                            onClick={() => scrollToSection(pricingRef)}
+                            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-6 py-3 rounded-lg text-sm font-bold animate-in fade-in transition-all flex items-center gap-2 border border-white/10 hover:border-white/30"
                           >
                               <Eye size={16} /> Espiar Oferta
                           </button>
@@ -286,107 +266,107 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           </section>
 
           {/* === TELA 4: CHECKOUT / PREÇOS === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-slate-950/80 backdrop-blur-md">
+          <section ref={pricingRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/60 backdrop-blur-lg">
               <div className="max-w-6xl w-full relative">
                   
-                  <div className="text-center mb-10">
-                      <div className="inline-block mb-4 animate-bounce">
-                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide flex items-center gap-2">
-                              <Sparkles size={14} className="fill-emerald-400" /> Turma Confirmada 2025
+                  <div className="text-center mb-12">
+                      <div className="inline-block mb-4">
+                          <span className="bg-white/5 text-white border border-white/20 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-md">
+                              <Sparkles size={14} /> Turma 2025 Confirmada
                           </span>
                       </div>
-                      <h2 className="text-4xl md:text-5xl font-black text-white mb-2">INVESTIMENTO NA SUA APROVAÇÃO</h2>
-                      <p className="text-slate-400 max-w-xl mx-auto">Escolha como você quer jogar esse jogo: no modo difícil (sozinho) ou com as melhores armas.</p>
+                      <h2 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight">INVESTIMENTO NA SUA APROVAÇÃO</h2>
+                      <p className="text-zinc-400 max-w-xl mx-auto text-lg">Escolha como você quer jogar esse jogo: no modo difícil (sozinho) ou com as melhores armas.</p>
                       
-                      {/* Toggle Mensal/Anual */}
-                      <div className="flex items-center justify-center gap-4 mt-8">
-                          <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-slate-500'}`}>Mensal</span>
+                      <div className="flex items-center justify-center gap-4 mt-10">
+                          <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-zinc-500'}`}>Mensal</span>
                           <button 
                             onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-                            className="w-16 h-8 bg-slate-800 rounded-full relative p-1 transition-colors border border-white/10 cursor-pointer"
+                            className="w-16 h-8 bg-zinc-900 rounded-full relative p-1 transition-colors border border-white/20 cursor-pointer"
                           >
-                              <div className={`w-6 h-6 bg-indigo-500 rounded-full shadow-md transition-transform ${billingCycle === 'yearly' ? 'translate-x-8' : 'translate-x-0'}`} />
+                              <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform ${billingCycle === 'yearly' ? 'translate-x-8' : 'translate-x-0'}`} />
                           </button>
-                          <span className={`text-sm font-bold ${billingCycle === 'yearly' ? 'text-white' : 'text-slate-500'}`}>
-                              Anual <span className="text-emerald-400 text-[10px] ml-1 uppercase">(2 meses grátis)</span>
+                          <span className={`text-sm font-bold ${billingCycle === 'yearly' ? 'text-white' : 'text-zinc-500'}`}>
+                              Anual <span className="text-emerald-400 text-[10px] ml-1 uppercase border border-emerald-500/30 px-1 rounded bg-emerald-500/10">(2 meses grátis)</span>
                           </span>
                       </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-center">
                       
-                      {/* PLANO BÁSICO - ANCORAGEM (Parecer menos atrativo) */}
+                      {/* PLANO BÁSICO - Escuro e Discreto */}
                       <div 
                         onClick={() => setSelectedPlan('basic')}
-                        className={`bg-slate-900/60 border p-8 rounded-3xl relative transition-all cursor-pointer group ${selectedPlan === 'basic' ? 'border-slate-600 opacity-100 scale-95' : 'border-slate-800 hover:border-slate-600 opacity-60 hover:opacity-80 scale-95'}`}
+                        className={`bg-black/40 border p-8 rounded-3xl relative transition-all cursor-pointer group backdrop-blur-md ${selectedPlan === 'basic' ? 'border-zinc-500 opacity-100 scale-95' : 'border-white/5 hover:border-zinc-700 opacity-60 hover:opacity-80 scale-95'}`}
                       >
                           <div className="flex justify-between items-start">
                               <div>
-                                  <h3 className="text-xl font-bold text-slate-400">Modo Sobrevivência</h3>
-                                  <p className="text-slate-600 text-xs mb-6">Apenas o conteúdo bruto.</p>
+                                  <h3 className="text-xl font-bold text-zinc-400">Modo Sobrevivência</h3>
+                                  <p className="text-zinc-600 text-xs mb-6">Apenas o conteúdo bruto.</p>
                               </div>
                           </div>
                           
                           <div className="mb-6 opacity-80">
                               <span className="text-3xl font-black text-white">R$ {billingCycle === 'monthly' ? '9,90' : '97,00'}</span>
-                              <span className="text-slate-500 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
+                              <span className="text-zinc-500 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
                           </div>
 
-                          <ul className="space-y-4 mb-8 text-slate-400 text-sm">
-                              <li className="flex gap-2"><CheckCircle size={16} /> Acesso às Aulas Gravadas</li>
-                              <li className="flex gap-2"><CheckCircle size={16} /> Banco de Questões</li>
-                              <li className="flex gap-2 text-slate-600 line-through decoration-slate-600/50"><X size={16} /> Sem NeuroTutor IA</li>
-                              <li className="flex gap-2 text-slate-600 line-through decoration-slate-600/50"><X size={16} /> Sem Redação IA</li>
-                              <li className="flex gap-2 text-slate-600 line-through decoration-slate-600/50"><X size={16} /> Sem Simulados Exclusivos</li>
+                          <ul className="space-y-4 mb-8 text-zinc-400 text-sm">
+                              <li className="flex gap-2"><CheckCircle size={16} className="text-zinc-600" /> Acesso às Aulas Gravadas</li>
+                              <li className="flex gap-2"><CheckCircle size={16} className="text-zinc-600" /> Banco de Questões</li>
+                              <li className="flex gap-2 text-zinc-700 line-through decoration-zinc-700"><X size={16} /> Sem NeuroTutor IA</li>
+                              <li className="flex gap-2 text-zinc-700 line-through decoration-zinc-700"><X size={16} /> Sem Redação IA</li>
+                              <li className="flex gap-2 text-zinc-700 line-through decoration-zinc-700"><X size={16} /> Sem Simulados Exclusivos</li>
                           </ul>
 
                           {selectedPlan === 'basic' && (
                               <div className="grid grid-cols-2 gap-3 animate-in fade-in">
-                                  <button onClick={() => handleCheckout('basic', 'pix')} className="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm border border-white/5"><QrCode size={16}/> PIX</button>
-                                  <button onClick={() => handleCheckout('basic', 'card')} className="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm border border-white/5"><CreditCard size={16}/> Cartão</button>
+                                  <button onClick={() => handleCheckout('basic', 'pix')} className="bg-zinc-800 hover:bg-zinc-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm border border-white/5"><QrCode size={16}/> PIX</button>
+                                  <button onClick={() => handleCheckout('basic', 'card')} className="bg-zinc-800 hover:bg-zinc-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm border border-white/5"><CreditCard size={16}/> Cartão</button>
                               </div>
                           )}
                       </div>
 
-                      {/* PLANO AVANÇADO - HERO (Destaque Total) */}
+                      {/* PLANO AVANÇADO - Branco/Preto Alto Contraste */}
                       <div 
                         onClick={() => setSelectedPlan('advanced')}
-                        className={`bg-gradient-to-b from-indigo-900/80 to-slate-900 border p-8 rounded-3xl relative transition-all cursor-pointer transform hover:-translate-y-2 shadow-2xl ${selectedPlan === 'advanced' ? 'border-emerald-500 shadow-emerald-500/20 ring-1 ring-emerald-500/50 scale-105 z-10' : 'border-indigo-500/50 opacity-90'}`}
+                        className={`bg-black/80 border p-8 rounded-3xl relative transition-all cursor-pointer transform hover:-translate-y-2 shadow-2xl backdrop-blur-xl ${selectedPlan === 'advanced' ? 'border-white shadow-[0_0_50px_rgba(255,255,255,0.1)] ring-1 ring-white/50 scale-105 z-10' : 'border-zinc-700 opacity-90'}`}
                       >
-                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-slate-900 px-6 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg flex items-center gap-2 whitespace-nowrap">
-                              <Star size={12} className="fill-slate-900" /> Recomendado por 94%
+                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg flex items-center gap-2 whitespace-nowrap border border-zinc-200">
+                              <Star size={12} className="fill-black" /> Recomendado por 94%
                           </div>
 
                           <h3 className="text-2xl font-black text-white flex items-center gap-2 mt-2">
-                              <Trophy size={24} className="text-yellow-400 fill-yellow-400/20" /> MODO APROVAÇÃO
+                              <Trophy size={24} className="text-white fill-white/20" /> MODO APROVAÇÃO
                           </h3>
-                          <p className="text-emerald-400 text-xs mb-6 font-bold uppercase tracking-wide">Ecossistema Completo</p>
+                          <p className="text-zinc-300 text-xs mb-6 font-bold uppercase tracking-wide">Ecossistema Completo</p>
                           
                           <div className="mb-2">
                               <span className="text-5xl font-black text-white">R$ {billingCycle === 'monthly' ? '19,90' : '197,00'}</span>
-                              <span className="text-slate-400 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
+                              <span className="text-zinc-400 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
                           </div>
+                          
                           {billingCycle === 'yearly' && (
-                              <p className="text-[10px] text-emerald-400 font-bold mb-6 bg-emerald-900/20 inline-block px-2 py-1 rounded">Menos de R$ 0,60 por dia</p>
+                              <p className="text-[10px] text-emerald-400 font-bold mb-6 bg-emerald-900/20 inline-block px-2 py-1 rounded border border-emerald-500/20">Menos de R$ 0,60 por dia</p>
                           )}
 
-                          <ul className="space-y-3 mb-8 text-slate-200 text-sm font-medium">
-                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-emerald-500 fill-emerald-500/20" /> Tudo do Básico</li>
-                              <li className="flex gap-2 items-center"><BrainCircuit size={18} className="text-emerald-500 fill-emerald-500/20" /> NeuroTutor IA (Tire dúvidas 24h)</li>
-                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-emerald-500 fill-emerald-500/20" /> Correção de Redação Instantânea</li>
-                              <li className="flex gap-2 items-center"><Trophy size={18} className="text-emerald-500 fill-emerald-500/20" /> Simulados com Ranking</li>
-                              <li className="flex gap-2 items-center"><Shield size={18} className="text-emerald-500 fill-emerald-500/20" /> Acesso à Comunidade VIP</li>
+                          <ul className="space-y-3 mb-8 text-white text-sm font-medium">
+                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-white fill-white/20" /> Tudo do Básico</li>
+                              <li className="flex gap-2 items-center"><BrainCircuit size={18} className="text-white fill-white/20" /> NeuroTutor IA (Tire dúvidas 24h)</li>
+                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-white fill-white/20" /> Correção de Redação Instantânea</li>
+                              <li className="flex gap-2 items-center"><Trophy size={18} className="text-white fill-white/20" /> Simulados com Ranking</li>
+                              <li className="flex gap-2 items-center"><Shield size={18} className="text-white fill-white/20" /> Acesso à Comunidade VIP</li>
                           </ul>
 
                           {selectedPlan === 'advanced' && (
                               <div className="grid grid-cols-2 gap-3 animate-in fade-in">
-                                  <button onClick={() => handleCheckout('advanced', 'pix')} className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 py-4 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"><QrCode size={18}/> PIX</button>
-                                  <button onClick={() => handleCheckout('advanced', 'card')} className="bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"><CreditCard size={18}/> Cartão</button>
+                                  <button onClick={() => handleCheckout('advanced', 'pix')} className="bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"><QrCode size={18}/> PIX</button>
+                                  <button onClick={() => handleCheckout('advanced', 'card')} className="bg-white hover:bg-zinc-200 text-black py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"><CreditCard size={18}/> Cartão</button>
                               </div>
                           )}
                           
                           <div className="mt-4 text-center">
-                              <p className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
+                              <p className="text-[10px] text-zinc-500 flex items-center justify-center gap-1">
                                   <Shield size={10} /> Garantia incondicional de 7 dias.
                               </p>
                           </div>
@@ -394,10 +374,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                   </div>
 
                   <div className="mt-16 text-center">
-                      <p className="text-slate-500 text-xs flex items-center justify-center gap-2">
+                      <p className="text-zinc-500 text-xs flex items-center justify-center gap-2">
                           <span className="text-emerald-500 font-bold ml-4 flex items-center gap-1"><User size={14}/> {purchasedCount} alunos entraram hoje para vencer.</span>
                       </p>
-                      <button onClick={onStartGame} className="mt-6 text-slate-600 hover:text-white text-xs underline transition-colors">
+                      <button onClick={onStartGame} className="mt-6 text-zinc-600 hover:text-white text-xs underline transition-colors">
                           Já tenho conta, fazer login
                       </button>
                   </div>
@@ -408,20 +388,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
       {/* --- MODAL PIX --- */}
       {showPixModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in p-4">
-              <div className="bg-slate-900 border border-emerald-500/30 p-8 rounded-3xl max-w-md w-full text-center relative shadow-2xl">
-                  <button onClick={() => setShowPixModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X size={20}/></button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in p-4">
+              <div className="bg-zinc-900 border border-white/20 p-8 rounded-3xl max-w-md w-full text-center relative shadow-2xl">
+                  <button onClick={() => setShowPixModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={20}/></button>
                   
                   <h3 className="text-2xl font-bold text-white mb-2">Pagamento via PIX</h3>
-                  <p className="text-slate-400 text-sm mb-6">Escaneie para liberar seu acesso imediatamente.</p>
+                  <p className="text-zinc-400 text-sm mb-6">Escaneie para liberar seu acesso imediatamente.</p>
                   
-                  <div className="bg-white p-4 rounded-2xl inline-block mb-6">
+                  <div className="bg-white p-4 rounded-2xl inline-block mb-6 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-48 h-48 mix-blend-multiply" />
                   </div>
                   
                   <div className="flex gap-2 mb-6">
-                      <input readOnly value={pixPayload || ''} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 text-xs text-slate-400 truncate" />
-                      <button onClick={() => navigator.clipboard.writeText(pixPayload || '')} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-white"><Copy size={18}/></button>
+                      <input readOnly value={pixPayload || ''} className="flex-1 bg-black border border-zinc-700 rounded-xl px-4 text-xs text-zinc-400 truncate" />
+                      <button onClick={() => navigator.clipboard.writeText(pixPayload || '')} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white"><Copy size={18}/></button>
                   </div>
 
                   <p className="text-emerald-400 font-bold text-2xl mb-6">R$ {pixAmount.toFixed(2)}</p>
