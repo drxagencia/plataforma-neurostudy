@@ -114,6 +114,8 @@ export const DatabaseService = {
   createLesson: async (subjectId: string, topic: string, lesson: Lesson): Promise<void> => {
       const newRef = push(ref(database, `lessons/${subjectId}/${topic}`));
       await set(newRef, sanitizeData({ ...lesson, id: newRef.key }));
+      // Ensure topic exists in index
+      await update(ref(database, `topics/${subjectId}`), { [topic]: true });
   },
 
   createLessonWithOrder: async (subjectId: string, topic: string, lesson: Lesson, targetIndex: number): Promise<void> => {
@@ -147,33 +149,50 @@ export const DatabaseService = {
       });
 
       await update(topicRef, updates);
+      await update(ref(database, `topics/${subjectId}`), { [topic]: true });
   },
 
   // --- QUESTIONS ---
+  
+  // Updated: Tries to fetch from specific subtopic node first for optimization
   getQuestions: async (category: string, subjectId: string, topic: string, subtopic?: string): Promise<Question[]> => {
       try {
-          const path = `questions/${category}/${subjectId}/${topic}`;
+          let path = `questions/${category}/${subjectId}/${topic}`;
+          
+          // Optimization: If subtopic is known, fetch ONLY that node
+          if (subtopic) {
+              path = `questions/${category}/${subjectId}/${topic}/${subtopic}`;
+          }
+
           const snapshot = await get(ref(database, path));
           
           if (snapshot.exists()) {
               const data = snapshot.val();
               let questions: Question[] = [];
               
-              Object.keys(data).forEach(subKey => {
-                  const subItem = data[subKey];
-                  if (subItem.text) {
-                      if (!subtopic || subItem.subtopic === subtopic) questions.push(subItem);
-                  } else {
-                      if (!subtopic || subKey === subtopic) {
+              if (subtopic) {
+                  // Direct list of questions
+                  questions = Object.values(data) as Question[];
+              } else {
+                  // It's a map of subtopics -> questions
+                  Object.keys(data).forEach(subKey => {
+                      const subItem = data[subKey];
+                      // Handle legacy structure where questions might be direct or nested
+                      if (subItem.text) {
+                          // Legacy direct question (unlikely with new structure but safe to keep)
+                          questions.push(subItem);
+                      } else {
+                          // Standard: subItem is a map of questions
                           const subQuestions = Object.values(subItem) as Question[];
                           questions = questions.concat(subQuestions);
                       }
-                  }
-              });
+                  });
+              }
               return questions;
           }
           return [];
       } catch (e) {
+          console.error("Error fetching questions:", e);
           return [];
       }
   },
@@ -181,18 +200,20 @@ export const DatabaseService = {
   getQuestionsFromSubtopics: async (category: string, subjectId: string, topic: string, subtopics: string[]): Promise<Question[]> => {
       try {
            const allQuestions: Question[] = [];
-           const path = `questions/${category}/${subjectId}/${topic}`;
-           const snapshot = await get(ref(database, path));
+           // Parallel fetch for selected subtopics to minimize data
+           const promises = subtopics.map(sub => 
+               get(ref(database, `questions/${category}/${subjectId}/${topic}/${sub}`))
+           );
            
-           if (snapshot.exists()) {
-               const data = snapshot.val();
-               subtopics.forEach(sub => {
-                   if (data[sub]) {
-                       const qs = Object.values(data[sub]) as Question[];
-                       allQuestions.push(...qs);
-                   }
-               });
-           }
+           const snapshots = await Promise.all(promises);
+           
+           snapshots.forEach(snap => {
+               if (snap.exists()) {
+                   const qs = Object.values(snap.val()) as Question[];
+                   allQuestions.push(...qs);
+               }
+           });
+           
            return allQuestions;
       } catch (e) {
           return [];
@@ -200,7 +221,6 @@ export const DatabaseService = {
   },
 
   createQuestion: async (category: string, subjectId: string, topic: string, subtopic: string, question: Question): Promise<void> => {
-      // SECURITY CHECK: PREVENT BASE64 IMAGES IN QUESTIONS
       if (isBase64Image(question.imageUrl)) {
           throw new Error("Imagens devem ser URLs externas (não cole imagens direto).");
       }
@@ -209,8 +229,10 @@ export const DatabaseService = {
       const newRef = push(ref(database, path));
       await set(newRef, sanitizeData({ ...question, id: newRef.key, subjectId, topic, subtopic }));
       
+      // Update Indices
       await update(ref(database, `topics/${subjectId}`), { [topic]: true }); 
-      await update(ref(database, `subtopics/${topic}`), { [subtopic]: true }); 
+      // NEW HIERARCHY: subtopics are nested under subjectId -> topicId
+      await update(ref(database, `subtopics/${subjectId}/${topic}`), { [subtopic]: true }); 
   },
   
   getTopics: async (): Promise<Record<string, string[]>> => {
@@ -226,13 +248,21 @@ export const DatabaseService = {
       return {};
   },
 
-  getSubTopics: async (): Promise<Record<string, string[]>> => {
+  // Updated to return nested structure Record<SubjectId, Record<TopicId, SubtopicList>>
+  getSubTopics: async (): Promise<Record<string, Record<string, string[]>>> => {
       const snap = await get(ref(database, 'subtopics'));
       if(snap.exists()) {
           const data = snap.val();
-          const result: Record<string, string[]> = {};
-          Object.keys(data).forEach(topic => {
-              result[topic] = Object.keys(data[topic]);
+          const result: Record<string, Record<string, string[]>> = {};
+          
+          // Data structure: subtopics -> subjectId -> topicId -> { subtopicName: true }
+          Object.keys(data).forEach(subjectId => {
+              result[subjectId] = {};
+              const topicsMap = data[subjectId];
+              
+              Object.keys(topicsMap).forEach(topicId => {
+                  result[subjectId][topicId] = Object.keys(topicsMap[topicId]);
+              });
           });
           return result;
       }
@@ -260,12 +290,10 @@ export const DatabaseService = {
   
   getQuestionsByIds: async (ids: string[]): Promise<Question[]> => {
       if (!ids || ids.length === 0) return [];
-      // This is inefficient in real RTDB, usually better to structure by ID or use a different index.
-      // But for this structure, we have to iterate or know paths.
-      // Assuming 'ids' passed here are simulation IDs which might not have full path info.
-      // Fallback: This method is tricky without paths. 
-      // If we use this for simulations, we might need to change how we store simulation questions (store full question object or path).
-      // For now, returning empty to prevent errors if not implemented fully.
+      // Simulation logic often needs a direct fetch. 
+      // If we don't know the path, this is hard in RTDB without a global index.
+      // For now, returning empty or we need to change Simulation structure to store paths.
+      // Assuming for this update we focus on the hierarchical browsing.
       return [];
   },
 

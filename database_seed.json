@@ -1,3 +1,4 @@
+
 {
   "announcements": {
     "ann_01": {
@@ -6,107 +7,105 @@
       "description": "Cronograma intensivo de 30 dias para a reta final.",
       "image": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=1000",
       "ctaText": "Ver Cronograma"
-    },
-    "ann_02": {
-      "id": "ann_02",
-      "title": "Novo Módulo Militar",
-      "description": "Conteúdo exclusivo para ESA e ESPCEX disponível.",
-      "image": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=1000",
-      "ctaText": "Acessar Agora"
     }
   },
   "subjects": {
-    "matematica": { "id": "matematica", "name": "Matemática", "iconName": "Calculator", "color": "text-blue-400", "category": "regular" },
     "fisica": { "id": "fisica", "name": "Física", "iconName": "Zap", "color": "text-yellow-400", "category": "regular" },
     "quimica": { "id": "quimica", "name": "Química", "iconName": "Beaker", "color": "text-purple-400", "category": "regular" },
+    "matematica": { "id": "matematica", "name": "Matemática", "iconName": "Calculator", "color": "text-blue-400", "category": "regular" },
     "biologia": { "id": "biologia", "name": "Biologia", "iconName": "Microscope", "color": "text-green-400", "category": "regular" },
     "historia": { "id": "historia", "name": "História", "iconName": "ScrollText", "color": "text-orange-400", "category": "regular" },
-    "geografia": { "id": "geografia", "name": "Geografia", "iconName": "Map", "color": "text-emerald-400", "category": "regular" },
-    "portugues": { "id": "portugues", "name": "Português", "iconName": "PenTool", "color": "text-red-400", "category": "regular" },
-    "ingles": { "id": "ingles", "name": "Inglês", "iconName": "Languages", "color": "text-cyan-400", "category": "regular" },
-    "esa": { "id": "esa", "name": "ESA", "iconName": "Target", "color": "text-emerald-600", "category": "military" },
-    "espcex": { "id": "espcex", "name": "ESPCEX", "iconName": "Sword", "color": "text-emerald-800", "category": "military" }
+    "geografia": { "id": "geografia", "name": "Geografia", "iconName": "Map", "color": "text-emerald-400", "category": "regular" }
   },
   "topics": {
-    "matematica": {
-      "Funções": true,
-      "Geometria Plana": true,
-      "Logaritmos": true
-    },
     "fisica": {
       "Cinemática": true,
-      "Dinâmica": true,
-      "Eletrodinâmica": true
+      "Ondulatória": true,
+      "Óptica": true,
+      "Eletricidade": true,
+      "Termologia": true,
+      "Hidrostática": true,
+      "Dinâmica": true
     },
-    "historia": {
-      "Brasil Colônia": true,
-      "Era Vargas": true
-    },
-    "esa": {
-      "Matemática Militar": true,
-      "História do Brasil": true
+    "quimica": {
+      "Química Básica": true,
+      "Química Orgânica": true,
+      "Funções Inorgânicas": true,
+      "Soluções": true,
+      "Gases": true,
+      "Equilíbrio Químico": true,
+      "Propriedades Coligativas": true,
+      "Atomística e Tabela Periódica": true,
+      "Química Ambiental": true,
+      "Ligações Químicas": true,
+      "Termoquímica": true,
+      "Eletroquímica": true,
+      "Estequiometria": true
     }
   },
   "subtopics": {
-    "Funções": {
-      "Função Afim": true,
-      "Função Quadrática": true,
-      "Gráficos": true
+    "fisica": {
+      "Cinemática": { "MRU": true, "MRUV": true, "Queda Livre": true, "Lançamento Oblíquo": true },
+      "Dinâmica": { "Leis de Newton": true, "Força de Atrito": true, "Energia e Trabalho": true },
+      "Eletricidade": { "Eletrostática": true, "Eletrodinâmica": true, "Campo Elétrico": true }
     },
-    "Cinemática": {
-      "MRU": true,
-      "MRUV": true,
-      "Queda Livre": true
-    },
-    "Matemática Militar": {
-      "Logaritmos Avançados": true,
-      "Combinatória": true
+    "quimica": {
+      "Química Orgânica": { "Hidrocarbonetos": true, "Funções Oxigenadas": true, "Isomeria": true },
+      "Estequiometria": { "Cálculo Estequiométrico": true, "Reagente Limitante": true, "Rendimento": true },
+      "Termoquímica": { "Entalpia": true, "Lei de Hess": true }
     }
   },
   "lessons": {
     "fisica": {
       "Cinemática": {
-        "l_001": {
-          "id": "l_001",
-          "title": "Introdução ao Movimento Uniforme",
+        "l_fis_01": {
+          "id": "l_fis_01",
+          "title": "Introdução à Cinemática",
           "type": "video",
           "videoUrl": "https://www.youtube.com/watch?v=ivLEa0rWxfM",
-          "duration": "12:30",
-          "order": 0,
-          "tag": { "text": "Essencial", "color": "indigo" }
+          "duration": "12:00",
+          "order": 0
         },
-        "l_002": {
-          "id": "l_002",
-          "title": "Velocidade Média e Escalar",
+        "l_fis_02": {
+          "id": "l_fis_02",
+          "title": "MRU - Movimento Uniforme",
           "type": "video",
           "videoUrl": "https://www.youtube.com/watch?v=6J1WbK0Xy0g",
-          "duration": "15:45",
+          "duration": "15:30",
           "order": 1
         },
-        "l_003": {
-          "id": "l_003",
-          "title": "Exercícios de Fixação: Cinemática",
+        "l_fis_03": {
+          "id": "l_fis_03",
+          "title": "Exercícios: MRU e Velocidade Média",
           "type": "exercise_block",
           "order": 2,
           "exerciseFilters": {
             "category": "regular",
             "subject": "fisica",
             "topic": "Cinemática",
-            "subtopics": ["MRU", "MRUV"]
+            "subtopics": ["MRU"]
           },
           "tag": { "text": "Prática", "color": "emerald" }
         }
       }
     },
-    "matematica": {
-      "Funções": {
-        "l_004": {
-          "id": "l_004",
-          "title": "O que é uma Função?",
+    "quimica": {
+      "Estequiometria": {
+        "l_qui_01": {
+          "id": "l_qui_01",
+          "title": "Conceitos de Mol e Massa Molar",
           "type": "video",
-          "videoUrl": "https://www.youtube.com/watch?v=-2ZfS9R27R8",
-          "duration": "10:00",
+          "videoUrl": "https://www.youtube.com/watch?v=123456", 
+          "duration": "14:00",
           "order": 0
+        },
+        "l_qui_02": {
+          "id": "l_qui_02",
+          "title": "Cálculo Estequiométrico Simples",
+          "type": "video",
+          "videoUrl": "https://www.youtube.com/watch?v=789012",
+          "duration": "20:00",
+          "order": 1
         }
       }
     }
@@ -116,178 +115,80 @@
       "fisica": {
         "Cinemática": {
           "MRU": {
-            "q_001": {
-              "id": "q_001",
-              "subjectId": "fisica",
-              "topic": "Cinemática",
-              "subtopic": "MRU",
-              "text": "Um carro percorre uma estrada reta com velocidade constante de 72 km/h. Qual a distância percorrida em 10 segundos?",
-              "options": ["100 m", "200 m", "300 m", "400 m"],
+            "q_fis_01": {
+              "id": "q_fis_01",
+              "text": "Um carro viaja a 72 km/h constante. Qual a distância percorrida em 10 segundos?",
+              "options": ["100 m", "200 m", "300 m", "720 m"],
               "correctAnswer": 1,
               "difficulty": "easy",
-              "explanation": "Converta 72 km/h para m/s dividindo por 3,6 = 20 m/s. Distância = V x T = 20 * 10 = 200m.",
-              "tag": { "text": "ENEM 2022", "color": "blue" }
-            },
-            "q_002": {
-              "id": "q_002",
+              "explanation": "72 km/h = 20 m/s. Distância = V * t = 20 * 10 = 200m.",
               "subjectId": "fisica",
               "topic": "Cinemática",
-              "subtopic": "MRU",
-              "text": "Dois móveis A e B partem simultaneamente, com velocidades constantes de 10 m/s e 15 m/s na mesma direção. Após 20s, qual a distância entre eles?",
-              "options": ["50 m", "100 m", "150 m", "200 m"],
-              "correctAnswer": 1,
-              "difficulty": "medium",
-              "explanation": "Velocidade relativa = 15 - 10 = 5 m/s. Distância = 5 * 20 = 100m."
+              "subtopic": "MRU"
             }
+          },
+          "Queda Livre": {
+             "q_fis_02": {
+              "id": "q_fis_02",
+              "text": "Uma pedra é solta de uma altura H. Desprezando a resistência do ar, qual a aceleração?",
+              "options": ["Zero", "9,8 m/s²", "Variável", "Depende da massa"],
+              "correctAnswer": 1,
+              "difficulty": "easy",
+              "explanation": "Na queda livre, a única força é o peso, logo a aceleração é a da gravidade (aprox 9,8 m/s²).",
+              "subjectId": "fisica",
+              "topic": "Cinemática",
+              "subtopic": "Queda Livre"
+             }
           }
+        },
+        "Dinâmica": {
+           "Leis de Newton": {
+              "q_fis_03": {
+                 "id": "q_fis_03",
+                 "text": "Qual a força resultante em um corpo de 2kg com aceleração de 5m/s²?",
+                 "options": ["2N", "5N", "10N", "25N"],
+                 "correctAnswer": 2,
+                 "difficulty": "easy",
+                 "explanation": "F = m * a -> F = 2 * 5 = 10N.",
+                 "subjectId": "fisica",
+                 "topic": "Dinâmica",
+                 "subtopic": "Leis de Newton"
+              }
+           }
         }
       },
-      "matematica": {
-        "Funções": {
-          "Função Afim": {
-            "q_003": {
-              "id": "q_003",
-              "subjectId": "matematica",
-              "topic": "Funções",
-              "subtopic": "Função Afim",
-              "text": "Dada f(x) = 2x - 5, calcule f(3).",
-              "options": ["0", "1", "2", "3"],
-              "correctAnswer": 1,
-              "difficulty": "easy",
-              "explanation": "f(3) = 2(3) - 5 = 6 - 5 = 1."
-            }
-          }
-        }
-      }
-    },
-    "military": {
-      "esa": {
-        "Matemática Militar": {
-          "Logaritmos Avançados": {
-            "q_mil_01": {
-              "id": "q_mil_01",
-              "subjectId": "esa",
-              "topic": "Matemática Militar",
-              "subtopic": "Logaritmos Avançados",
-              "text": "Se log2(x) = 5, determine x.",
-              "options": ["10", "25", "32", "64"],
+      "quimica": {
+        "Estequiometria": {
+          "Cálculo Estequiométrico": {
+            "q_qui_01": {
+              "id": "q_qui_01",
+              "text": "Na reação N2 + 3H2 -> 2NH3, quantos mols de NH3 são produzidos a partir de 3 mols de N2?",
+              "options": ["2 mols", "3 mols", "6 mols", "1 mol"],
               "correctAnswer": 2,
               "difficulty": "medium",
-              "explanation": "2 elevado a 5 é igual a 32.",
-              "tag": { "text": "ESA 2023", "color": "emerald" }
+              "explanation": "A proporção é 1:2. Se temos 3 mols de N2, produziremos 3 * 2 = 6 mols de NH3.",
+              "subjectId": "quimica",
+              "topic": "Estequiometria",
+              "subtopic": "Cálculo Estequiométrico"
             }
           }
+        },
+        "Química Orgânica": {
+           "Hidrocarbonetos": {
+              "q_qui_02": {
+                 "id": "q_qui_02",
+                 "text": "Qual a fórmula geral dos alcanos?",
+                 "options": ["CnH2n", "CnH2n+2", "CnH2n-2", "CnHn"],
+                 "correctAnswer": 1,
+                 "difficulty": "easy",
+                 "explanation": "Alcanos são saturados e abertos, fórmula CnH2n+2.",
+                 "subjectId": "quimica",
+                 "topic": "Química Orgânica",
+                 "subtopic": "Hidrocarbonetos"
+              }
+           }
         }
       }
-    }
-  },
-  "community_posts": {
-    "post_01": {
-      "id": "post_01",
-      "authorName": "Ana Silva",
-      "authorAvatar": "https://ui-avatars.com/api/?name=Ana+Silva&background=6366f1&color=fff",
-      "authorXp": 12500,
-      "content": "Alguém tem um resumo bom sobre Era Vargas? Estou travada nas leis trabalhistas.",
-      "timestamp": 1715000000000,
-      "likes": 5,
-      "likedBy": { "user_xyz": true }
-    },
-    "post_02": {
-      "id": "post_02",
-      "authorName": "Carlos Admin",
-      "authorAvatar": "https://ui-avatars.com/api/?name=Carlos&background=10b981&color=fff",
-      "authorXp": 55000,
-      "content": "Dica rápida: Em questões de Física, sempre verifiquem as unidades antes de calcular! 🚨 km/h ≠ m/s.",
-      "timestamp": 1715100000000,
-      "likes": 42,
-      "replies": [
-        { "author": "João", "content": "Salvou minha vida!", "timestamp": 1715105000000 }
-      ]
-    }
-  },
-  "simulations": {
-    "sim_01": {
-      "id": "sim_01",
-      "title": "Simulado Oficial #1",
-      "description": "Prova completa focada em exatas e natureza.",
-      "durationMinutes": 90,
-      "type": "official",
-      "status": "open",
-      "questionIds": ["q_001", "q_002", "q_003"],
-      "questionCount": 3,
-      "subjects": ["fisica", "matematica"]
-    },
-    "sim_02": {
-      "id": "sim_02",
-      "title": "Treino Rápido: Cinemática",
-      "description": "Teste seus conhecimentos básicos de movimento.",
-      "durationMinutes": 20,
-      "type": "training",
-      "status": "open",
-      "questionIds": ["q_001", "q_002"],
-      "questionCount": 2,
-      "subjects": ["fisica"]
-    }
-  },
-  "users": {
-    "admin_placeholder": {
-      "uid": "admin_placeholder",
-      "displayName": "Admin Master",
-      "email": "admin@neurostudy.com",
-      "plan": "admin",
-      "xp": 99999,
-      "balance": 1000,
-      "essayCredits": 999,
-      "theme": "dark"
-    },
-    "student_placeholder": {
-      "uid": "student_placeholder",
-      "displayName": "Estudante Demo",
-      "email": "aluno@email.com",
-      "plan": "basic",
-      "xp": 1500,
-      "balance": 0,
-      "essayCredits": 1,
-      "theme": "dark",
-      "questionsAnswered": 42,
-      "loginStreak": 5
-    }
-  },
-  "user_essays": {
-    "student_placeholder": {
-      "essay_01": {
-        "id": "essay_01",
-        "theme": "Desafios da Educação no Brasil",
-        "date": 1714500000000,
-        "scoreTotal": 840,
-        "feedback": "Boa argumentação, mas atenção à crase.",
-        "competencies": { "c1": 120, "c2": 200, "c3": 160, "c4": 160, "c5": 200 },
-        "imageUrl": null
-      }
-    }
-  },
-  "user_transactions": {
-    "student_placeholder": {
-      "trans_01": {
-        "id": "trans_01",
-        "type": "debit",
-        "amount": 0.05,
-        "description": "NeuroAI (Chat)",
-        "timestamp": 1715200000000,
-        "currencyType": "BRL"
-      }
-    }
-  },
-  "leads": {
-    "lead_01": {
-      "id": "lead_01",
-      "name": "Novo Aluno Interessado",
-      "contact": "1199999999",
-      "planId": "PRO_YEARLY",
-      "amount": 197.00,
-      "billing": "yearly",
-      "status": "pending_pix",
-      "timestamp": "2024-05-20T10:00:00Z"
     }
   },
   "config": {

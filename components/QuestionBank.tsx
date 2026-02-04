@@ -66,7 +66,8 @@ interface QuestionBankProps {
 const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
-  const [subtopics, setSubtopics] = useState<Record<string, string[]>>({});
+  // Updated: Subtopics are now nested by subjectId and topicId
+  const [subtopics, setSubtopics] = useState<Record<string, Record<string, string[]>>>({});
   const [loading, setLoading] = useState(true);
   const [answeredMap, setAnsweredMap] = useState<Record<string, {correct: boolean}>>({});
 
@@ -279,8 +280,14 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const isAnswered = currentQ?.id ? !!answeredMap[currentQ.id] : false;
   const wasCorrect = currentQ?.id ? answeredMap[currentQ.id]?.correct : false;
   const filteredSubjects = subjects.filter(s => s.category === selectedCategory);
+  
+  // Helper to safely get subtopics for current selection
   const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
-  const subTopicOptions = selectedTopic ? subtopics[selectedTopic] || [] : [];
+  
+  // Safe Access to nested subtopics
+  const subTopicOptions = (selectedSubject && selectedTopic && subtopics[selectedSubject] && subtopics[selectedSubject][selectedTopic]) 
+      ? subtopics[selectedSubject][selectedTopic] 
+      : [];
 
   return (
     <div className="h-full flex flex-col relative animate-fade-in">
@@ -595,7 +602,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                         <PlayCircle size={64} className="mb-6 opacity-30 text-indigo-500" />
                         <h3 className="text-2xl font-bold text-white mb-2 text-center">Comece a Praticar</h3>
                         <p className="max-w-sm text-center mb-8">Selecione uma matéria e um assunto no filtro acima para carregar as questões.</p>
-                        <button onClick={() => setIsFilterOpen(true)} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-colors">
+                        <button onClick={() => setIsFilterOpen(true)} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-50 transition-colors">
                             Abrir Filtros
                         </button>
                      </>
