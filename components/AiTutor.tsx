@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit, Infinity, CreditCard, Crown, Rocket, Zap } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit, Infinity, CreditCard, Crown, Rocket, Zap, ArrowRight, Circle, Diamond } from 'lucide-react';
 import { AiService, ChatMessage } from '../services/aiService';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
@@ -12,6 +12,95 @@ interface AiTutorProps {
     user: UserProfile;
     onUpdateUser: (u: UserProfile) => void;
 }
+
+// --- PROFESSIONAL RENDERER COMPONENT ---
+const ProfessionalMarkdown: React.FC<{ text: string }> = ({ text }) => {
+    if (!text) return null;
+
+    // Split text preserving newlines to handle blocks
+    const lines = text.split('\n');
+
+    return (
+        <div className="space-y-4 font-sans text-sm md:text-base leading-relaxed">
+            {lines.map((line, idx) => {
+                const trimmed = line.trim();
+                
+                // 1. HEADERS (### Title)
+                if (trimmed.startsWith('###')) {
+                    const content = trimmed.replace(/^###\s*/, '');
+                    return (
+                        <div key={idx} className="flex items-center gap-3 mt-6 mb-3 animate-in slide-in-from-left-2 duration-500">
+                            <div className="w-2 h-8 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
+                            <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                                {content}
+                            </h3>
+                        </div>
+                    );
+                }
+
+                // 2. LISTS (- item)
+                if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                    const content = trimmed.replace(/^[-*]\s*/, '');
+                    return (
+                        <div key={idx} className="flex gap-3 pl-2 group">
+                            <div className="mt-1.5 min-w-[16px]">
+                                <ArrowRight size={16} className="text-indigo-400 group-hover:translate-x-1 transition-transform" />
+                            </div>
+                            <p className="text-slate-200">
+                                {parseInlineStyles(content)}
+                            </p>
+                        </div>
+                    );
+                }
+
+                // 3. BLOCKQUOTES / HIGHLIGHTS (> text)
+                if (trimmed.startsWith('>')) {
+                    const content = trimmed.replace(/^>\s*/, '');
+                    return (
+                        <div key={idx} className="my-4 p-4 rounded-xl bg-indigo-900/20 border-l-4 border-indigo-500 shadow-lg relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-2 opacity-10">
+                                <Sparkles size={40} />
+                            </div>
+                            <div className="flex gap-3 relative z-10">
+                                <Zap size={20} className="text-yellow-400 shrink-0 mt-0.5 fill-yellow-400" />
+                                <p className="text-indigo-100 font-medium italic">
+                                    {parseInlineStyles(content)}
+                                </p>
+                            </div>
+                        </div>
+                    );
+                }
+
+                // 4. EMPTY LINES
+                if (!trimmed) return <div key={idx} className="h-2"></div>;
+
+                // 5. STANDARD PARAGRAPHS
+                return (
+                    <p key={idx} className="text-slate-300">
+                        {parseInlineStyles(line)}
+                    </p>
+                );
+            })}
+        </div>
+    );
+};
+
+// Helper to parse **bold** inside lines
+const parseInlineStyles = (text: string) => {
+    // Split by **
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            // Stylized Bold: Gradient Text
+            return (
+                <span key={i} className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-purple-300 to-indigo-300 animate-pulse-slow">
+                    {part.slice(2, -2)}
+                </span>
+            );
+        }
+        return part;
+    });
+};
 
 const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -88,17 +177,6 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
 
   const triggerNotification = (type: 'success' | 'error', message: string) => {
       setNotification({ type, message });
-  };
-
-  // Simple Markdown Parser for visual formatting
-  const renderMarkdown = (text: string) => {
-    const parts = text.split(/(\*\*.*?\*\*)/g);
-    return parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-            return <strong key={i} className="text-indigo-200">{part.slice(2, -2)}</strong>;
-        }
-        return part;
-    });
   };
 
   const handleSend = async (e?: React.FormEvent) => {
@@ -359,12 +437,15 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                     {msg.role === 'ai' ? <Sparkles size={20} /> : <UserIcon size={20} />}
                     </div>
 
-                    <div className={`max-w-[80%] p-4 rounded-2xl leading-relaxed shadow-md ${
+                    <div className={`max-w-[90%] p-5 rounded-2xl leading-relaxed shadow-md ${
                     msg.role === 'ai' 
                         ? 'bg-slate-800/80 border border-white/5 text-slate-100 rounded-tl-none' 
                         : 'bg-indigo-600 text-white rounded-tr-none'
                     }`}>
-                    <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
+                    {msg.role === 'ai' 
+                        ? <ProfessionalMarkdown text={msg.content} />
+                        : <p className="whitespace-pre-wrap">{msg.content}</p>
+                    }
                     </div>
                 </div>
                 ))}

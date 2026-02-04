@@ -1,5 +1,6 @@
 
 import * as firebaseApp from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getDatabase, ref, get, update, push, set } from "firebase/database";
 import OpenAI from "openai";
 
@@ -12,13 +13,14 @@ const firebaseConfig = {
 
 // Initialize Firebase App for serverless context
 let app;
-if (firebaseApp.getApps().length > 0) {
-    app = firebaseApp.getApp();
+const apps = getApps();
+if (apps.length > 0) {
+    app = getApp();
 } else {
     try {
-        app = firebaseApp.initializeApp(firebaseConfig, "serverless_worker");
+        app = initializeApp(firebaseConfig, "serverless_worker");
     } catch (e: any) {
-        app = firebaseApp.getApps().length > 0 ? firebaseApp.getApp() : firebaseApp.initializeApp(firebaseConfig);
+        app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     }
 }
 

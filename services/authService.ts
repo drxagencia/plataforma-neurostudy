@@ -1,10 +1,11 @@
+
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
   updateProfile, 
-  User as FirebaseUser
 } from "firebase/auth";
+import type { User as FirebaseUser } from "firebase/auth";
 import { auth, secondaryAuth } from "./firebaseConfig";
 import { User } from '../types';
 

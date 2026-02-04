@@ -20,7 +20,7 @@ import {
     Simulation, 
     SimulationResult,
     Lead,
-    RechargeRequest,
+    RechargeRequest, 
     Transaction,
     AiConfig,
     UserPlan,
@@ -51,6 +51,11 @@ const sanitizeData = (data: any): any => {
         return newObj;
     }
     return data;
+};
+
+// HELPER: Get current week ID
+const getCurrentWeekId = () => {
+    return Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
 };
 
 export const DatabaseService = {
@@ -307,6 +312,8 @@ export const DatabaseService = {
           const newUser = {
               ...defaultData,
               xp: 0,
+              weeklyXp: 0,
+              lastXpWeek: getCurrentWeekId(),
               balance: 0,
               plan: defaultData.plan || 'basic',
               createdAt: Date.now()
@@ -393,8 +400,24 @@ export const DatabaseService = {
       const userRef = ref(database, `users/${uid}`);
       const snap = await get(userRef);
       if (snap.exists()) {
-          const currentXp = snap.val().xp || 0;
-          await update(userRef, { xp: currentXp + xpAmount });
+          const userData = snap.val();
+          const currentXp = userData.xp || 0;
+          
+          // Weekly Logic
+          const currentWeekId = getCurrentWeekId();
+          let weeklyXp = userData.weeklyXp || 0;
+          const lastXpWeek = userData.lastXpWeek || 0;
+
+          if (currentWeekId !== lastXpWeek) {
+              weeklyXp = 0; // Reset for new week
+          }
+
+          await update(userRef, { 
+              xp: currentXp + xpAmount,
+              weeklyXp: weeklyXp + xpAmount,
+              lastXpWeek: currentWeekId
+          });
+          
           if (DatabaseService._xpCallback) DatabaseService._xpCallback(xpAmount, actionType);
       }
   },
@@ -436,18 +459,30 @@ export const DatabaseService = {
        await update(userRef, { questionsAnswered: current + count });
   },
 
-  getLeaderboard: async (): Promise<UserProfile[]> => {
-      const q = query(ref(database, 'users'), orderByChild('xp'), limitToLast(50));
+  getLeaderboard: async (period: 'total' | 'weekly' = 'total'): Promise<UserProfile[]> => {
+      // NOTE: Removed orderByChild('xp') to avoid "Index not defined" error if rules are missing.
+      // We fetch all users (or a large chunk) and sort client-side.
+      // For scalability, users should add ".indexOn": "xp" to firebase rules and use orderByChild.
+      const q = query(ref(database, 'users'));
       const snap = await get(q);
+      
       if (snap.exists()) {
           const users = Object.values(snap.val()) as UserProfile[];
-          // Clean heavy photos on the fly to prevent app crash if dirty data exists
+          
+          // Sanitize Images client-side before rendering
           users.forEach(u => {
               if (isBase64Image(u.photoURL)) {
                   u.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.displayName)}&background=random`;
               }
           });
-          return users.sort((a, b) => (b.xp || 0) - (a.xp || 0));
+
+          // Sort Logic
+          if (period === 'weekly') {
+              return users.sort((a, b) => (b.weeklyXp || 0) - (a.weeklyXp || 0)).slice(0, 50);
+          }
+          
+          // Total XP
+          return users.sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 50);
       }
       return [];
   },

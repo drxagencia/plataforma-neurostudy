@@ -49,8 +49,20 @@ const getUserData = async (uid: string) => {
     return snap.val();
 };
 
+const FORMATTING_RULES = `
+REGRAS DE FORMATAÇÃO ESTRITA:
+1. Use '### ' para Títulos e Subtítulos importantes.
+2. Use '**' para destacar palavras-chave e conceitos centrais (Isso será renderizado com cores especiais).
+3. Use listas com '- ' para passo-a-passo ou tópicos.
+4. Use '> ' para notas de destaque, avisos ou "Dicas de Ouro".
+5. NÃO use formatações complexas como tabelas Markdown ou LaTeX cru sem explicação.
+6. O tom deve ser encorajador e direto.
+7. Use emojis estrategicamente para ilustrar pontos (ex: 🚀, 💡, 🧠).
+`;
+
 export const AiService = {
-  sendMessage: async (message: string, history: ChatMessage[], actionLabel: string = 'NeuroAI Tutor'): Promise<string> => {
+  // Added optional 'systemContext' parameter to inject Lesson details or specific persona instructions
+  sendMessage: async (message: string, history: ChatMessage[], actionLabel: string = 'NeuroAI Tutor', systemContext?: string): Promise<string> => {
     if (!auth.currentUser) throw new Error("User not authenticated");
     const uid = auth.currentUser.uid;
 
@@ -64,7 +76,17 @@ export const AiService = {
 
       // 2. Call OpenAI
       const ai = getAiInstance();
-      const systemInstruction = "Você é a NeuroAI, uma tutora educacional de elite. Seja didática, direta e use formatação Markdown rica (negrito, listas).";
+      
+      let systemInstruction = `
+        Você é a NeuroAI, uma tutora educacional de elite. 
+        Sua missão é explicar conteúdos de forma DIDÁTICA, VISUAL e PROFISSIONAL.
+        ${FORMATTING_RULES}
+      `;
+
+      // If specific context is provided (e.g. Lesson Title + Task Persona), use it but append formatting rules
+      if (systemContext) {
+          systemInstruction = `${systemContext}\n\n${FORMATTING_RULES}`;
+      }
       
       // Map history to OpenAI format
       const openaiHistory = history.map(h => ({
@@ -96,12 +118,10 @@ export const AiService = {
       const baseCost = totalTokens * BASE_COST_PER_TOKEN * baseMultiplier;
 
       // Apply Visual Multiplier to the ACTUAL DEBIT (x80 for Basic, x40 for Others)
-      // This ensures the debit matches the visual representation requested by the user.
       const billingMultiplier = isBasic ? 80 : 40;
       const finalCost = baseCost * billingMultiplier;
 
       // 4. Deduct Balance (Allow negative)
-      // Re-fetch strictly to ensure no race condition on balance (simplified here)
       const currentBalance = userData.balance || 0;
       
       // Removed zero clamp to allow negative balance for one-time overage
@@ -147,7 +167,12 @@ ALTERNATIVA SELECIONADA (INCORRETA): "${wrongAnswerText}"
 [GABARITO OFICIAL]
 ALTERNATIVA CORRETA: "${correctAnswerText}"
 
-INSTRUÇÃO: Compare a alternativa incorreta com a correta. Explique onde está o erro conceitual do aluno. Use APENAS os dados acima como verdade.
+INSTRUÇÃO: 
+Você é um Professor Particular Senior. Explique onde está o erro conceitual do aluno e como chegar na resposta correta.
+Use a seguinte estrutura de formatação para renderização profissional:
+- Use '### ' para separar "Análise do Erro" e "Caminho Correto".
+- Use '**' para destacar termos técnicos.
+- Use '> ' para uma "Dica Final" ou macete de memorização.
       `;
 
       const completion = await ai.chat.completions.create({

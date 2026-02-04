@@ -17,6 +17,8 @@ export interface UserProfile extends User {
   billingCycle?: BillingCycle;
   subscriptionExpiry?: string;
   xp?: number;
+  weeklyXp?: number; // New: Weekly XP
+  lastXpWeek?: number; // New: Week ID for reset logic
   balance: number;
   essayCredits?: number;
   hoursStudied?: number;
