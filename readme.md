@@ -134,8 +134,8 @@ Uso de `React.memo` e virtualização de listas para renderizar bancos de quest�
 
 Desenvolvido com foco em excelência técnica e impacto de produto.
 
-**[Seu Nome]**
-*Senior Frontend Engineer*
+**Herick Moraes**
+*Junior FullStack Developer*
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/seu-perfil)
 [![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=About.me&logoColor=white)](https://seu-portfolio.com)
