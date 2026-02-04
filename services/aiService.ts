@@ -57,7 +57,8 @@ export const AiService = {
     try {
       // 1. Get User Data for Plan Check (Optimistic check before call)
       const userData = await getUserData(uid);
-      if (userData.balance <= 0.001) {
+      // Allow if balance > 0 (even if tiny). Block if already <= 0.
+      if (userData.balance <= 0) {
           throw new Error("402: Saldo insuficiente");
       }
 
@@ -96,16 +97,12 @@ export const AiService = {
       
       const cost = totalTokens * BASE_COST_PER_TOKEN * multiplier;
 
-      // 4. Deduct Balance (Atomic-like update)
+      // 4. Deduct Balance (Allow negative)
       // Re-fetch strictly to ensure no race condition on balance (simplified here)
       const currentBalance = userData.balance || 0;
       
-      if (currentBalance < cost) {
-          // Edge case: ran out during generation
-          await update(ref(database, `users/${uid}`), { balance: 0 });
-      } else {
-          await update(ref(database, `users/${uid}`), { balance: currentBalance - cost });
-      }
+      // Removed zero clamp to allow negative balance for one-time overage
+      await update(ref(database, `users/${uid}`), { balance: currentBalance - cost });
 
       // 5. Log Transaction
       const transRef = push(ref(database, `user_transactions/${uid}`));
@@ -133,7 +130,8 @@ export const AiService = {
 
     try {
       const userData = await getUserData(uid);
-      if (userData.balance <= 0.001) throw new Error("402: Saldo insuficiente");
+      // Allow if balance > 0
+      if (userData.balance <= 0) throw new Error("402: Saldo insuficiente");
 
       const ai = getAiInstance();
       const prompt = `
@@ -164,7 +162,8 @@ INSTRUÇÃO: Compare a alternativa incorreta com a correta. Explique onde está 
       const cost = totalTokens * BASE_COST_PER_TOKEN * multiplier;
 
       const currentBalance = userData.balance || 0;
-      await update(ref(database, `users/${uid}`), { balance: Math.max(0, currentBalance - cost) });
+      // Removed zero clamp to allow negative balance
+      await update(ref(database, `users/${uid}`), { balance: currentBalance - cost });
 
       const transRef = push(ref(database, `user_transactions/${uid}`));
       await set(transRef, {

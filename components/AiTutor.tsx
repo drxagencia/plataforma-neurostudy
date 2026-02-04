@@ -105,8 +105,9 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
     e?.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    if (user.balance <= 0.005) { // Adjusted check
-        triggerNotification('error', 'Saldo Insuficiente para realizar esta ação.');
+    // Check if balance is strictly greater than 0. If it is 0 or negative, block.
+    if (user.balance <= 0) { 
+        triggerNotification('error', 'Seu saldo está zerado ou negativo. Recarregue para continuar.');
         setTimeout(() => setShowRecharge(true), 500);
         return;
     }
@@ -142,7 +143,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
 
     } catch (error: any) {
       if (error.message.includes('402')) {
-          triggerNotification('error', 'Seu saldo acabou durante a requisição.');
+          triggerNotification('error', 'Saldo insuficiente para processar a resposta.');
           setShowRecharge(true);
       } else if (error.message.includes('403')) {
           triggerNotification('error', 'Seu plano não permite o uso do chat livre.');
@@ -312,7 +313,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
             <div className="flex items-center gap-3 bg-slate-900 border border-white/10 px-4 py-2 rounded-xl">
                 <div className="flex flex-col items-end">
                     <span className="text-[10px] text-slate-400 uppercase font-bold">Seu Saldo</span>
-                    <span className={`font-mono font-bold ${user.balance > 1 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <span className={`font-mono font-bold ${user.balance > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         R$ {user.balance.toFixed(2)}
                     </span>
                 </div>
@@ -416,8 +417,9 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                           {transactions.map(t => {
                               const isDebit = t.type === 'debit';
                               const isBasicUser = user.plan === 'basic'; // Admin, Adv, Int -> false
-                              // Multiplier Logic: Basic=200, Others=100. Admin is treated as Adv/Others.
-                              const multiplier = isDebit ? (isBasicUser ? 200 : 100) : 1;
+                              
+                              // Multiplier Logic: Basic=80 (prev 200), Others=40 (prev 100).
+                              const multiplier = isDebit ? (isBasicUser ? 80 : 40) : 1;
                               const displayAmount = t.amount * multiplier;
 
                               return (
