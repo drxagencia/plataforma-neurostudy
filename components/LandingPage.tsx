@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState, useRef } from 'react';
-import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone } from 'lucide-react';
+import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { TrafficConfig, Lead } from '../types';
@@ -11,10 +10,10 @@ interface LandingPageProps {
 
 // --- FAKE PROGRESS BAR COMPONENT (PSYCHOLOGICAL HACK) ---
 const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onFinish: () => void }) => {
-    const [progress, setProgress] = useState(65); // Começa parecendo que já viu bastante (Hook)
+    const [progress, setProgress] = useState(75); // Começa em 75% para dar sensação de quase lá
 
     useEffect(() => {
-        const totalDuration = 25000; // 25 segundos simulados para a barra andar
+        const totalDuration = 25000; // 25 segundos simulados para o restante
         const intervalTime = 100;
         const steps = totalDuration / intervalTime;
         let currentStep = 0;
@@ -24,8 +23,9 @@ const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onF
             
             // Simula desaceleração no final (Paradoxo de Zenão visual)
             setProgress(prev => {
-                if (prev >= 98) return 98; // Nunca chega a 100% instantaneamente
-                const increment = (100 - prev) / 80; 
+                if (prev >= 98.5) return 98.5; // Trava visualmente no finalzinho
+                // Avança bem devagar pois já começou em 75%
+                const increment = (99 - prev) / 150; 
                 return prev + increment;
             });
 
@@ -43,15 +43,21 @@ const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onF
     }, []);
 
     return (
-        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mt-4 border border-white/10 shadow-[0_0_15px_rgba(99,102,241,0.3)] relative group cursor-not-allowed">
-            <div 
-                className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 relative transition-all duration-100 ease-linear"
-                style={{ width: `${progress}%` }}
-            >
-                <div className="absolute right-0 top-0 bottom-0 w-2 bg-white/80 blur-[2px] animate-pulse" />
+        <div className="w-full">
+            <div className="flex justify-between text-[10px] text-indigo-300 font-bold mb-1 uppercase tracking-wider px-1">
+                <span className="flex items-center gap-1"><Lock size={10} /> Sincronizando Conhecimento...</span>
+                <span className="animate-pulse text-red-400">Não feche a página</span>
             </div>
-            <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white drop-shadow-md tracking-widest opacity-80 uppercase">
-                Renderização da Aula em andamento... {Math.floor(progress)}%
+            <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/10 shadow-inner relative group cursor-not-allowed">
+                <div 
+                    className="h-full bg-gradient-to-r from-red-600 via-yellow-500 to-emerald-500 relative transition-all duration-100 ease-linear"
+                    style={{ width: `${progress}%` }}
+                >
+                    <div className="absolute right-0 top-0 bottom-0 w-2 bg-white/80 blur-[2px] animate-pulse" />
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white drop-shadow-md tracking-widest opacity-90 uppercase z-10 mix-blend-overlay">
+                    Renderizando Módulo Secreto... {Math.floor(progress)}%
+                </div>
             </div>
         </div>
     );
@@ -250,7 +256,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                               </div>
                               <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-red-400 transition-colors">{enemy.title}</h3>
                               <p className="text-slate-400 text-sm">{enemy.desc}</p>
-                              <div className="mt-6 w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                              <div className="mt-6 w-12 h-1 bg-slate-800 rounded-full overflow-hidden">
                                   <div className={`h-full bg-${enemy.color}-500 w-[90%]`}></div>
                               </div>
                           </div>
@@ -272,9 +278,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           {/* === TELA 3: VSL & TIMER === */}
           <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-slate-950">
               <div className="max-w-5xl w-full">
-                  <div className="bg-slate-900/80 p-1 rounded-3xl border border-indigo-500/30 shadow-[0_0_100px_rgba(79,70,229,0.15)] backdrop-blur-xl relative">
+                  <div className="bg-slate-900/80 rounded-3xl border border-indigo-500/30 shadow-[0_0_100px_rgba(79,70,229,0.15)] backdrop-blur-xl relative overflow-hidden">
                       {/* Monitor Header */}
-                      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-slate-950/50 rounded-t-2xl">
+                      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-slate-950/50">
                           <div className="flex gap-1.5">
                               <div className="w-3 h-3 rounded-full bg-red-500/50" />
                               <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
@@ -283,8 +289,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                           <div className="flex-1 text-center text-xs font-mono text-slate-500">SECRET_WEAPON_FILE.mp4</div>
                       </div>
 
-                      {/* Video Container */}
-                      <div className="relative aspect-video bg-black rounded-b-xl overflow-hidden group">
+                      {/* Video Container (No bottom rounding) */}
+                      <div className="relative aspect-video bg-black rounded-none overflow-hidden group">
                           <video 
                             src="/video.mp4" 
                             className="w-full h-full object-cover" 
@@ -295,27 +301,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                               Seu navegador não suporta vídeos.
                           </video>
                       </div>
-                  </div>
 
-                  {/* FAKE PROGRESS BAR (Retention) */}
-                  <div className="mt-6 max-w-3xl mx-auto relative">
-                      <div className="flex justify-between text-xs text-indigo-300 font-bold mb-1 uppercase tracking-wider">
-                          <span>Sincronizando Conhecimento...</span>
-                          <span className="animate-pulse text-red-400">Não feche a página</span>
+                      {/* FAKE PROGRESS BAR (GLUED TO PLAYER) */}
+                      <div className="bg-slate-950 p-4 border-t border-white/5">
+                          <FakeProgressBar 
+                            onHalfTime={() => setShowEarlyOffer(true)} 
+                            onFinish={() => setShowFinalOffer(true)} 
+                          />
                       </div>
-                      <FakeProgressBar 
-                        onHalfTime={() => setShowEarlyOffer(true)} 
-                        onFinish={() => setShowFinalOffer(true)} 
-                      />
                   </div>
 
-                  {/* Dynamic CTAs */}
-                  <div className="mt-8 text-center h-20 relative">
+                  {/* Dynamic CTAs (Below Monitor) */}
+                  <div className="mt-8 text-center h-24 relative flex flex-col items-center justify-center">
                       {showFinalOffer ? (
-                          <div className="animate-in zoom-in-50 duration-500">
+                          <div className="animate-in zoom-in-50 duration-500 w-full">
                               <button 
                                 onClick={() => scrollToStep(3)}
-                                className="px-12 py-5 bg-emerald-500 hover:bg-emerald-400 text-white font-black text-2xl rounded-xl shadow-[0_0_60px_rgba(16,185,129,0.6)] hover:scale-105 transition-all animate-pulse-slow flex items-center gap-3 mx-auto uppercase tracking-widest"
+                                className="w-full md:w-auto px-12 py-5 bg-emerald-500 hover:bg-emerald-400 text-white font-black text-2xl rounded-xl shadow-[0_0_60px_rgba(16,185,129,0.6)] hover:scale-105 transition-all animate-pulse-slow flex items-center justify-center gap-3 mx-auto uppercase tracking-widest border border-emerald-400/50"
                               >
                                   <Rocket size={28} className="fill-white" />
                                   LIBERAR ACESSO AGORA
@@ -325,9 +327,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       ) : showEarlyOffer && (
                           <button 
                             onClick={() => scrollToStep(3)}
-                            className="text-slate-400 hover:text-white underline text-sm animate-in fade-in"
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-6 py-3 rounded-lg text-sm font-bold animate-in fade-in transition-all flex items-center gap-2 border border-white/5 hover:border-white/20"
                           >
-                              Já vi o suficiente, quero ver a oferta
+                              <Eye size={16} /> Espiar Oferta
                           </button>
                       )}
                   </div>
