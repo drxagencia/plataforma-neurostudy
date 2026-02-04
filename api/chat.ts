@@ -1,5 +1,4 @@
 
-import * as firebaseApp from "firebase/app";
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getDatabase, ref, get, update, push, set } from "firebase/database";
 import OpenAI from "openai";

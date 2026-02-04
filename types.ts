@@ -202,7 +202,30 @@ export interface Transaction {
   currencyType?: 'BRL' | 'CREDIT';
 }
 
+export interface PlanFeatures {
+    canUseChat: boolean;
+    canUseExplanation: boolean; // For question bank AI
+    canUseEssay: boolean;
+    canUseSimulations: boolean;
+    canUseCommunity: boolean;
+    canUseMilitary: boolean;
+}
+
+export interface PlanConfig {
+    permissions: {
+        basic: PlanFeatures;
+        intermediate: PlanFeatures;
+        advanced: PlanFeatures;
+    };
+    prices: {
+        basic: number;
+        intermediate: number;
+        advanced: number;
+    };
+}
+
 export interface AiConfig {
+  // Legacy, kept for compatibility, now mostly superseded by PlanConfig
   intermediateLimits: {
     canUseChat: boolean;
     canUseExplanation: boolean;

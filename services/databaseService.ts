@@ -25,7 +25,8 @@ import {
     AiConfig,
     UserPlan,
     EssayCorrection,
-    TrafficConfig
+    TrafficConfig,
+    PlanConfig
 } from "../types";
 import { XP_VALUES } from "../constants";
 
@@ -623,12 +624,24 @@ export const DatabaseService = {
       if (status === 'approved') {
           const userRef = ref(database, `users/${req.userId}`);
           const userSnap = await get(userRef);
-          
-          if (req.currencyType === 'CREDIT') {
-              const current = userSnap.val()?.essayCredits || 0;
+          const userData = userSnap.val();
+
+          // SPECIAL LOGIC: Handle Plan Upgrade
+          if (req.planLabel && req.planLabel.includes('UPGRADE')) {
+              // Parse plan from label (Hack, but works for the MVP context)
+              // Label format: "UPGRADE: Basic to Pro (Mensal)" or "UPGRADE: Intermediate"
+              let newPlan: UserPlan = 'basic';
+              if (req.planLabel.toLowerCase().includes('intermediate')) newPlan = 'intermediate';
+              if (req.planLabel.toLowerCase().includes('advanced') || req.planLabel.toLowerCase().includes('pro')) newPlan = 'advanced';
+              
+              await update(userRef, { plan: newPlan });
+          } 
+          // Standard Recharge
+          else if (req.currencyType === 'CREDIT') {
+              const current = userData?.essayCredits || 0;
               await update(userRef, { essayCredits: current + (req.quantityCredits || 0) });
           } else {
-              const current = userSnap.val()?.balance || 0;
+              const current = userData?.balance || 0;
               await update(userRef, { balance: current + req.amount });
           }
           
@@ -648,6 +661,28 @@ export const DatabaseService = {
       const snap = await get(ref(database, 'config/ai'));
       if (snap.exists()) return snap.val();
       return { intermediateLimits: { canUseChat: false, canUseExplanation: true } };
+  },
+
+  getPlanConfig: async (): Promise<PlanConfig> => {
+      const snap = await get(ref(database, 'config/plans'));
+      if (snap.exists()) return snap.val();
+      // Default Config if none exists
+      return {
+          permissions: {
+              basic: { canUseChat: false, canUseExplanation: true, canUseEssay: false, canUseSimulations: false, canUseCommunity: true, canUseMilitary: false },
+              intermediate: { canUseChat: true, canUseExplanation: true, canUseEssay: true, canUseSimulations: true, canUseCommunity: true, canUseMilitary: false },
+              advanced: { canUseChat: true, canUseExplanation: true, canUseEssay: true, canUseSimulations: true, canUseCommunity: true, canUseMilitary: true },
+          },
+          prices: {
+              basic: 29.90,
+              intermediate: 49.90,
+              advanced: 79.90
+          }
+      };
+  },
+
+  savePlanConfig: async (config: PlanConfig): Promise<void> => {
+      await update(ref(database, 'config/plans'), config);
   },
 
   getTrafficSettings: async (): Promise<TrafficConfig> => {
