@@ -48,14 +48,14 @@ const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onF
                 <span className="flex items-center gap-1"><Lock size={10} /> Sincronizando Conhecimento...</span>
                 <span className="animate-pulse text-red-400">Não feche a página</span>
             </div>
-            <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-white/10 shadow-inner relative group cursor-not-allowed">
+            <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-white/10 shadow-inner relative group cursor-not-allowed">
                 <div 
-                    className="h-full bg-gradient-to-r from-red-600 via-yellow-500 to-emerald-500 relative transition-all duration-100 ease-linear"
+                    className="h-full bg-blue-600 relative transition-all duration-100 ease-linear"
                     style={{ width: `${progress}%` }}
                 >
-                    <div className="absolute right-0 top-0 bottom-0 w-2 bg-white/80 blur-[2px] animate-pulse" />
+                    <div className="absolute right-0 top-0 bottom-0 w-2 bg-blue-400 blur-[2px] animate-pulse" />
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white drop-shadow-md tracking-widest opacity-90 uppercase z-10 mix-blend-overlay">
+                <div className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-white drop-shadow-md tracking-widest opacity-90 uppercase z-10">
                     Renderizando Módulo Secreto... {Math.floor(progress)}%
                 </div>
             </div>
