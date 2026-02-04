@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import Navigation from './components/Navigation';
 import Auth from './components/Auth';
@@ -115,42 +116,48 @@ const App: React.FC = () => {
   // Auth Persistence & DB Structure Enforcement
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const mappedUser = mapUser(firebaseUser);
-        
-        // Ensure user exists in Realtime Database under users/[uid]
-        const dbUser = await DatabaseService.ensureUserProfile(firebaseUser.uid, {
-               displayName: mappedUser.displayName,
-               email: mappedUser.email,
-               photoURL: mappedUser.photoURL || '',
-               plan: mappedUser.isAdmin ? 'admin' : 'basic',
-               isAdmin: mappedUser.isAdmin
-        });
+      try {
+        if (firebaseUser) {
+          const mappedUser = mapUser(firebaseUser);
+          
+          // Ensure user exists in Realtime Database under users/[uid]
+          const dbUser = await DatabaseService.ensureUserProfile(firebaseUser.uid, {
+                 displayName: mappedUser.displayName,
+                 email: mappedUser.email,
+                 photoURL: mappedUser.photoURL || '',
+                 plan: mappedUser.isAdmin ? 'admin' : 'basic',
+                 isAdmin: mappedUser.isAdmin
+          });
 
-        // Initialize XP Ref on first load
-        if (prevXpRef.current === 0 && dbUser?.xp) {
-            prevXpRef.current = dbUser.xp;
+          // Initialize XP Ref on first load
+          if (prevXpRef.current === 0 && dbUser?.xp) {
+              prevXpRef.current = dbUser.xp;
+          }
+
+          // Fallback for deprecated 'midnight' theme in DB to 'dark'
+          const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
+
+          setUser({
+              ...mappedUser,
+              ...dbUser, 
+              displayName: dbUser?.displayName || mappedUser.displayName,
+              photoURL: dbUser?.photoURL || mappedUser.photoURL,
+              plan: dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic'), 
+              theme: safeTheme
+          });
+
+          // Check Login Streak automatically
+          await DatabaseService.processXpAction(firebaseUser.uid, 'DAILY_LOGIN_BASE');
+
+        } else {
+          setUser(null);
         }
-
-        // Fallback for deprecated 'midnight' theme in DB to 'dark'
-        const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
-
-        setUser({
-            ...mappedUser,
-            ...dbUser, 
-            displayName: dbUser?.displayName || mappedUser.displayName,
-            photoURL: dbUser?.photoURL || mappedUser.photoURL,
-            plan: dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic'), 
-            theme: safeTheme
-        });
-
-        // Check Login Streak automatically
-        await DatabaseService.processXpAction(firebaseUser.uid, 'DAILY_LOGIN_BASE');
-
-      } else {
-        setUser(null);
+      } catch (error) {
+        console.error("Failed to load user profile:", error);
+        setUser(null); // Fallback to login screen on error
+      } finally {
+        setLoadingAuth(false);
       }
-      setLoadingAuth(false);
     });
 
     return () => unsubscribe();

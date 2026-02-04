@@ -1,4 +1,3 @@
-
 import { auth, database } from "./firebaseConfig";
 import { GoogleGenAI } from "@google/genai";
 import { ref, push, set, get, update } from "firebase/database";
@@ -9,11 +8,29 @@ export interface ChatMessage {
   content: string;
 }
 
-// Initialize GenAI
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 // Models
 const GEMINI_MODEL = "gemini-3-flash-preview";
+
+// Helper: Get API Key safely for Vite Environment
+const getApiKey = () => {
+    // Priority: Guidelines require using process.env.API_KEY exclusively
+    return process.env.API_KEY || '';
+};
+
+// Lazy initialization to prevent app crash on load if key is missing
+let aiInstance: GoogleGenAI | null = null;
+
+const getAiInstance = () => {
+    if (!aiInstance) {
+        const key = getApiKey();
+        if (!key) {
+            console.warn("Gemini API Key missing. AI features will fail.");
+            throw new Error("API Key não configurada.");
+        }
+        aiInstance = new GoogleGenAI({ apiKey: key });
+    }
+    return aiInstance;
+};
 
 // Helper to check/deduct balance
 const checkAndDeductBalance = async (uid: string, amount: number, description: string) => {
@@ -44,7 +61,6 @@ const checkAndDeductBalance = async (uid: string, amount: number, description: s
 
 export const AiService = {
   sendMessage: async (message: string, history: ChatMessage[]): Promise<string> => {
-    if (!process.env.API_KEY) throw new Error("Server Config Error: Missing Gemini API Key. Configure process.env.API_KEY");
     if (!auth.currentUser) throw new Error("User not authenticated");
 
     const COST = 0.02; // Fixed cost per message for simplicity
@@ -54,6 +70,7 @@ export const AiService = {
       await checkAndDeductBalance(auth.currentUser.uid, COST, "NeuroAI (Chat)");
 
       // 2. Call AI
+      const ai = getAiInstance();
       const systemInstruction = "Você é a NeuroAI, uma tutora educacional de elite. Seja didática, direta e use formatação Markdown rica (negrito, listas).";
       
       const geminiHistory = history.map(h => ({
@@ -77,7 +94,6 @@ export const AiService = {
   },
 
   explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string): Promise<string> => {
-    if (!process.env.API_KEY) throw new Error("Server Config Error: Missing Gemini API Key");
     if (!auth.currentUser) throw new Error("User not authenticated");
 
     const COST = 0.05; // Slightly higher for explanation
@@ -87,6 +103,7 @@ export const AiService = {
       await checkAndDeductBalance(auth.currentUser.uid, COST, "NeuroAI (Explicação)");
 
       // 2. Call AI
+      const ai = getAiInstance();
       const prompt = `
 [DADOS DA QUESTÃO]
 ENUNCIADO: "${questionText}"
