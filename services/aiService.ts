@@ -1,3 +1,4 @@
+
 import { auth, database } from "./firebaseConfig";
 import OpenAI from "openai";
 import { ref, push, set, get, update } from "firebase/database";
@@ -65,7 +66,10 @@ export const AiService = {
   sendMessage: async (message: string, history: ChatMessage[]): Promise<string> => {
     if (!auth.currentUser) throw new Error("User not authenticated");
 
-    const COST = 0.02; // Fixed cost per message for simplicity
+    // NEW RAW COST: 0.0002
+    // Multiplied by 100 (Advanced) = R$ 0.02 displayed
+    // Multiplied by 200 (Basic) = R$ 0.04 displayed
+    const COST = 0.0002; 
 
     try {
       // 1. Check Balance
@@ -104,7 +108,8 @@ export const AiService = {
   explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string): Promise<string> => {
     if (!auth.currentUser) throw new Error("User not authenticated");
 
-    const COST = 0.05; // Slightly higher for explanation
+    // Explanation Raw Cost (Slightly higher)
+    const COST = 0.0005; 
 
     try {
       // 1. Check Balance

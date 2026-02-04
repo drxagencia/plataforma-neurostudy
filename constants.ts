@@ -19,6 +19,25 @@ import {
 
 export const APP_NAME = "NeuroStudy AI";
 
+// Links de Pagamento
+export const KIRVANO_LINKS = {
+    balance_recharge: "https://kirvano.com/checkout/...", // Link genérico ou específico para saldo
+    essay_credits: "https://kirvano.com/checkout/...",    // Link genérico (fallback)
+    
+    // Novos Pacotes de Redação (Cartão)
+    essay_pack_basic: "https://kirvano.com/checkout/...",        // 8 Créditos - R$ 17
+    essay_pack_intermediate: "https://kirvano.com/checkout/...", // 14 Créditos - R$ 27
+    essay_pack_advanced: "https://kirvano.com/checkout/...",     // 30 Créditos - R$ 47
+
+    // Planos IA Ilimitada (Cartão)
+    ai_unlimited_monthly: "https://kirvano.com/checkout/...",   // R$ 37
+    ai_unlimited_semester: "https://kirvano.com/checkout/...",  // R$ 57
+    ai_unlimited_yearly: "https://kirvano.com/checkout/...",    // R$ 97
+
+    upgrade_monthly: "https://kirvano.com/checkout/...",  // Upgrade Mensal
+    upgrade_yearly: "https://kirvano.com/checkout/..."    // Upgrade Anual
+};
+
 export const ANNOUNCEMENTS: Announcement[] = [
   {
     id: '1',

@@ -4,7 +4,8 @@ import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { auth } from '../services/firebaseConfig';
 import { EssayCorrection, UserProfile } from '../types';
-import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight, Crown } from 'lucide-react';
+import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight, Crown, CreditCard, Star, Repeat, Gift, Zap, ShieldCheck } from 'lucide-react';
+import { KIRVANO_LINKS } from '../constants';
 
 interface RedacaoProps {
     user: UserProfile;
@@ -22,6 +23,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [showPix, setShowPix] = useState(false);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
   
   // Upgrade Flow
   const [isUpgrading, setIsUpgrading] = useState(false);
@@ -84,8 +86,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   const handleSelectHistoryItem = async (item: EssayCorrection) => {
       setLoadingDetails(true);
-      // NOTE: We do NOT fetch image anymore. History is text-only to save data.
-      // If the user wants to see the essay image, they can't. This is by design for optimization.
       setCurrentResult(item);
       setExpandedCompetency('c1');
       setLoadingDetails(false);
@@ -106,6 +106,13 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   // --- Upgrade Logic ---
   const handleUpgradeRequest = () => {
       if (!auth.currentUser) return;
+      
+      if (paymentMethod === 'card') {
+          const link = user.billingCycle === 'yearly' ? KIRVANO_LINKS.upgrade_yearly : KIRVANO_LINKS.upgrade_monthly;
+          window.open(link, '_blank');
+          return;
+      }
+
       setIsUpgrading(true);
       
       let upgradeCost = 10;
@@ -124,9 +131,18 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   };
 
   // --- Payment Handlers ---
-  const handleGeneratePix = () => {
+  const handleGeneratePayment = () => {
       if (buyQty < 1) return;
       setIsUpgrading(false);
+
+      if (paymentMethod === 'card') {
+          // This path handles generic card requests from calculator if needed, 
+          // but we mostly direct to cards via specific packages now.
+          window.open(KIRVANO_LINKS.essay_credits, '_blank');
+          setNotification({ type: 'success', message: "Redirecionando para pagamento..." });
+          return;
+      }
+
       try {
           const payload = PixService.generatePayload(totalPrice);
           setPixPayload(payload);
@@ -151,7 +167,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               undefined, 
               label
           );
-          setNotification({ type: 'success', message: "Upgrade solicitado! Aguardando aprovação." });
+          setNotification({ type: 'success', message: "Upgrade solicitado! Aguarde a aprovação." });
       } else {
           await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'User', totalPrice, 'CREDIT', buyQty);
           setNotification({ type: 'success', message: "Solicitação enviada! Aguarde a aprovação." });
@@ -190,14 +206,13 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       setView('scanning');
 
       try {
-          // Send to AI (which doesn't save to DB, just processes)
           const res = await fetch('/api/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   mode: 'essay-correction',
                   message: theme,
-                  image: image, // Send base64 to API
+                  image: image, 
                   uid: auth.currentUser.uid
               })
           });
@@ -226,8 +241,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
           const result: EssayCorrection = {
               theme,
-              // IMPORTANT: We do NOT set imageUrl here for saving.
-              // We pass `imageUrl: null` implicitly by omitting it or explicit below.
               imageUrl: null, 
               date: Date.now(),
               scoreTotal: finalTotal,
@@ -246,7 +259,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               structuralTips: parsed.structural_tips || ""
           };
 
-          // Save METADATA ONLY (Text)
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
           await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_CORRECTION');
@@ -260,16 +272,10 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               essayCredits: Math.max(0, currentCredits - 1)
           });
 
-          // Show result with image temporarily (from local state), but don't save it
-          // We attach the local image to currentResult for display purposes only
           setCurrentResult({ ...result, imageUrl: image }); 
           
           setExpandedCompetency('c1');
           setView('result');
-          
-          // Clear image from memory immediately after setting result to display
-          // Actually, we need it for display. 
-          // But effectively we are NOT saving it to DB.
           
           fetchHistory();
 
@@ -279,7 +285,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       }
   };
 
-  // --- COMPONENT MAP ---
   const COMPETENCY_LABELS: Record<string, string> = {
       c1: 'Norma Culta',
       c2: 'Tema e Estrutura',
@@ -295,8 +300,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       c4: BookOpen,
       c5: CheckCircle
   };
-
-  // --- RENDERERS ---
 
   const renderNotification = () => {
       if (!notification) return null;
@@ -338,7 +341,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       );
   }
 
-  // --- RESULT VIEW ---
   if (view === 'result' && currentResult) {
       const getScoreColor = (score: number) => {
           if (score >= 900) return 'text-emerald-400';
@@ -368,11 +370,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Left Column */}
                   <div className="space-y-6">
                       <div className="glass-card p-10 rounded-3xl text-center relative overflow-hidden border border-indigo-500/20 shadow-[0_0_40px_rgba(99,102,241,0.1)]">
                           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
-                          
                           <p className="text-slate-400 font-bold text-sm uppercase tracking-widest relative z-10">Nota Final</p>
                           <div className={`text-8xl font-black mt-4 mb-2 tracking-tighter relative z-10 ${getScoreColor(currentResult.scoreTotal)}`}>
                               {displayScore}
@@ -381,8 +381,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                               {currentResult.scoreTotal >= 900 ? 'Excelente' : currentResult.scoreTotal >= 700 ? 'Muito Bom' : 'Em Evolução'}
                           </div>
                       </div>
-
-                      {/* Info Alert about Image */}
                       {!currentResult.imageUrl && (
                           <div className="bg-slate-900/50 border border-white/10 p-4 rounded-xl text-center">
                               <p className="text-xs text-slate-500">A imagem da redação não é salva para otimizar o sistema. Apenas a análise permanece no histórico.</p>
@@ -390,9 +388,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                       )}
                   </div>
 
-                  {/* Details Column */}
                   <div className="lg:col-span-2 space-y-6">
-                      {/* Competencies */}
                       <div className="space-y-4">
                           {['c1', 'c2', 'c3', 'c4', 'c5'].map((key) => {
                               const score = currentResult.competencies[key as keyof typeof currentResult.competencies];
@@ -409,7 +405,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                           <div className={`p-3 rounded-xl ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
                                               <Icon size={20} />
                                           </div>
-                                          
                                           <div className="flex-1">
                                               <div className="flex justify-between items-center mb-1">
                                                   <h4 className={`font-bold text-sm uppercase ${isExpanded ? 'text-white' : 'text-slate-300'}`}>{COMPETENCY_LABELS[key]}</h4>
@@ -421,7 +416,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                           </div>
                                           <ChevronRight size={20} className={`text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                       </div>
-
                                       {isExpanded && (
                                           <div className="px-5 pb-6 pt-0 border-t border-white/5 animate-in fade-in slide-in-from-top-1">
                                               <div className="mt-4 mb-4">
@@ -435,7 +429,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                               )
                           })}
                       </div>
-
                       <div className="glass-card p-6 rounded-2xl bg-indigo-950/20 border border-indigo-500/10">
                           <h3 className="font-bold text-white mb-3 text-lg">Parecer Geral</h3>
                           <p className="text-slate-300 leading-relaxed text-sm italic">"{currentResult.feedback}"</p>
@@ -508,6 +501,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       );
   }
 
+  // --- BUY VIEW: Updated Logic ---
   if (view === 'buy') {
       return (
           <div className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-right pb-20 relative">
@@ -519,142 +513,209 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               <div className="text-center mb-8">
                   <h2 className="text-3xl font-bold text-white mb-2">Pacotes de Correção</h2>
                   <p className="text-slate-400">Escolha a quantidade ideal para sua rotina de estudos.</p>
-                  
-                  {isBasicPlan && (
-                      <div className="mt-4 bg-red-900/20 border border-red-500/40 p-4 rounded-xl inline-block max-w-2xl animate-pulse">
-                          <p className="text-red-300 font-bold text-sm uppercase flex items-center justify-center gap-2">
-                              <AlertTriangle size={16} /> Atenção: Preço Elevado
-                          </p>
-                          <p className="text-slate-300 text-xs mt-1">
-                              Usuários do plano <strong className="text-white uppercase">Basic</strong> pagam até 4x mais caro nos créditos.
-                              <br/>O plano <strong className="text-emerald-400 uppercase">Advanced</strong> tem 80% de desconto (R$ 3,50/un).
-                          </p>
-                      </div>
-                  )}
               </div>
 
-              {!showPix ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                      {/* Left: Pricing Tiers Visualization */}
+              {/* PAYMENT METHOD TOGGLE (TOP) */}
+              <div className="flex justify-center mb-10">
+                  <div className="bg-slate-900 p-1 rounded-xl border border-white/10 flex">
+                      <button 
+                          onClick={() => { setPaymentMethod('pix'); setShowPix(false); }}
+                          className={`px-6 py-3 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${paymentMethod === 'pix' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                      >
+                          <QrCode size={18} /> PIX (Avulso)
+                      </button>
+                      <button 
+                          onClick={() => { setPaymentMethod('card'); setShowPix(false); }}
+                          className={`px-6 py-3 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${paymentMethod === 'card' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                      >
+                          <CreditCard size={18} /> Cartão (Assinatura)
+                      </button>
+                  </div>
+              </div>
+
+              {/* --- PIX VIEW (CALCULATOR) --- */}
+              {paymentMethod === 'pix' && !showPix && (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in fade-in">
+                      {/* Left: Tiers Info */}
                       <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {/* Tier 1 */}
                           <div className="glass-card p-6 rounded-2xl border border-white/5 flex flex-col justify-between hover:border-white/20 transition-all">
                               <div>
                                 <h3 className="font-bold text-white text-lg">Básico</h3>
-                                <p className="text-slate-400 text-xs mt-1">Para correções pontuais.</p>
                                 <div className="mt-4">
                                     <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 4,00</span>
                                     {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 16,00</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
-                              <div className="mt-6 pt-4 border-t border-white/5">
-                                  <p className="text-xs text-slate-400">Ao comprar 1 a 4 créditos</p>
-                              </div>
+                              <div className="mt-6 pt-4 border-t border-white/5"><p className="text-xs text-slate-400">1 a 4 créditos</p></div>
                           </div>
-
-                          {/* Tier 2 */}
-                          <div className="glass-card p-6 rounded-2xl border border-indigo-500/30 flex flex-col justify-between bg-indigo-900/5 hover:bg-indigo-900/10 transition-all relative overflow-hidden">
+                          <div className="glass-card p-6 rounded-2xl border border-indigo-500/30 flex flex-col justify-between bg-indigo-900/5 hover:bg-indigo-900/10 transition-all">
                               <div>
-                                <h3 className="font-bold text-indigo-300 text-lg">Intermediário</h3>
-                                <p className="text-slate-400 text-xs mt-1">Foco e constância.</p>
+                                <h3 className="font-bold text-indigo-300 text-lg">Médio</h3>
                                 <div className="mt-4">
                                     <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 3,75</span>
                                     {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 15,00</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
-                              <div className="mt-6 pt-4 border-t border-white/5">
-                                  <p className="text-xs text-indigo-300 font-bold">Ao comprar 5 a 9 créditos</p>
-                              </div>
+                              <div className="mt-6 pt-4 border-t border-white/5"><p className="text-xs text-indigo-300 font-bold">5 a 9 créditos</p></div>
                           </div>
-
-                          {/* Tier 3 (Best Value) */}
-                          <div className="glass-card p-6 rounded-2xl border border-emerald-500/50 flex flex-col justify-between bg-emerald-900/10 hover:bg-emerald-900/20 transition-all relative shadow-lg shadow-emerald-900/20">
+                          <div className="glass-card p-6 rounded-2xl border border-emerald-500/50 flex flex-col justify-between bg-emerald-900/10 hover:bg-emerald-900/20 transition-all shadow-lg shadow-emerald-900/20">
                               <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 text-[10px] font-bold px-3 py-1 rounded-bl-xl">MELHOR PREÇO</div>
                               <div>
                                 <h3 className="font-bold text-emerald-400 text-lg">Pro</h3>
-                                <p className="text-slate-300 text-xs mt-1">Intensivo reta final.</p>
                                 <div className="mt-4">
                                     <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 3,50</span>
                                     {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 14,00</span>}
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
-                              <div className="mt-6 pt-4 border-t border-white/5">
-                                  <p className="text-xs text-emerald-400 font-bold">Ao comprar 10+ créditos</p>
-                              </div>
+                              <div className="mt-6 pt-4 border-t border-white/5"><p className="text-xs text-emerald-400 font-bold">10+ créditos</p></div>
                           </div>
                       </div>
 
-                      {/* Right: Interactive Calculator */}
-                      <div className="glass-card p-8 rounded-3xl border-t-4 border-t-indigo-500 bg-slate-900/80 shadow-2xl relative overflow-hidden">
-                          {isBasicPlan && (
-                              <div className="absolute inset-x-0 top-0 bg-red-900/90 p-4 z-20 text-center animate-pulse">
-                                  <p className="text-white font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                                      <AlertTriangle size={14} className="text-yellow-400" />
-                                      Você está pagando 4x mais caro
-                                  </p>
-                                  <p className="text-[10px] text-red-200 mt-1">
-                                      USUÁRIOS ADVANCED TÊM QUASE 80% DE DESCONTO + 50% OFF NO CONSUMO DE IA.
-                                  </p>
-                              </div>
-                          )}
-
-                          <label className={`text-xs text-slate-400 font-bold uppercase mb-4 block tracking-wider ${isBasicPlan ? 'mt-16' : ''}`}>Calculadora de Investimento</label>
-                          
+                      {/* Right: Calculator */}
+                      <div className="glass-card p-8 rounded-3xl border-t-4 border-t-emerald-500 bg-slate-900/80 shadow-2xl relative overflow-hidden">
+                          <label className="text-xs text-emerald-400 font-bold uppercase mb-4 block tracking-wider flex items-center gap-2">
+                              <QrCode size={14}/> Calculadora PIX
+                          </label>
                           <div className="flex items-center gap-2 mb-8">
                               <button onClick={() => setBuyQty(Math.max(1, buyQty - 1))} className="w-12 h-12 bg-slate-800 rounded-xl text-white font-bold hover:bg-slate-700 transition-colors text-xl">-</button>
                               <div className="flex-1 text-center">
-                                  <input 
-                                    type="number" 
-                                    value={buyQty} 
-                                    onChange={e => setBuyQty(Math.max(1, parseInt(e.target.value) || 0))}
-                                    className="w-full bg-transparent text-center text-4xl font-black text-white outline-none"
-                                  />
+                                  <input type="number" value={buyQty} onChange={e => setBuyQty(Math.max(1, parseInt(e.target.value) || 0))} className="w-full bg-transparent text-center text-4xl font-black text-white outline-none" />
                                   <p className="text-xs text-slate-500 mt-1 uppercase">Créditos</p>
                               </div>
-                              <button onClick={() => setBuyQty(buyQty + 1)} className="w-12 h-12 bg-indigo-600 rounded-xl text-white font-bold hover:bg-indigo-500 transition-colors text-xl">+</button>
+                              <button onClick={() => setBuyQty(buyQty + 1)} className="w-12 h-12 bg-emerald-600 rounded-xl text-white font-bold hover:bg-emerald-500 transition-colors text-xl">+</button>
                           </div>
-
-                          <div className="space-y-4 mb-8">
-                              <div className="flex justify-between items-center text-sm">
-                                  <span className="text-slate-400">Preço Unitário</span>
-                                  <span className="text-white font-medium">R$ {getPricePerUnit(buyQty).toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between items-center pt-4 border-t border-white/10">
-                                  <span className="text-slate-300 font-bold">Total</span>
-                                  <span className={`text-3xl font-black ${isBasicPlan ? 'text-red-400' : 'text-emerald-400'}`}>R$ {totalPrice.toFixed(2)}</span>
-                              </div>
+                          <div className="flex justify-between items-center pt-4 border-t border-white/10 mb-6">
+                              <span className="text-slate-300 font-bold">Total</span>
+                              <span className={`text-3xl font-black ${isBasicPlan ? 'text-red-400' : 'text-emerald-400'}`}>R$ {totalPrice.toFixed(2)}</span>
                           </div>
-
-                          <button 
-                            onClick={handleGeneratePix}
-                            className={`w-full py-4 font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 transform hover:scale-[1.02] ${isBasicPlan ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-emerald-900/20'}`}
-                          >
-                              <QrCode size={20} /> {isBasicPlan ? 'Pagar Preço Alto' : 'Gerar Pagamento PIX'}
+                          <button onClick={handleGeneratePayment} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 transform hover:scale-[1.02]">
+                              <QrCode size={20} /> Gerar PIX
                           </button>
-
-                          {isBasicPlan && (
-                              <button 
-                                onClick={handleUpgradeRequest}
-                                className="w-full mt-3 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02] animate-bounce duration-[2000ms]"
-                              >
-                                  <Crown size={20} className="fill-yellow-400 text-yellow-400" />
-                                  Fazer Upgrade por R$ {user.billingCycle === 'yearly' ? '100,00' : '10,00'}
-                              </button>
-                          )}
-
-                          <p className="text-center text-[10px] text-slate-500 mt-4">Liberação automática após verificação.</p>
                       </div>
                   </div>
-              ) : (
+              )}
+
+              {/* --- CARD VIEW (SUBSCRIPTIONS) --- */}
+              {paymentMethod === 'card' && (
+                  <div className="animate-in fade-in slide-in-from-bottom-4">
+                      
+                      {/* Subscription Disclaimer */}
+                      <div className="max-w-4xl mx-auto mb-8 bg-amber-900/20 border border-amber-500/30 p-4 rounded-xl flex items-start gap-3 relative overflow-hidden">
+                          <div className="absolute inset-0 bg-amber-500/5 animate-pulse" />
+                          <AlertTriangle className="text-amber-500 shrink-0 relative z-10" size={20} />
+                          <div className="relative z-10">
+                              <h4 className="text-amber-400 font-bold text-sm flex items-center gap-2">Assinatura Mensal Recorrente <Repeat size={14} /></h4>
+                              <p className="text-amber-200/80 text-xs mt-1 leading-relaxed">
+                                  Ao escolher o pagamento com cartão, você garante sua cota de correções renovada automaticamente todo mês.
+                                  Cancele a qualquer momento na área de ajustes.
+                              </p>
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-end">
+                          {/* Basic Plan */}
+                          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 hover:border-slate-500 transition-all flex flex-col items-center text-center group h-fit">
+                              <div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                  <PenTool size={28} className="text-slate-400" />
+                              </div>
+                              <h3 className="text-xl font-bold text-white mb-1">Básico</h3>
+                              <p className="text-slate-400 text-xs mb-4">Para quem está começando</p>
+                              <div className="text-3xl font-black text-white mb-1">R$ 17,00</div>
+                              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-4">/mês</p>
+                              
+                              <div className="bg-slate-800 px-4 py-2 rounded-lg text-sm font-bold text-slate-300 mb-6 w-full border border-white/5">
+                                  8 Correções
+                              </div>
+                              <button 
+                                onClick={() => window.open(KIRVANO_LINKS.essay_pack_basic, '_blank')}
+                                className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 transition-colors font-bold text-white flex items-center justify-center gap-2 text-sm"
+                              >
+                                  <CreditCard size={16}/> Assinar Básico
+                              </button>
+                          </div>
+
+                          {/* Intermediate Plan */}
+                          <div className="bg-indigo-900/10 border border-indigo-500/30 rounded-3xl p-6 hover:border-indigo-500/60 transition-all flex flex-col items-center text-center group relative overflow-hidden h-fit">
+                              <div className="w-14 h-14 bg-indigo-900/30 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border border-indigo-500/20">
+                                  <Layers size={28} className="text-indigo-400" />
+                              </div>
+                              <h3 className="text-xl font-bold text-indigo-100 mb-1">Intermediário</h3>
+                              <p className="text-indigo-300/60 text-xs mb-4">Constância nos estudos</p>
+                              <div className="text-3xl font-black text-white mb-1">R$ 27,00</div>
+                              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-4">/mês</p>
+
+                              <div className="bg-indigo-500/20 px-4 py-2 rounded-lg text-sm font-bold text-indigo-300 mb-6 border border-indigo-500/30 w-full">
+                                  14 Correções
+                              </div>
+                              <button 
+                                onClick={() => window.open(KIRVANO_LINKS.essay_pack_intermediate, '_blank')}
+                                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors font-bold text-white shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 text-sm"
+                              >
+                                  <CreditCard size={16}/> Assinar Intermediário
+                              </button>
+                          </div>
+
+                          {/* Advanced Plan (HERO) */}
+                          <div className="bg-gradient-to-b from-emerald-900/20 to-slate-900 border-2 border-emerald-500 rounded-3xl p-6 hover:shadow-[0_0_40px_rgba(16,185,129,0.2)] transition-all flex flex-col items-center text-center group relative overflow-hidden transform hover:-translate-y-2">
+                              <div className="absolute top-0 inset-x-0 bg-emerald-500 text-slate-900 text-[10px] font-black uppercase tracking-widest py-1.5 shadow-lg">Oferta VIP Completa</div>
+                              
+                              <div className="w-16 h-16 bg-emerald-900/40 rounded-full flex items-center justify-center mb-4 mt-6 group-hover:scale-110 transition-transform border border-emerald-500/40 shadow-xl shadow-emerald-900/20">
+                                  <Crown size={32} className="text-emerald-400 fill-emerald-400/20" />
+                              </div>
+                              
+                              <h3 className="text-2xl font-black text-emerald-100 mb-1">Avançado</h3>
+                              <p className="text-emerald-300/70 text-xs mb-4">Foco total na aprovação</p>
+                              
+                              <div className="text-4xl font-black text-white mb-1 drop-shadow-md">R$ 47,00</div>
+                              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-6">/mês</p>
+
+                              <div className="w-full space-y-2 mb-6">
+                                  <div className="bg-emerald-500/20 px-4 py-2.5 rounded-lg text-sm font-bold text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-2 shadow-inner">
+                                      <Star size={14} fill="currentColor"/> 30 Correções
+                                  </div>
+                                  <div className="text-left space-y-1.5 pl-2">
+                                      <div className="flex items-center gap-2 text-xs text-slate-300">
+                                          <Check size={12} className="text-emerald-500" /> Curso de Redação Nota 1000
+                                      </div>
+                                      <div className="flex items-center gap-2 text-xs text-slate-300">
+                                          <Check size={12} className="text-emerald-500" /> Banco de Exemplos Reais
+                                      </div>
+                                      <div className="flex items-center gap-2 text-xs text-slate-300">
+                                          <Check size={12} className="text-emerald-500" /> Correção Prioritária (Fast)
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <button 
+                                onClick={() => window.open(KIRVANO_LINKS.essay_pack_advanced, '_blank')}
+                                className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition-all font-black text-white shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2 group-hover:scale-105"
+                              >
+                                  <Zap size={18} className="fill-white"/> ASSINAR VIP AGORA
+                              </button>
+                          </div>
+                      </div>
+                      
+                      <div className="mt-8 flex justify-center gap-4 text-[10px] text-slate-500">
+                          <span className="flex items-center gap-1"><ShieldCheck size={12}/> Pagamento Seguro</span>
+                          <span className="flex items-center gap-1"><CheckCircle size={12}/> Renovação Automática</span>
+                          <span className="flex items-center gap-1"><Gift size={12}/> Liberação Imediata</span>
+                      </div>
+                  </div>
+              )}
+
+              {/* --- PIX MODAL --- */}
+              {showPix && paymentMethod === 'pix' && (
                   <div className="max-w-md mx-auto glass-card p-8 rounded-2xl text-center animate-in zoom-in-95 relative border border-emerald-500/20 shadow-2xl">
-                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
-                      <h3 className="text-2xl font-bold text-white mb-2">{isUpgrading ? 'Upgrade de Plano' : 'Pagamento via PIX'}</h3>
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600" />
+                      <button onClick={() => setShowPix(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X size={20}/></button>
+                      
+                      <h3 className="text-2xl font-bold text-white mb-2">Pagamento via PIX</h3>
                       <p className="text-slate-400 text-sm mb-6">Escaneie o QR Code ou copie o código abaixo.</p>
                       
-                      <div className="bg-white p-4 rounded-2xl inline-block mb-6 shadow-inner">
+                      <div className="bg-white p-4 rounded-2xl inline-block mb-6 shadow-inner border-4 border-white">
                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-48 h-48 mix-blend-multiply" />
                       </div>
                       
@@ -665,7 +726,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                           </button>
                       </div>
                       
-                      <button onClick={handleConfirmPayment} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                      <button onClick={handleConfirmPayment} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
                           <CheckCircle size={20} /> Já realizei o pagamento
                       </button>
                   </div>
@@ -678,7 +739,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       return <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-indigo-500" /></div>;
   }
 
-  // --- HOME VIEW ---
   return (
     <div className="space-y-8 animate-slide-up pb-20 relative">
       {renderNotification()}
