@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target, Tag, Megaphone, Copy, AlertTriangle, MousePointerClick, Clock, ShoppingCart } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target, Tag, Megaphone, Copy, AlertTriangle, MousePointerClick, Clock, ShoppingCart, User } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config' | 'metrics' | 'traffic'>('leads');
@@ -49,10 +49,19 @@ const AdminPanel: React.FC = () => {
   const [importType, setImportType] = useState<'question' | 'lesson'>('question'); // NEW STATE
   const [isImporting, setIsImporting] = useState(false);
 
-  // Lead Approval State
-  const [approvingLead, setApprovingLead] = useState<Lead | null>(null);
-  const [newStudentEmail, setNewStudentEmail] = useState('');
-  const [newStudentPassword, setNewStudentPassword] = useState('mudar123'); // Default password
+  // --- USER CREATION / APPROVAL STATE ---
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [targetLead, setTargetLead] = useState<Lead | null>(null); // If null, it's a manual creation (Kirvano)
+  
+  const [accessForm, setAccessForm] = useState({
+      displayName: '',
+      email: '',
+      password: 'mudar123',
+      plan: 'basic' as UserPlan,
+      essayCredits: 0,
+      balance: 0.00,
+      expiryDate: '' // YYYY-MM-DD
+  });
 
   // Simulation Form
   const [simForm, setSimForm] = useState({
@@ -71,7 +80,7 @@ const AdminPanel: React.FC = () => {
   const [manageQTopic, setManageQTopic] = useState('');
   const [manageQCategory, setManageQCategory] = useState('regular');
 
-  // Edit User
+  // Edit User (Existing)
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [newUserMode, setNewUserMode] = useState(false);
   const [userDataForm, setUserDataForm] = useState({
@@ -164,7 +173,7 @@ const AdminPanel: React.FC = () => {
   // LAZY LOAD: Leads
   useEffect(() => {
       if (activeTab === 'leads' || activeTab === 'metrics') {
-          DatabaseService.getLeads().then(l => setLeads(l));
+          DatabaseService.getLeads().then(l => setLeads(l.reverse())); // Newest first
       }
   }, [activeTab]);
 
@@ -237,53 +246,100 @@ const AdminPanel: React.FC = () => {
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
   };
 
-  // Leads Approval Logic
-  const handleOpenApproveModal = (lead: Lead) => {
-      setApprovingLead(lead);
-      setNewStudentEmail(''); 
-      setNewStudentPassword('mudar123');
+  // --- ACCESS MANAGEMENT LOGIC (PATH 1 & 2) ---
+
+  const handleOpenAccessModal = (lead?: Lead) => {
+      // Calculate Default Expiry (1 Year)
+      const nextYear = new Date();
+      nextYear.setFullYear(nextYear.getFullYear() + 1);
+      const defaultExpiry = nextYear.toISOString().split('T')[0];
+
+      if (lead) {
+          // Path 1: From Lead
+          setTargetLead(lead);
+          
+          // Auto-configure based on Plan ID from Lead
+          let plan: UserPlan = 'basic';
+          let credits = 0;
+          let balance = 0;
+
+          const pid = lead.planId.toLowerCase();
+          if (pid.includes('pro') || pid.includes('adv')) {
+              plan = 'advanced';
+              credits = 30; // Pro typically starts with more
+              balance = 5.00; // Bonus balance
+          } else if (pid.includes('int')) {
+              plan = 'intermediate';
+              credits = 14;
+          } else {
+              // Basic
+              credits = 8;
+          }
+
+          setAccessForm({
+              displayName: lead.name,
+              email: '', // Admin must input correct email
+              password: 'mudar123',
+              plan: plan,
+              essayCredits: credits,
+              balance: balance,
+              expiryDate: defaultExpiry
+          });
+      } else {
+          // Path 2: Manual (Kirvano)
+          setTargetLead(null);
+          setAccessForm({
+              displayName: '',
+              email: '',
+              password: 'mudar123',
+              plan: 'basic',
+              essayCredits: 8,
+              balance: 0.00,
+              expiryDate: defaultExpiry
+          });
+      }
+      setShowUserModal(true);
   };
 
-  const handleApproveLead = async () => {
-      if (!approvingLead || !newStudentEmail || !newStudentPassword) {
-          alert("Preencha o email e senha para criar a conta.");
+  const handleSubmitAccess = async () => {
+      if (!accessForm.email || !accessForm.password || !accessForm.displayName) {
+          alert("Campos obrigatórios: Nome, Email, Senha.");
           return;
       }
 
       setLoading(true);
       try {
-          const newUid = await AuthService.registerStudent(newStudentEmail, newStudentPassword, approvingLead.name);
+          // 1. Create Auth User
+          const newUid = await AuthService.registerStudent(accessForm.email, accessForm.password, accessForm.displayName);
 
-          let userPlan: UserPlan = 'basic';
-          const pid = approvingLead.planId.toLowerCase();
-          if (pid.includes('adv') || pid.includes('pro')) userPlan = 'advanced';
-          else if (pid.includes('int') || pid.includes('med')) userPlan = 'intermediate';
-
-          const expiryDate = new Date();
-          expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-
+          // 2. Create Database Profile with specific attributes
           await DatabaseService.createUserProfile(newUid, {
-              displayName: approvingLead.name,
-              email: newStudentEmail,
-              plan: userPlan,
-              billingCycle: approvingLead.billing as 'monthly' | 'yearly', // Pass billing info
-              subscriptionExpiry: expiryDate.toISOString().split('T')[0],
+              displayName: accessForm.displayName,
+              email: accessForm.email,
+              plan: accessForm.plan,
+              subscriptionExpiry: accessForm.expiryDate,
               xp: 0,
-              balance: 0,
-              essayCredits: 0
+              // Apply specific credits/balance
+              essayCredits: Number(accessForm.essayCredits),
+              balance: Number(accessForm.balance),
+              // Determine billing cycle based on Lead or default to Monthly for manual
+              billingCycle: targetLead ? (targetLead.billing as any) : 'monthly' 
           });
 
-          await DatabaseService.markLeadProcessed(approvingLead.id);
+          // 3. If it was a Lead, mark as processed
+          if (targetLead) {
+              await DatabaseService.markLeadProcessed(targetLead.id);
+              // Refresh leads
+              const l = await DatabaseService.getLeads();
+              setLeads(l.reverse());
+          }
 
-          alert(`Aluno ${approvingLead.name} aprovado com sucesso!`);
-          setApprovingLead(null);
-          
-          const l = await DatabaseService.getLeads();
-          setLeads(l);
+          alert(targetLead ? "Lead convertido em Aluno!" : "Aluno cadastrado com sucesso!");
+          setShowUserModal(false);
 
       } catch (e: any) {
           console.error(e);
-          alert(`Erro ao aprovar: ${e.message}`);
+          alert(`Erro ao criar aluno: ${e.message}`);
       } finally {
           setLoading(false);
       }
@@ -762,31 +818,108 @@ const AdminPanel: React.FC = () => {
   return (
     <div className="space-y-6 animate-slide-up pb-20 relative">
       
-      {/* APPROVAL MODAL */}
-      {approvingLead && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-              <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl w-full max-w-md animate-in zoom-in-95">
-                  <h3 className="text-xl font-bold text-white mb-4">Aprovar: {approvingLead.name}</h3>
-                  <div className="space-y-3 mb-6">
-                      <input 
-                        placeholder="Email para Login" 
-                        className="w-full glass-input p-3 rounded-lg"
-                        value={newStudentEmail}
-                        onChange={e => setNewStudentEmail(e.target.value)}
-                      />
-                      <input 
-                        placeholder="Senha Provisória" 
-                        className="w-full glass-input p-3 rounded-lg"
-                        value={newStudentPassword}
-                        onChange={e => setNewStudentPassword(e.target.value)}
-                      />
-                      <p className="text-xs text-slate-500">Info do Pagamento: {approvingLead.contact}</p>
+      {/* ACCESS MANAGEMENT MODAL (PATH 1 & 2) */}
+      {showUserModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl w-full max-w-lg animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+                  <h3 className="text-xl font-bold text-white mb-1">
+                      {targetLead ? `Aprovar Lead: ${targetLead.name}` : 'Cadastrar Aluno (Manual)'}
+                  </h3>
+                  <p className="text-xs text-slate-400 mb-6">{targetLead ? 'Preencha os dados finais para liberar o acesso.' : 'Preencha os dados da venda externa (Kirvano).'}</p>
+                  
+                  <div className="space-y-4 mb-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
+                              <input 
+                                className="w-full glass-input p-3 rounded-lg"
+                                value={accessForm.displayName}
+                                onChange={e => setAccessForm({...accessForm, displayName: e.target.value})}
+                              />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase">Email de Acesso</label>
+                              <input 
+                                className="w-full glass-input p-3 rounded-lg"
+                                value={accessForm.email}
+                                onChange={e => setAccessForm({...accessForm, email: e.target.value})}
+                                placeholder="email@aluno.com"
+                              />
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase">Senha Provisória</label>
+                              <input 
+                                className="w-full glass-input p-3 rounded-lg"
+                                value={accessForm.password}
+                                onChange={e => setAccessForm({...accessForm, password: e.target.value})}
+                              />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase">Plano</label>
+                              <select 
+                                className="w-full glass-input p-3 rounded-lg"
+                                value={accessForm.plan}
+                                onChange={e => setAccessForm({...accessForm, plan: e.target.value as UserPlan})}
+                              >
+                                  <option value="basic">Básico</option>
+                                  <option value="intermediate">Intermediário</option>
+                                  <option value="advanced">Avançado (Pro)</option>
+                                  <option value="admin">Admin</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div className="bg-white/5 p-4 rounded-xl space-y-4 border border-white/5">
+                          <h4 className="text-sm font-bold text-indigo-400 flex items-center gap-2"><SettingsIcon size={14}/> Configurações do Plano</h4>
+                          
+                          <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase">Créd. Redação</label>
+                                  <input 
+                                    type="number"
+                                    className="w-full glass-input p-2 rounded-lg text-sm"
+                                    value={accessForm.essayCredits}
+                                    onChange={e => setAccessForm({...accessForm, essayCredits: parseInt(e.target.value)})}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase">Saldo IA (R$)</label>
+                                  <input 
+                                    type="number"
+                                    step="0.01"
+                                    className="w-full glass-input p-2 rounded-lg text-sm"
+                                    value={accessForm.balance}
+                                    onChange={e => setAccessForm({...accessForm, balance: parseFloat(e.target.value)})}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase">Expiração</label>
+                                  <input 
+                                    type="date"
+                                    className="w-full glass-input p-2 rounded-lg text-sm"
+                                    value={accessForm.expiryDate}
+                                    onChange={e => setAccessForm({...accessForm, expiryDate: e.target.value})}
+                                  />
+                              </div>
+                          </div>
+                      </div>
+                      
+                      {targetLead && (
+                          <div className="p-3 bg-yellow-900/20 border border-yellow-500/20 rounded-lg">
+                              <p className="text-xs text-yellow-200">Info do Pagamento: {targetLead.contact}</p>
+                              <p className="text-xs text-yellow-200">Plano Solicitado: {targetLead.planId}</p>
+                          </div>
+                      )}
                   </div>
+
                   <div className="flex justify-end gap-3">
-                      <button onClick={() => setApprovingLead(null)} className="text-slate-400 hover:text-white px-3">Cancelar</button>
-                      <button onClick={handleApproveLead} disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                      <button onClick={() => setShowUserModal(false)} className="text-slate-400 hover:text-white px-3">Cancelar</button>
+                      <button onClick={handleSubmitAccess} disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
                           {loading ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle size={16}/>}
-                          Criar Conta
+                          {targetLead ? 'Aprovar e Criar' : 'Cadastrar Aluno'}
                       </button>
                   </div>
               </div>
@@ -1220,30 +1353,48 @@ const AdminPanel: React.FC = () => {
           </div>
       )}
 
-      {/* --- LEADS TAB --- */}
+      {/* --- LEADS TAB (Unified with User Creation) --- */}
       {activeTab === 'leads' && (
           <div className="space-y-6">
+              <div className="flex justify-end mb-4">
+                  <button 
+                    onClick={() => handleOpenAccessModal(undefined)} 
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold shadow-lg transition-all"
+                  >
+                      <UserPlus size={18} /> Adicionar Aluno Manualmente
+                  </button>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {leads.map(lead => (
-                      <div key={lead.id} className="glass-card p-5 rounded-2xl border-l-4 border-l-indigo-500 hover:bg-slate-900/60 transition-all">
+                      <div key={lead.id} className={`glass-card p-5 rounded-2xl border-l-4 transition-all hover:bg-slate-900/60 ${lead.processed ? 'border-l-emerald-500' : 'border-l-yellow-500'}`}>
                           <div className="flex justify-between items-start mb-2">
-                              <h4 className="font-bold text-white">{lead.name}</h4>
-                              {lead.processed ? <CheckCircle size={16} className="text-emerald-500"/> : <Clock size={16} className="text-yellow-500"/>}
+                              <h4 className="font-bold text-white truncate max-w-[150px]" title={lead.name}>{lead.name}</h4>
+                              {lead.processed ? (
+                                  <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">[ALUNO]</span>
+                              ) : (
+                                  <span className="text-[10px] font-bold bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">[LEAD]</span>
+                              )}
                           </div>
-                          <p className="text-xs text-slate-400 mb-1">{lead.planId} • {lead.billing}</p>
+                          
+                          <p className="text-xs text-slate-400 mb-1 font-mono">{lead.planId} • {lead.billing}</p>
                           <p className="text-xs text-slate-500 mb-4">{new Date(lead.timestamp).toLocaleDateString()}</p>
                           
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center border-t border-white/5 pt-3">
                               <span className="text-emerald-400 font-bold">R$ {lead.amount}</span>
-                              {!lead.processed && (
-                                  <button onClick={() => handleOpenApproveModal(lead)} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-500">
-                                      Aprovar
+                              {!lead.processed ? (
+                                  <button onClick={() => handleOpenAccessModal(lead)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-500 font-bold shadow-lg shadow-indigo-900/20">
+                                      Aprovar Acesso
+                                  </button>
+                              ) : (
+                                  <button disabled className="px-3 py-1.5 bg-slate-800 text-slate-500 text-xs rounded font-bold cursor-default">
+                                      Processado
                                   </button>
                               )}
                           </div>
                       </div>
                   ))}
-                  {leads.length === 0 && <p className="text-slate-500">Nenhum lead encontrado.</p>}
+                  {leads.length === 0 && <p className="text-slate-500 col-span-full text-center py-10">Nenhum lead encontrado.</p>}
               </div>
           </div>
       )}

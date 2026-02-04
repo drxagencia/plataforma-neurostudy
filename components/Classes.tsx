@@ -158,10 +158,6 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
       setLoadingContent(false);
   };
 
-  const handleTopicClick = (topicName: string) => {
-      setSelectedTopic(topicName);
-  };
-
   const handleLessonClick = (lesson: Lesson) => {
       if (lesson.type === 'exercise_block' && lesson.exerciseFilters) {
           sessionStorage.setItem('qb_filters', JSON.stringify(lesson.exerciseFilters));
@@ -172,6 +168,15 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
           setShowSmartPanel(false);
           setTutorHistory([]);
           window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+  };
+
+  const handleTopicClick = (topicName: string) => {
+      setSelectedTopic(topicName);
+      // AUTO-SELECT FIRST LESSON TO ENTER PLAYER VIEW
+      const lessons = topicsWithLessons[topicName];
+      if (lessons && lessons.length > 0) {
+          handleLessonClick(lessons[0]);
       }
   };
 
