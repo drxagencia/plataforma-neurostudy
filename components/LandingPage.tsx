@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye } from 'lucide-react';
+import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye, Sparkles } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { TrafficConfig, Lead } from '../types';
@@ -59,31 +59,6 @@ const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onF
                     Renderizando Módulo Secreto... {Math.floor(progress)}%
                 </div>
             </div>
-        </div>
-    );
-};
-
-// --- COUNTDOWN TIMER ---
-const Countdown = () => {
-    const [time, setTime] = useState({ m: 14, s: 59 });
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setTime(prev => {
-                if (prev.s === 0) {
-                    if (prev.m === 0) return prev;
-                    return { m: prev.m - 1, s: 59 };
-                }
-                return { ...prev, s: prev.s - 1 };
-            });
-        }, 1000);
-        return () => clearInterval(interval);
-    }, []);
-
-    return (
-        <div className="flex items-center gap-2 text-red-400 font-mono font-bold text-xl bg-red-950/30 px-4 py-2 rounded-lg border border-red-500/30 animate-pulse">
-            <Timer size={20} />
-            <span>00:{time.m.toString().padStart(2, '0')}:{time.s.toString().padStart(2, '0')}</span>
         </div>
     );
 };
@@ -152,23 +127,29 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   };
 
   return (
-    <div className="h-screen w-screen bg-black text-white font-sans overflow-hidden relative selection:bg-indigo-500/30">
+    <div className="h-screen w-screen bg-slate-950 text-white font-sans overflow-hidden relative selection:bg-indigo-500/30">
       
-      {/* Background (Fixed) */}
+      {/* Background (Fixed & Visible Everywhere) */}
       <div className="fixed inset-0 z-0 pointer-events-none">
+          {/* Deep Space Gradient Base */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(30,27,75,0.8),#020617_80%)]" />
+          
+          {/* Stars Layers */}
           <div className="star-layer stars-1"></div>
           <div className="star-layer stars-2"></div>
-          <div className="nebula-glow fixed inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(76,29,149,0.1),transparent_70%)]"></div>
+          
+          {/* Nebula Glows */}
+          <div className="nebula-glow fixed inset-0"></div>
       </div>
 
       {/* --- MAIN SLIDER CONTAINER --- */}
       <div 
-        className="h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.65,0,0.35,1)]"
+        className="h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.65,0,0.35,1)] relative z-10"
         style={{ transform: `translateY(-${currentStep * 100}vh)` }}
       >
 
           {/* === TELA 1: HERO === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0">
+          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-transparent">
               <div className="absolute top-10 flex flex-col items-center animate-in fade-in duration-1000">
                  <div className="w-16 h-16 bg-indigo-600/20 rounded-2xl flex items-center justify-center border border-indigo-500/50 mb-4 shadow-[0_0_30px_rgba(99,102,241,0.3)] animate-pulse-slow">
                      <BrainCircuit size={40} className="text-indigo-400" />
@@ -201,7 +182,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           </section>
 
           {/* === TELA 2: INIMIGOS === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-black/50 backdrop-blur-sm">
+          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-black/40 backdrop-blur-sm">
               <div className="max-w-6xl mx-auto w-full">
                   <div className="text-center mb-12">
                       <span className="text-red-500 font-bold tracking-widest uppercase text-sm mb-2 block animate-pulse">Warning: Threats Detected</span>
@@ -244,7 +225,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           </section>
 
           {/* === TELA 3: VSL & TIMER === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-slate-950">
+          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-slate-950/60 backdrop-blur-md">
               <div className="max-w-5xl w-full">
                   <div className="bg-slate-900/80 rounded-3xl border border-indigo-500/30 shadow-[0_0_100px_rgba(79,70,229,0.15)] backdrop-blur-xl relative overflow-hidden">
                       {/* Monitor Header */}
@@ -304,90 +285,97 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               </div>
           </section>
 
-          {/* === TELA 4: CHECKOUT / PREÇOS (MOVED UP) === */}
-          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-slate-950">
+          {/* === TELA 4: CHECKOUT / PREÇOS === */}
+          <section className="h-screen w-full flex flex-col items-center justify-center relative px-6 shrink-0 bg-slate-950/80 backdrop-blur-md">
               <div className="max-w-6xl w-full relative">
-                  {/* Header de Escassez */}
-                  <div className="absolute -top-32 left-0 right-0 flex justify-center">
-                      <div className="bg-red-500/10 border border-red-500/30 p-3 rounded-full flex items-center gap-4 animate-in slide-in-from-top-4">
-                          <span className="flex items-center gap-2 text-red-400 font-bold text-sm uppercase px-2">
-                              <AlertTriangle size={16} /> Últimas Vagas
-                          </span>
-                          <div className="h-4 w-[1px] bg-red-500/30"></div>
-                          <Countdown />
-                      </div>
-                  </div>
-
+                  
                   <div className="text-center mb-10">
-                      <h2 className="text-4xl md:text-5xl font-black text-white mb-2">ESCOLHA SEU PLANO</h2>
+                      <div className="inline-block mb-4 animate-bounce">
+                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide flex items-center gap-2">
+                              <Sparkles size={14} className="fill-emerald-400" /> Turma Confirmada 2025
+                          </span>
+                      </div>
+                      <h2 className="text-4xl md:text-5xl font-black text-white mb-2">INVESTIMENTO NA SUA APROVAÇÃO</h2>
+                      <p className="text-slate-400 max-w-xl mx-auto">Escolha como você quer jogar esse jogo: no modo difícil (sozinho) ou com as melhores armas.</p>
                       
                       {/* Toggle Mensal/Anual */}
-                      <div className="flex items-center justify-center gap-4 mt-6">
+                      <div className="flex items-center justify-center gap-4 mt-8">
                           <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-slate-500'}`}>Mensal</span>
                           <button 
                             onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-                            className="w-16 h-8 bg-slate-800 rounded-full relative p-1 transition-colors border border-white/10"
+                            className="w-16 h-8 bg-slate-800 rounded-full relative p-1 transition-colors border border-white/10 cursor-pointer"
                           >
                               <div className={`w-6 h-6 bg-indigo-500 rounded-full shadow-md transition-transform ${billingCycle === 'yearly' ? 'translate-x-8' : 'translate-x-0'}`} />
                           </button>
-                          <span className={`text-sm font-bold ${billingCycle === 'yearly' ? 'text-white' : 'text-slate-500'}`}>Anual (VIP)</span>
+                          <span className={`text-sm font-bold ${billingCycle === 'yearly' ? 'text-white' : 'text-slate-500'}`}>
+                              Anual <span className="text-emerald-400 text-[10px] ml-1 uppercase">(2 meses grátis)</span>
+                          </span>
                       </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-center">
                       
-                      {/* PLANO BÁSICO */}
+                      {/* PLANO BÁSICO - ANCORAGEM (Parecer menos atrativo) */}
                       <div 
                         onClick={() => setSelectedPlan('basic')}
-                        className={`bg-slate-900 border p-8 rounded-3xl relative transition-all cursor-pointer group ${selectedPlan === 'basic' ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-800 hover:border-slate-600 opacity-60 hover:opacity-100'}`}
+                        className={`bg-slate-900/60 border p-8 rounded-3xl relative transition-all cursor-pointer group ${selectedPlan === 'basic' ? 'border-slate-600 opacity-100 scale-95' : 'border-slate-800 hover:border-slate-600 opacity-60 hover:opacity-80 scale-95'}`}
                       >
-                          <h3 className="text-xl font-bold text-slate-300">Estudante</h3>
-                          <p className="text-slate-500 text-xs mb-6">Acesso Essencial</p>
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <h3 className="text-xl font-bold text-slate-400">Modo Sobrevivência</h3>
+                                  <p className="text-slate-600 text-xs mb-6">Apenas o conteúdo bruto.</p>
+                              </div>
+                          </div>
                           
-                          <div className="mb-6">
-                              <span className="text-4xl font-black text-white">R$ {billingCycle === 'monthly' ? '9,90' : '97,00'}</span>
+                          <div className="mb-6 opacity-80">
+                              <span className="text-3xl font-black text-white">R$ {billingCycle === 'monthly' ? '9,90' : '97,00'}</span>
                               <span className="text-slate-500 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
                           </div>
 
-                          <ul className="space-y-3 mb-8 text-slate-400 text-sm">
-                              <li className="flex gap-2"><CheckCircle size={16} /> Acesso às Aulas</li>
+                          <ul className="space-y-4 mb-8 text-slate-400 text-sm">
+                              <li className="flex gap-2"><CheckCircle size={16} /> Acesso às Aulas Gravadas</li>
                               <li className="flex gap-2"><CheckCircle size={16} /> Banco de Questões</li>
-                              <li className="flex gap-2 opacity-50"><X size={16} /> Sem NeuroTutor IA</li>
-                              <li className="flex gap-2 opacity-50"><X size={16} /> Sem Redação IA</li>
+                              <li className="flex gap-2 text-slate-600 line-through decoration-slate-600/50"><X size={16} /> Sem NeuroTutor IA</li>
+                              <li className="flex gap-2 text-slate-600 line-through decoration-slate-600/50"><X size={16} /> Sem Redação IA</li>
+                              <li className="flex gap-2 text-slate-600 line-through decoration-slate-600/50"><X size={16} /> Sem Simulados Exclusivos</li>
                           </ul>
 
                           {selectedPlan === 'basic' && (
                               <div className="grid grid-cols-2 gap-3 animate-in fade-in">
-                                  <button onClick={() => handleCheckout('basic', 'pix')} className="bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"><QrCode size={16}/> PIX</button>
-                                  <button onClick={() => handleCheckout('basic', 'card')} className="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"><CreditCard size={16}/> Cartão</button>
+                                  <button onClick={() => handleCheckout('basic', 'pix')} className="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm border border-white/5"><QrCode size={16}/> PIX</button>
+                                  <button onClick={() => handleCheckout('basic', 'card')} className="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm border border-white/5"><CreditCard size={16}/> Cartão</button>
                               </div>
                           )}
                       </div>
 
-                      {/* PLANO AVANÇADO */}
+                      {/* PLANO AVANÇADO - HERO (Destaque Total) */}
                       <div 
                         onClick={() => setSelectedPlan('advanced')}
-                        className={`bg-gradient-to-b from-indigo-900/40 to-slate-900 border p-8 rounded-3xl relative transition-all cursor-pointer transform hover:-translate-y-2 ${selectedPlan === 'advanced' ? 'border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.15)] ring-2 ring-emerald-500/20' : 'border-indigo-500/50 opacity-90'}`}
+                        className={`bg-gradient-to-b from-indigo-900/80 to-slate-900 border p-8 rounded-3xl relative transition-all cursor-pointer transform hover:-translate-y-2 shadow-2xl ${selectedPlan === 'advanced' ? 'border-emerald-500 shadow-emerald-500/20 ring-1 ring-emerald-500/50 scale-105 z-10' : 'border-indigo-500/50 opacity-90'}`}
                       >
-                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-slate-900 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg">
-                              Mais Escolhido
+                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-slate-900 px-6 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg flex items-center gap-2 whitespace-nowrap">
+                              <Star size={12} className="fill-slate-900" /> Recomendado por 94%
                           </div>
 
-                          <h3 className="text-2xl font-black text-white flex items-center gap-2">
-                              <Trophy size={24} className="text-yellow-400" /> PRO GAMER
+                          <h3 className="text-2xl font-black text-white flex items-center gap-2 mt-2">
+                              <Trophy size={24} className="text-yellow-400 fill-yellow-400/20" /> MODO APROVAÇÃO
                           </h3>
-                          <p className="text-emerald-400 text-xs mb-6">Aprovação Acelerada</p>
+                          <p className="text-emerald-400 text-xs mb-6 font-bold uppercase tracking-wide">Ecossistema Completo</p>
                           
-                          <div className="mb-6">
+                          <div className="mb-2">
                               <span className="text-5xl font-black text-white">R$ {billingCycle === 'monthly' ? '19,90' : '197,00'}</span>
-                              <span className="text-slate-500 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
+                              <span className="text-slate-400 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
                           </div>
+                          {billingCycle === 'yearly' && (
+                              <p className="text-[10px] text-emerald-400 font-bold mb-6 bg-emerald-900/20 inline-block px-2 py-1 rounded">Menos de R$ 0,60 por dia</p>
+                          )}
 
-                          <ul className="space-y-3 mb-8 text-slate-300 text-sm font-medium">
-                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-emerald-500" /> Tudo do Básico</li>
-                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-emerald-500" /> NeuroTutor IA (Chat)</li>
-                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-emerald-500" /> Correção de Redação</li>
-                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-emerald-500" /> Simulados Exclusivos</li>
+                          <ul className="space-y-3 mb-8 text-slate-200 text-sm font-medium">
+                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-emerald-500 fill-emerald-500/20" /> Tudo do Básico</li>
+                              <li className="flex gap-2 items-center"><BrainCircuit size={18} className="text-emerald-500 fill-emerald-500/20" /> NeuroTutor IA (Tire dúvidas 24h)</li>
+                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-emerald-500 fill-emerald-500/20" /> Correção de Redação Instantânea</li>
+                              <li className="flex gap-2 items-center"><Trophy size={18} className="text-emerald-500 fill-emerald-500/20" /> Simulados com Ranking</li>
+                              <li className="flex gap-2 items-center"><Shield size={18} className="text-emerald-500 fill-emerald-500/20" /> Acesso à Comunidade VIP</li>
                           </ul>
 
                           {selectedPlan === 'advanced' && (
@@ -396,15 +384,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                                   <button onClick={() => handleCheckout('advanced', 'card')} className="bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"><CreditCard size={18}/> Cartão</button>
                               </div>
                           )}
+                          
+                          <div className="mt-4 text-center">
+                              <p className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
+                                  <Shield size={10} /> Garantia incondicional de 7 dias.
+                              </p>
+                          </div>
                       </div>
                   </div>
 
-                  <div className="mt-12 text-center">
+                  <div className="mt-16 text-center">
                       <p className="text-slate-500 text-xs flex items-center justify-center gap-2">
-                          <Shield size={14}/> Compra 100% Segura. Garantia de 7 dias.
-                          <span className="text-emerald-500 font-bold ml-4 flex items-center gap-1"><User size={14}/> {purchasedCount} alunos entraram hoje.</span>
+                          <span className="text-emerald-500 font-bold ml-4 flex items-center gap-1"><User size={14}/> {purchasedCount} alunos entraram hoje para vencer.</span>
                       </p>
-                      <button onClick={onStartGame} className="mt-6 text-slate-600 hover:text-white text-xs underline">
+                      <button onClick={onStartGame} className="mt-6 text-slate-600 hover:text-white text-xs underline transition-colors">
                           Já tenho conta, fazer login
                       </button>
                   </div>
