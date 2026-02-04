@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { Subject, Lesson, View, UserProfile } from '../types';
@@ -93,15 +92,11 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
   const [loadingContent, setLoadingContent] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
 
-  // AI Summary Modal State (Legacy - kept for "Concluir Aula" flow)
-  const [showAiModal, setShowAiModal] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-
   // --- ULTRA NEURO TUTOR STATE ---
   const [showSmartPanel, setShowSmartPanel] = useState(false);
   const [tutorInput, setTutorInput] = useState('');
-  const [tutorHistory, setTutorHistory] = useState<{role: 'user' | 'ai', content: string}[]>([]);
+  // Fix: Include 'id' in the history state type to match ChatMessage[]
+  const [tutorHistory, setTutorHistory] = useState<{id: string, role: 'user' | 'ai', content: string}[]>([]);
   const [tutorLoading, setTutorLoading] = useState(false);
 
   useEffect(() => {
@@ -144,8 +139,6 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
           onNavigate('questoes');
       } else {
           setSelectedLesson(lesson);
-          setShowAiModal(false);
-          setAiSummary(null);
           // Reset Tutor on new lesson
           setShowSmartPanel(false);
           setTutorHistory([]);
@@ -180,29 +173,6 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
 
       // 3. Update local state
       setCompletedLessons(prev => new Set(prev).add(selectedLesson.id!));
-
-      // 4. Show Modal
-      setShowAiModal(true);
-  };
-
-  const generateSummary = async () => {
-      if (!selectedLesson) return;
-      if (user.balance < 0.05) {
-          alert("Saldo insuficiente. Recarregue no menu.");
-          return;
-      }
-
-      setAiLoading(true);
-      try {
-          const prompt = `Resumo da aula "${selectedLesson.title}".`;
-          const text = await AiService.sendMessage(prompt, []); // Legacy simple call
-          setAiSummary(text);
-          await updateBalanceLocally();
-      } catch (e) {
-          setAiSummary("Erro ao gerar resumo.");
-      } finally {
-          setAiLoading(false);
-      }
   };
 
   // --- ULTRA TUTOR LOGIC ---
@@ -233,35 +203,22 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
       }
 
       // Add user message to history optimistically
-      const newUserMsg = { role: 'user' as const, content: userQuery };
+      const newUserMsg = { id: Date.now().toString(), role: 'user' as const, content: userQuery };
       const newHistory = [...tutorHistory, newUserMsg];
       setTutorHistory(newHistory);
       setTutorInput('');
 
       try {
-          // Call Backend with special override
-          const response = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                  message: userQuery,
-                  history: tutorHistory, // Pass previous context
-                  uid: auth.currentUser?.uid,
-                  systemOverride: systemPrompt, // Force specific persona
-                  mode: 'lesson_tutor' // Trigger specific pricing/logging if needed
-              }),
-          });
+          // Use AiService which now calls Client-side GenAI directly
+          const responseText = await AiService.sendMessage(userQuery, newHistory);
 
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error);
-
-          setTutorHistory(prev => [...prev, { role: 'ai', content: data.text }]);
+          setTutorHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: responseText }]);
           await updateBalanceLocally();
           
           if(auth.currentUser) DatabaseService.processXpAction(auth.currentUser.uid, 'AI_CHAT_MESSAGE');
 
       } catch (e: any) {
-          setTutorHistory(prev => [...prev, { role: 'ai', content: "Erro de conexão com o NeuroTutor." }]);
+          setTutorHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: "Erro de conexão com o NeuroTutor. Verifique se sua API Key está configurada." }]);
       } finally {
           setTutorLoading(false);
       }
@@ -374,45 +331,6 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                       <p className="text-center text-[10px] text-slate-500 mt-2">NeuroTutor tem acesso total ao contexto desta aula.</p>
                   </div>
               </div>
-
-              {/* Legacy AI Summary Modal (Only for 'Finish Lesson') */}
-              {showAiModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-                      <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-8 max-w-lg w-full relative shadow-2xl">
-                          <button onClick={() => setShowAiModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X size={20}/></button>
-                          
-                          <div className="text-center mb-6">
-                              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-400">
-                                  <CheckCircle size={32} />
-                              </div>
-                              <h3 className="text-2xl font-bold text-white">Aula Concluída!</h3>
-                              <p className="text-slate-400">Você entendeu bem o conteúdo?</p>
-                          </div>
-
-                          {!aiSummary ? (
-                              <div className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-4">
-                                      <button onClick={() => setShowAiModal(false)} className="p-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-colors">
-                                          Sim, entendi!
-                                      </button>
-                                      <button onClick={generateSummary} disabled={aiLoading} className="p-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors flex flex-col items-center justify-center gap-1 relative overflow-hidden">
-                                          {aiLoading ? <Loader2 className="animate-spin" size={20}/> : <BrainCircuit size={24} />}
-                                          <span className="text-xs">Gerar Resumo IA</span>
-                                      </button>
-                                  </div>
-                              </div>
-                          ) : (
-                              <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 animate-in slide-in-from-bottom-2">
-                                  <h4 className="text-indigo-400 font-bold mb-2 flex items-center gap-2"><BrainCircuit size={16}/> Resumo Rápido</h4>
-                                  <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
-                                  <button onClick={() => setShowAiModal(false)} className="mt-4 w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold">
-                                      Fechar
-                                  </button>
-                              </div>
-                          )}
-                      </div>
-                  </div>
-              )}
 
               <button onClick={() => setSelectedLesson(null)} className="flex items-center gap-2 text-slate-400 hover:text-white mb-2 transition-colors group">
                   <div className="p-2 rounded-full bg-slate-800 group-hover:bg-slate-700 transition-colors">

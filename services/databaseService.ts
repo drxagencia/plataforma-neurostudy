@@ -35,6 +35,24 @@ const isBase64Image = (str?: string) => {
     return str.trim().startsWith('data:image');
 };
 
+// HELPER: Remove undefined keys (Firebase rejects undefined)
+const sanitizeData = (data: any): any => {
+    if (Array.isArray(data)) {
+        return data.map(sanitizeData);
+    }
+    if (data !== null && typeof data === 'object') {
+        const newObj: any = {};
+        Object.keys(data).forEach(key => {
+            const val = data[key];
+            if (val !== undefined) {
+                newObj[key] = sanitizeData(val);
+            }
+        });
+        return newObj;
+    }
+    return data;
+};
+
 export const DatabaseService = {
   // --- SUBJECTS & LESSONS ---
   getSubjects: async (): Promise<Subject[]> => {
@@ -72,24 +90,30 @@ export const DatabaseService = {
               
               Object.keys(data).forEach(topic => {
                   const lessonsObj = data[topic];
-                  const lessonsArr = Object.values(lessonsObj) as Lesson[];
+                  // Map the Firebase Key to the ID property explicitly
+                  const lessonsArr = Object.keys(lessonsObj).map(key => ({
+                      ...lessonsObj[key],
+                      id: key
+                  })) as Lesson[];
+                  
                   result[topic] = lessonsArr.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
               });
               return result;
           }
           return {};
       } catch (e) {
+          console.error(e);
           return {};
       }
   },
 
   createSubject: async (subject: Subject): Promise<void> => {
-      await set(ref(database, `subjects/${subject.id}`), subject);
+      await set(ref(database, `subjects/${subject.id}`), sanitizeData(subject));
   },
 
   createLesson: async (subjectId: string, topic: string, lesson: Lesson): Promise<void> => {
       const newRef = push(ref(database, `lessons/${subjectId}/${topic}`));
-      await set(newRef, { ...lesson, id: newRef.key });
+      await set(newRef, sanitizeData({ ...lesson, id: newRef.key }));
   },
 
   createLessonWithOrder: async (subjectId: string, topic: string, lesson: Lesson, targetIndex: number): Promise<void> => {
@@ -99,7 +123,10 @@ export const DatabaseService = {
       let lessons: any[] = [];
       if (snapshot.exists()) {
           const data = snapshot.val();
-          lessons = Object.values(data).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+          lessons = Object.keys(data).map(key => ({
+              ...data[key],
+              id: key
+          })).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
       }
 
       const newRef = push(topicRef);
@@ -115,7 +142,7 @@ export const DatabaseService = {
       lessons.forEach((l, idx) => {
           updates[`${l.id}/order`] = idx;
           if (l.id === newRef.key) {
-              updates[`${l.id}`] = { ...l, order: idx };
+              updates[`${l.id}`] = sanitizeData({ ...l, order: idx });
           }
       });
 
@@ -180,7 +207,7 @@ export const DatabaseService = {
 
       const path = `questions/${category}/${subjectId}/${topic}/${subtopic}`;
       const newRef = push(ref(database, path));
-      await set(newRef, { ...question, id: newRef.key, subjectId, topic, subtopic });
+      await set(newRef, sanitizeData({ ...question, id: newRef.key, subjectId, topic, subtopic }));
       
       await update(ref(database, `topics/${subjectId}`), { [topic]: true }); 
       await update(ref(database, `subtopics/${topic}`), { [subtopic]: true }); 
@@ -232,6 +259,13 @@ export const DatabaseService = {
   },
   
   getQuestionsByIds: async (ids: string[]): Promise<Question[]> => {
+      if (!ids || ids.length === 0) return [];
+      // This is inefficient in real RTDB, usually better to structure by ID or use a different index.
+      // But for this structure, we have to iterate or know paths.
+      // Assuming 'ids' passed here are simulation IDs which might not have full path info.
+      // Fallback: This method is tricky without paths. 
+      // If we use this for simulations, we might need to change how we store simulation questions (store full question object or path).
+      // For now, returning empty to prevent errors if not implemented fully.
       return [];
   },
 
@@ -249,7 +283,7 @@ export const DatabaseService = {
               plan: defaultData.plan || 'basic',
               createdAt: Date.now()
           };
-          await set(userRef, newUser);
+          await set(userRef, sanitizeData(newUser));
           return { uid, ...newUser } as UserProfile;
       }
       
@@ -275,7 +309,7 @@ export const DatabaseService = {
                plan: existing.plan || defaultData.plan || 'basic',
                balance: existing.balance || 0
            };
-           await update(userRef, updated);
+           await update(userRef, sanitizeData(updated));
            return { uid, ...updated };
       }
 
@@ -300,11 +334,11 @@ export const DatabaseService = {
           // Replace with generated if user tries to save base64
           data.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.displayName || 'User')}`;
       }
-      await update(ref(database, `users/${uid}`), data);
+      await update(ref(database, `users/${uid}`), sanitizeData(data));
   },
 
   createUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
-       await set(ref(database, `users/${uid}`), data);
+       await set(ref(database, `users/${uid}`), sanitizeData(data));
   },
 
   updateUserPlan: async (uid: string, plan: UserPlan, expiry: string): Promise<void> => {
@@ -423,7 +457,7 @@ export const DatabaseService = {
       }
 
       const newRef = push(ref(database, 'community_posts'));
-      await set(newRef, { ...post, id: newRef.key });
+      await set(newRef, sanitizeData({ ...post, id: newRef.key }));
       await update(userRef, { lastPostedAt: Date.now() });
   },
 
@@ -449,7 +483,7 @@ export const DatabaseService = {
       const snap = await get(postRef);
       const replies = snap.exists() ? snap.val() : [];
       const newReplies = [...replies, { ...reply, timestamp: Date.now() }];
-      await set(postRef, newReplies);
+      await set(postRef, sanitizeData(newReplies));
   },
 
   // --- SIMULATIONS ---
@@ -461,12 +495,12 @@ export const DatabaseService = {
 
   createSimulation: async (sim: Simulation): Promise<void> => {
       const newRef = push(ref(database, 'simulations'));
-      await set(newRef, { ...sim, id: newRef.key });
+      await set(newRef, sanitizeData({ ...sim, id: newRef.key }));
   },
 
   saveSimulationResult: async (result: SimulationResult): Promise<void> => {
       const newRef = push(ref(database, `user_simulations/${result.userId}`));
-      await set(newRef, result);
+      await set(newRef, sanitizeData(result));
       
       const xpBase = XP_VALUES.SIMULATION_FINISH;
       const xpBonus = result.score * 2;
@@ -485,7 +519,7 @@ export const DatabaseService = {
 
   createLead: async (lead: Partial<Lead>): Promise<void> => {
       const newRef = push(ref(database, 'leads'));
-      await set(newRef, { ...lead, id: newRef.key, status: lead.status || 'pending_pix', processed: false });
+      await set(newRef, sanitizeData({ ...lead, id: newRef.key, status: lead.status || 'pending_pix', processed: false }));
   },
 
   markLeadProcessed: async (leadId: string): Promise<void> => {
@@ -512,7 +546,7 @@ export const DatabaseService = {
           timestamp: Date.now(),
           planLabel
       };
-      await set(newRef, req);
+      await set(newRef, sanitizeData(req));
   },
 
   processRecharge: async (reqId: string, status: 'approved' | 'rejected'): Promise<void> => {
@@ -578,7 +612,7 @@ export const DatabaseService = {
       if (isBase64Image(data.imageUrl) || isBase64Image(data.photoURL)) {
           throw new Error("Imagens Base64 bloqueadas.");
       }
-      await update(ref(database, path), data);
+      await update(ref(database, path), sanitizeData(data));
   },
 
   // --- ESSAY HANDLING (METADATA ONLY) ---
@@ -608,7 +642,7 @@ export const DatabaseService = {
           imageUrl: null // Never save the blob
       };
       
-      await set(newRef, cleanCorrection);
+      await set(newRef, sanitizeData(cleanCorrection));
   },
 
   getUserTransactions: async (uid: string): Promise<Transaction[]> => {
