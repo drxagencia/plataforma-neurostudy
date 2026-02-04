@@ -415,12 +415,8 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                       </div>
                       <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
                           {transactions.map(t => {
-                              const isDebit = t.type === 'debit';
-                              const isBasicUser = user.plan === 'basic'; // Admin, Adv, Int -> false
-                              
-                              // Multiplier Logic: Basic=80 (prev 200), Others=40 (prev 100).
-                              const multiplier = isDebit ? (isBasicUser ? 80 : 40) : 1;
-                              const displayAmount = t.amount * multiplier;
+                              // Display the exact amount stored in DB, which now includes the multiplier
+                              const displayAmount = t.amount;
 
                               return (
                               <div key={t.id} className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">

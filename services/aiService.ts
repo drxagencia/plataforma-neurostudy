@@ -89,31 +89,34 @@ export const AiService = {
       const usage = completion.usage;
       const totalTokens = usage?.total_tokens || 0;
       
-      // Dynamic Pricing Rule
-      // Basic Plan: Pays 2x multiplier
-      // Advanced/Intermediate/Admin: Pays 1x multiplier
       const isBasic = userData.plan === 'basic';
-      const multiplier = isBasic ? 2 : 1;
       
-      const cost = totalTokens * BASE_COST_PER_TOKEN * multiplier;
+      // Base Cost Calculation
+      const baseMultiplier = isBasic ? 2 : 1;
+      const baseCost = totalTokens * BASE_COST_PER_TOKEN * baseMultiplier;
+
+      // Apply Visual Multiplier to the ACTUAL DEBIT (x80 for Basic, x40 for Others)
+      // This ensures the debit matches the visual representation requested by the user.
+      const billingMultiplier = isBasic ? 80 : 40;
+      const finalCost = baseCost * billingMultiplier;
 
       // 4. Deduct Balance (Allow negative)
       // Re-fetch strictly to ensure no race condition on balance (simplified here)
       const currentBalance = userData.balance || 0;
       
       // Removed zero clamp to allow negative balance for one-time overage
-      await update(ref(database, `users/${uid}`), { balance: currentBalance - cost });
+      await update(ref(database, `users/${uid}`), { balance: currentBalance - finalCost });
 
       // 5. Log Transaction
       const transRef = push(ref(database, `user_transactions/${uid}`));
       await set(transRef, {
           id: transRef.key,
           type: 'debit',
-          amount: cost,
+          amount: finalCost, // Storing the inflated cost so history matches debit
           description: actionLabel, // Use specific label, e.g. "NeuroTutor: Resumo"
           timestamp: Date.now(),
           currencyType: 'BRL',
-          tokensUsed: totalTokens // Kept for analytics but not shown in description
+          tokensUsed: totalTokens // Kept for analytics
       });
 
       return responseText;
@@ -158,18 +161,22 @@ INSTRUÇÃO: Compare a alternativa incorreta com a correta. Explique onde está 
       const usage = completion.usage;
       const totalTokens = usage?.total_tokens || 0;
       const isBasic = userData.plan === 'basic';
-      const multiplier = isBasic ? 2 : 1;
-      const cost = totalTokens * BASE_COST_PER_TOKEN * multiplier;
+      
+      const baseMultiplier = isBasic ? 2 : 1;
+      const baseCost = totalTokens * BASE_COST_PER_TOKEN * baseMultiplier;
+
+      const billingMultiplier = isBasic ? 80 : 40;
+      const finalCost = baseCost * billingMultiplier;
 
       const currentBalance = userData.balance || 0;
       // Removed zero clamp to allow negative balance
-      await update(ref(database, `users/${uid}`), { balance: currentBalance - cost });
+      await update(ref(database, `users/${uid}`), { balance: currentBalance - finalCost });
 
       const transRef = push(ref(database, `user_transactions/${uid}`));
       await set(transRef, {
           id: transRef.key,
           type: 'debit',
-          amount: cost,
+          amount: finalCost, // Storing the inflated cost
           description: contextLabel,
           timestamp: Date.now(),
           currencyType: 'BRL',
