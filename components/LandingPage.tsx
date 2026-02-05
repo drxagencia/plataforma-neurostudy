@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye, Sparkles } from 'lucide-react';
+import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye, Sparkles, Crosshair } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { TrafficConfig, Lead } from '../types';
@@ -64,6 +64,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [showEarlyOffer, setShowEarlyOffer] = useState(false);
   const [showFinalOffer, setShowFinalOffer] = useState(false);
 
+  // Enemy Shooting Logic
+  const [deadEnemies, setDeadEnemies] = useState<number[]>([]);
+
   // Pricing / Checkout Logic
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [showPixModal, setShowPixModal] = useState(false);
@@ -83,6 +86,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
       ref.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleKillEnemy = (index: number) => {
+      if (deadEnemies.includes(index)) return;
+      setDeadEnemies(prev => [...prev, index]);
+      
+      // Vibrate on mobile
+      if (navigator.vibrate) navigator.vibrate(50);
   };
 
   // --- ACTIONS ---
@@ -113,11 +124,33 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   return (
     <div className="min-h-screen w-full bg-black text-white font-sans overflow-y-auto overflow-x-hidden relative selection:bg-white selection:text-black scroll-smooth">
       
-      {/* Overrides for Star Visibility */}
+      {/* 90FPS CSS Optimizations */}
       <style>{`
         :root { --star-color: #ffffff !important; }
-        .nebula-glow { opacity: 0.15 !important; background-image: none !important; } 
-        .star-layer { opacity: 1 !important; }
+        .nebula-glow { opacity: 0.15 !important; background-image: none !important; will-change: transform, opacity; } 
+        .star-layer { opacity: 1 !important; will-change: transform; }
+        
+        /* Shooting Animation */
+        @keyframes muzzleFlash {
+            0% { background-color: rgba(255, 255, 255, 0.8); }
+            100% { background-color: transparent; }
+        }
+        @keyframes enemyDeath {
+            0% { transform: scale(1) translate(0, 0); filter: brightness(2) sepia(1) hue-rotate(-50deg) saturate(5); }
+            20% { transform: scale(0.95) translate(5px, -5px); }
+            40% { transform: scale(0.9) translate(-5px, 5px); }
+            100% { transform: scale(0.8) translateY(20px); opacity: 0; filter: grayscale(1); }
+        }
+        .animate-shot {
+            animation: enemyDeath 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        .muzzle-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            animation: muzzleFlash 0.1s linear forwards;
+            z-index: 50;
+        }
       `}</style>
 
       {/* Background Fixado (Visível em toda a rolagem - z-0) */}
@@ -165,13 +198,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               </div>
           </section>
 
-          {/* === TELA 2: INIMIGOS === */}
-          <section ref={enemiesRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/20 backdrop-blur-sm">
+          {/* === TELA 2: INIMIGOS (SHOOTER MODE) === */}
+          <section ref={enemiesRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/20 backdrop-blur-sm cursor-[url('https://cdn.custom-cursor.com/db/cursor/32/Crosshair.png'),_crosshair]">
               <div className="max-w-6xl mx-auto w-full">
                   <div className="text-center mb-16">
                       <span className="text-white font-mono font-bold tracking-widest uppercase text-sm mb-4 block animate-pulse border border-white/20 inline-block px-4 py-1 rounded">System Alert: Threats Detected</span>
                       <h2 className="text-4xl md:text-6xl font-black text-white mb-4">ESCOLHA SEUS INIMIGOS</h2>
-                      <p className="text-zinc-400">Quais destes "Monstros" estão drenando seu XP diário?</p>
+                      <p className="text-zinc-400 flex items-center justify-center gap-2">
+                          <Crosshair size={16} /> Clique para eliminar os "Monstros" que drenam seu XP.
+                      </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
@@ -179,8 +214,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                           { title: "Procrastinação", lvl: "LVL 99 BOSS", icon: <Timer size={40} />, desc: "Rouba 4h do seu dia rolando feed.", color: "text-white" },
                           { title: "Ansiedade", lvl: "Elite Mob", icon: <AlertTriangle size={40} />, desc: "Causa debuff de 'Branco' na hora da prova.", color: "text-zinc-300" },
                           { title: "Desorganização", lvl: "Common Mob", icon: <Swords size={40} />, desc: "Impede você de saber o que estudar hoje.", color: "text-zinc-400" }
-                      ].map((enemy, idx) => (
-                          <div key={idx} className="group relative bg-black/60 border border-white/10 p-8 rounded-2xl hover:bg-white/5 hover:border-white/40 transition-all duration-500 cursor-crosshair">
+                      ].map((enemy, idx) => {
+                          const isDead = deadEnemies.includes(idx);
+                          return (
+                          <div 
+                            key={idx} 
+                            onClick={() => handleKillEnemy(idx)}
+                            className={`group relative bg-black/60 border border-white/10 p-8 rounded-2xl transition-all duration-300 select-none overflow-hidden ${isDead ? 'animate-shot pointer-events-none' : 'hover:bg-white/5 hover:border-white/40 cursor-[url(https://cdn.custom-cursor.com/db/cursor/32/Crosshair.png),_crosshair]'}`}
+                          >
+                              {isDead && (
+                                  <>
+                                    <div className="muzzle-overlay" />
+                                    <div className="absolute inset-0 flex items-center justify-center z-20">
+                                        <span className="text-red-500 font-black text-4xl -rotate-12 border-4 border-red-500 px-4 py-2 rounded-lg opacity-80">ELIMINADO</span>
+                                    </div>
+                                  </>
+                              )}
+
                               <div className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-1 rounded bg-white/10 text-white border border-white/20`}>
                                   {enemy.lvl}
                               </div>
@@ -193,7 +243,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                                   <div className={`h-full bg-white w-[90%] shadow-[0_0_10px_white]`}></div>
                               </div>
                           </div>
-                      ))}
+                      )})}
                   </div>
 
                   <div className="text-center">

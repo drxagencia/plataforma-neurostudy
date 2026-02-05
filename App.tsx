@@ -104,13 +104,17 @@ const App: React.FC = () => {
           if (prevXpRef.current === 0 && dbUser?.xp) prevXpRef.current = dbUser.xp;
           const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
 
+          // PLAN NORMALIZATION: Force lowercase to prevent matching errors
+          const rawPlan = dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic');
+          const finalPlan = rawPlan.toLowerCase() as 'basic' | 'advanced' | 'admin';
+
           // Set User with DB Data taking precedence over Auth Data
           setUser({
               ...mappedUser,
               ...dbUser, 
               displayName: dbUser?.displayName || mappedUser.displayName,
               photoURL: dbUser?.photoURL || mappedUser.photoURL,
-              plan: dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic'), 
+              plan: finalPlan, 
               theme: safeTheme
           });
           await DatabaseService.processXpAction(firebaseUser.uid, 'DAILY_LOGIN_BASE');
@@ -163,11 +167,14 @@ const App: React.FC = () => {
     // If not loaded yet, allow safe views
     if (!user) return ['dashboard', 'aulas', 'questoes', 'competitivo', 'ajustes'].includes(view);
 
+    // Normalize plan just in case
+    const userPlan = user.plan.toLowerCase();
+
     // 1. Admin & Advanced users have full access
-    if (user.isAdmin || user.plan === 'admin' || user.plan === 'advanced') return true;
+    if (user.isAdmin || userPlan === 'admin' || userPlan === 'advanced') return true;
 
     // 2. Basic users have strict limitations
-    if (user.plan === 'basic') {
+    if (userPlan === 'basic') {
         const restrictedViews: View[] = [
             'tutor',       // AI Tutor
             'redacao',     // Redação AI
