@@ -93,9 +93,10 @@ const App: React.FC = () => {
         if (firebaseUser) {
           const mappedUser = mapUser(firebaseUser);
           
-          // CRITICAL: Force initial assumption to match mapped user, BUT DB OVERRIDES LATER
+          // Initial assumption (Admin check is safe here as it relies on email)
           const initialPlan = mappedUser.isAdmin ? 'admin' : 'basic';
 
+          // FETCH DB USER - SOURCE OF TRUTH
           const dbUser = await DatabaseService.ensureUserProfile(firebaseUser.uid, {
                  displayName: mappedUser.displayName,
                  email: mappedUser.email,
@@ -108,26 +109,39 @@ const App: React.FC = () => {
           const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
 
           // PLAN NORMALIZATION: Extreme Robustness
-          // 1. Get raw plan from DB (priority) or fallback to initial
-          const rawPlan = dbUser?.plan || initialPlan;
-          // 2. Clean string: remove extra spaces, quotes, lower case
-          const cleanPlan = String(rawPlan).replace(/['"]+/g, '').trim().toLowerCase();
-          // 3. Strict type casting
           let finalPlan: 'basic' | 'advanced' | 'admin' = 'basic';
-          
-          if (cleanPlan === 'admin' || mappedUser.isAdmin) finalPlan = 'admin';
-          else if (cleanPlan === 'advanced' || cleanPlan === 'pro' || cleanPlan === 'vip') finalPlan = 'advanced';
-          else finalPlan = 'basic';
 
-          // Set User with DB Data taking precedence over Auth Data
+          // 1. If DB User exists, we TRUST the DB Plan above all else.
+          if (dbUser && dbUser.plan) {
+              const rawDbPlan = String(dbUser.plan).trim().toLowerCase();
+              
+              if (rawDbPlan === 'admin' || mappedUser.isAdmin) {
+                  finalPlan = 'admin';
+              } else if (
+                  rawDbPlan === 'advanced' || 
+                  rawDbPlan === 'pro' || 
+                  rawDbPlan === 'vip' ||
+                  rawDbPlan.includes('adv') // Catch 'Advanced' or 'advanced '
+              ) {
+                  finalPlan = 'advanced';
+              } else {
+                  finalPlan = 'basic';
+              }
+          } else {
+              // Fallback only if DB read failed or field missing completely
+              finalPlan = initialPlan as any;
+          }
+
+          // Set User with DB Data taking precedence
           setUser({
-              ...mappedUser,
-              ...dbUser, 
+              ...mappedUser, // Auth basics
+              ...dbUser,     // DB specifics (overwrite auth basics if needed)
               displayName: dbUser?.displayName || mappedUser.displayName,
               photoURL: dbUser?.photoURL || mappedUser.photoURL,
-              plan: finalPlan, 
+              plan: finalPlan, // The calculated robust plan
               theme: safeTheme
           });
+          
           await DatabaseService.processXpAction(firebaseUser.uid, 'DAILY_LOGIN_BASE');
         } else {
           setUser(null);

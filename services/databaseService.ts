@@ -339,16 +339,28 @@ export const DatabaseService = {
           existing.photoURL = cleanPhoto;
       }
 
-      // SAFETY: Ensure plan is not undefined, but prefer existing plan over default
-      if (existing.plan === undefined || existing.balance === undefined) {
-           const updated = {
-               ...existing,
-               // CRITICAL: Prefer existing plan > default data plan > basic.
-               // Never overwrite an existing plan unless it is undefined/null.
-               plan: existing.plan || defaultData.plan || 'basic',
-               balance: existing.balance || 0
-           };
-           await update(userRef, sanitizeData(updated));
+      // SAFETY: Robust update logic
+      // Only update fields if they are critically missing.
+      // NEVER overwrite plan if it exists in DB.
+      const updates: any = {};
+      let needsUpdate = false;
+
+      // 1. Check Plan - Only default to basic if strictly undefined/null/empty
+      // If 'existing.plan' is present (even if it differs from defaultData), KEEP IT.
+      if (!existing.plan) {
+          updates.plan = defaultData.plan || 'basic';
+          needsUpdate = true;
+      }
+
+      // 2. Check Balance
+      if (existing.balance === undefined) {
+          updates.balance = 0;
+          needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+           const updated = { ...existing, ...updates };
+           await update(userRef, sanitizeData(updates));
            return { uid, ...updated };
       }
 
