@@ -13,46 +13,28 @@ const AdminPanel: React.FC = () => {
   const [viewMode, setViewMode] = useState<'create' | 'manage'>('create');
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingPath, setEditingPath] = useState<string | null>(null);
-
+  
   // Data
   const [leads, setLeads] = useState<Lead[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
-  // Updated subtopics type: SubjectId -> TopicId -> SubtopicList
-  const [subtopics, setSubtopics] = useState<Record<string, Record<string, string[]>>>({});
   const [recharges, setRecharges] = useState<RechargeRequest[]>([]);
-  const [aiConfig, setAiConfig] = useState<AiConfig | null>(null);
-  const [planConfig, setPlanConfig] = useState<PlanConfig | null>(null); // NEW: Plan Config
-  const [simulations, setSimulations] = useState<Simulation[]>([]);
+  const [planConfig, setPlanConfig] = useState<PlanConfig | null>(null);
   
   // Traffic Data
   const [trafficConfig, setTrafficConfig] = useState({ vslScript: '', checkoutLinkMonthly: '', checkoutLinkYearly: '' });
   
-  // Metrics Specific
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  // Lead Creation Form
+  const [leadForm, setLeadForm] = useState({ name: '', contact: '', planId: 'plan_basic', billing: 'monthly', paymentMethod: 'manual' });
+  const [showLeadModal, setShowLeadModal] = useState(false);
 
-  // Management Lists
-  const [filteredQuestions, setFilteredQuestions] = useState<(Question & { path: string, subtopic: string })[]>([]);
-  
-  // Lesson Management
-  const [manageLessonSubject, setManageLessonSubject] = useState('');
-  const [manageLessonTopic, setManageLessonTopic] = useState('');
-  const [topicLessons, setTopicLessons] = useState<Lesson[]>([]);
-
-  // States
+  // Loading
   const [loading, setLoading] = useState(true);
-  
-  // Import State
-  const [importText, setImportText] = useState('');
-  const [importCategory, setImportCategory] = useState('regular');
-  const [importType, setImportType] = useState<'question' | 'lesson'>('question'); // NEW STATE
-  const [isImporting, setIsImporting] = useState(false);
 
   // --- USER CREATION / APPROVAL STATE ---
   const [showUserModal, setShowUserModal] = useState(false);
-  const [targetLead, setTargetLead] = useState<Lead | null>(null); // If null, it's a manual creation (Kirvano)
+  const [targetLead, setTargetLead] = useState<Lead | null>(null); 
   
   const [accessForm, setAccessForm] = useState({
       displayName: '',
@@ -61,113 +43,32 @@ const AdminPanel: React.FC = () => {
       plan: 'basic' as UserPlan,
       essayCredits: 0,
       balance: 0.00,
-      expiryDate: '' // YYYY-MM-DD
+      expiryDate: '' 
   });
 
-  // Simulation Form
-  const [simForm, setSimForm] = useState({
-      title: '',
-      description: '',
-      duration: 60,
-      type: 'official',
-      status: 'open',
-      subjects: [] as string[],
-      selectedQuestionIds: [] as string[]
-  });
-  const [simFilter, setSimFilter] = useState({ subject: '', topic: '' });
-
-  // Manage Questions Filter
-  const [manageQSubject, setManageQSubject] = useState('');
-  const [manageQTopic, setManageQTopic] = useState('');
-  const [manageQCategory, setManageQCategory] = useState('regular');
-
-  // Edit User (Existing)
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [newUserMode, setNewUserMode] = useState(false);
-  const [userDataForm, setUserDataForm] = useState({
-      displayName: '',
-      email: '',
-      plan: 'basic',
-      expiry: '',
-      isAdmin: false
-  });
-
-  // Content Form
-  const [materials, setMaterials] = useState<LessonMaterial[]>([]);
-  const [currentMaterial, setCurrentMaterial] = useState({ title: '', url: '' });
-
-  // Extended Content Form for Multi-Select & Ordering
-  const [contentForm, setContentForm] = useState({
-      category: 'regular',
-      subjectId: '',
-      topicName: '',
-      subtopicName: '', 
-      qText: '',
-      qImageUrl: '', 
-      qOptions: ['', '', '', ''],
-      qCorrect: 0,
-      qDifficulty: 'medium',
-      qExplanation: '',
-      
-      // Lesson Specific
-      lType: 'video', // 'video' | 'exercise_block'
-      lTitle: '',
-      lUrl: '',
-      lDuration: '',
-      // Exercise Block Filters
-      lExCategory: 'regular',
-      lExSubject: '',
-      lExTopic: '',
-      lExSubtopics: [] as string[], // NEW: Array of subtopics
-      
-      // Lesson Positioning
-      lInsertAfterId: 'end', // 'end' | 'start' | [lessonId]
-
-      // Subject Form
-      sName: '',
-      sIcon: 'BookOpen',
-      sColor: 'text-indigo-400',
-      sCategory: 'regular',
-
-      // Tagging System
-      tagText: '',
-      tagColor: 'indigo'
-  });
-
-  // NEW: Helper State for existing lessons in Create Mode (for dropdown ordering)
-  const [createModeExistingLessons, setCreateModeExistingLessons] = useState<{lesson: Lesson, topic: string}[]>([]);
-
-  // INITIAL LOAD: Load lightweight configs only
+  // INITIAL LOAD
   useEffect(() => {
     fetchConfigData();
   }, []);
 
   const fetchConfigData = async () => {
     setLoading(true);
-    const [s, t, st, ac, pc] = await Promise.all([
+    const [s, t, pc] = await Promise.all([
         DatabaseService.getSubjects(),
         DatabaseService.getTopics(),
-        DatabaseService.getSubTopics(),
-        DatabaseService.getAiConfig(),
-        DatabaseService.getPlanConfig() // Load Plan Config
+        DatabaseService.getPlanConfig()
     ]);
-    
     setSubjects(s);
     setTopics(t);
-    setSubtopics(st);
-    setAiConfig(ac);
     setPlanConfig(pc);
     setLoading(false);
   };
 
-  // LAZY LOAD: Users (Only when tab active)
+  // LAZY LOAD: Users
   useEffect(() => {
       if (activeTab === 'users' || activeTab === 'metrics') {
           DatabaseService.getUsersPaginated(100).then(u => {
-              const realUsers = u.filter(user => 
-                  user.uid !== 'student_uid_placeholder' && 
-                  user.uid !== 'admin_uid_placeholder'
-              );
+              const realUsers = u.filter(user => user.uid !== 'student_uid_placeholder');
               setUsers(realUsers);
           });
       }
@@ -176,14 +77,14 @@ const AdminPanel: React.FC = () => {
   // LAZY LOAD: Leads
   useEffect(() => {
       if (activeTab === 'leads' || activeTab === 'metrics') {
-          DatabaseService.getLeads().then(l => setLeads(l.reverse())); // Newest first
+          DatabaseService.getLeads().then(l => setLeads(l.reverse()));
       }
-  }, [activeTab]);
+  }, [activeTab, showLeadModal, showUserModal]); // Reload when modals close
 
   // LAZY LOAD: Finance
   useEffect(() => {
       if (activeTab === 'finance' || activeTab === 'metrics') {
-          DatabaseService.getRechargeRequests().then(r => setRecharges(r));
+          DatabaseService.getRechargeRequests().then(r => setRecharges(r.reverse()));
       }
   }, [activeTab]);
 
@@ -194,74 +95,14 @@ const AdminPanel: React.FC = () => {
       }
   }, [activeTab]);
 
-  // LAZY LOAD: Simulations
-  useEffect(() => {
-      if (activeTab === 'content' && contentTab === 'simulation') {
-          DatabaseService.getSimulations().then(s => setSimulations(s));
-      }
-  }, [activeTab, contentTab]);
-
-  // LAZY LOAD: Questions
-  useEffect(() => {
-      if (activeTab !== 'content') return;
-      
-      const loadQ = async () => {
-          if (contentTab === 'simulation' && simFilter.subject && simFilter.topic) {
-              const q = await DatabaseService.getQuestionsByPath('regular', simFilter.subject, simFilter.topic);
-              setFilteredQuestions(q);
-          }
-          else if (contentTab === 'question' && viewMode === 'manage' && manageQSubject && manageQTopic) {
-              const q = await DatabaseService.getQuestionsByPath(manageQCategory, manageQSubject, manageQTopic);
-              setFilteredQuestions(q);
-          } else {
-              setFilteredQuestions([]);
-          }
-      };
-      loadQ();
-  }, [activeTab, contentTab, viewMode, simFilter, manageQSubject, manageQTopic, manageQCategory]);
-
-
-  // Fetch Lessons for Manager
-  useEffect(() => {
-      if (viewMode === 'manage' && contentTab === 'lesson' && manageLessonSubject && manageLessonTopic) {
-          DatabaseService.getLessonsByTopic(manageLessonSubject).then(res => {
-              setTopicLessons(res[manageLessonTopic] || []);
-          });
-      }
-  }, [manageLessonSubject, manageLessonTopic, viewMode, contentTab]);
-
-  // NEW: Fetch existing lessons for Ordering Dropdown in Create Mode
-  useEffect(() => {
-      if (viewMode === 'create' && contentTab === 'lesson' && contentForm.subjectId) {
-          DatabaseService.getLessonsByTopic(contentForm.subjectId).then(res => {
-              const flattened: {lesson: Lesson, topic: string}[] = [];
-              Object.keys(res).forEach(topic => {
-                  res[topic].forEach(l => flattened.push({ lesson: l, topic }));
-              });
-              setCreateModeExistingLessons(flattened);
-          });
-      } else {
-          setCreateModeExistingLessons([]);
-      }
-  }, [contentForm.subjectId, viewMode, contentTab]);
-
-  const normalizeId = (str: string) => {
-      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  };
-
-  // --- ACCESS MANAGEMENT LOGIC (PATH 1 & 2) ---
-
+  // --- ACCESS MANAGEMENT ---
   const handleOpenAccessModal = (lead?: Lead) => {
-      // Calculate Default Expiry (1 Year)
       const nextYear = new Date();
       nextYear.setFullYear(nextYear.getFullYear() + 1);
       const defaultExpiry = nextYear.toISOString().split('T')[0];
 
       if (lead) {
-          // Path 1: From Lead
           setTargetLead(lead);
-          
-          // Auto-configure based on Plan ID from Lead
           let plan: UserPlan = 'basic';
           let credits = 0;
           let balance = 0;
@@ -269,16 +110,15 @@ const AdminPanel: React.FC = () => {
           const pid = lead.planId.toLowerCase();
           if (pid.includes('pro') || pid.includes('adv')) {
               plan = 'advanced';
-              credits = 30; // Pro typically starts with more
-              balance = 5.00; // Bonus balance
+              credits = 30;
+              balance = 5.00;
           } else {
-              // Basic
               credits = 8;
           }
 
           setAccessForm({
               displayName: lead.name,
-              email: '', // Admin must input correct email
+              email: '', 
               password: 'mudar123',
               plan: plan,
               essayCredits: credits,
@@ -286,7 +126,6 @@ const AdminPanel: React.FC = () => {
               expiryDate: defaultExpiry
           });
       } else {
-          // Path 2: Manual (Kirvano)
           setTargetLead(null);
           setAccessForm({
               displayName: '',
@@ -309,33 +148,27 @@ const AdminPanel: React.FC = () => {
 
       setLoading(true);
       try {
-          // 1. Create Auth User
           const newUid = await AuthService.registerStudent(accessForm.email, accessForm.password, accessForm.displayName);
-
-          // 2. Create Database Profile with specific attributes
           await DatabaseService.createUserProfile(newUid, {
               displayName: accessForm.displayName,
               email: accessForm.email,
               plan: accessForm.plan,
               subscriptionExpiry: accessForm.expiryDate,
               xp: 0,
-              // Apply specific credits/balance
               essayCredits: Number(accessForm.essayCredits),
               balance: Number(accessForm.balance),
-              // Determine billing cycle based on Lead or default to Monthly for manual
               billingCycle: targetLead ? (targetLead.billing as any) : 'monthly' 
           });
 
-          // 3. If it was a Lead, mark as processed
           if (targetLead) {
               await DatabaseService.markLeadProcessed(targetLead.id);
-              // Refresh leads
-              const l = await DatabaseService.getLeads();
-              setLeads(l.reverse());
           }
 
           alert(targetLead ? "Lead convertido em Aluno!" : "Aluno cadastrado com sucesso!");
           setShowUserModal(false);
+          // Refresh lists
+          DatabaseService.getUsersPaginated(100).then(setUsers);
+          DatabaseService.getLeads().then(l => setLeads(l.reverse()));
 
       } catch (e: any) {
           console.error(e);
@@ -345,86 +178,83 @@ const AdminPanel: React.FC = () => {
       }
   };
 
-  const handleSavePlanConfig = async () => {
-      if (!planConfig) return;
-      try {
-          await DatabaseService.savePlanConfig(planConfig);
-          alert("Configurações de Planos Salvas!");
-      } catch (e) {
-          alert("Erro ao salvar planos.");
-      }
-  };
-
-  const togglePermission = (plan: UserPlan, feature: keyof PlanFeatures) => {
-      if (!planConfig) return;
-      // Note: Admin plan implicitly has everything, we mainly config Basic/Adv
-      if (plan === 'admin') return;
-
-      setPlanConfig(prev => {
-          if (!prev) return null;
-          return {
-              ...prev,
-              permissions: {
-                  ...prev.permissions,
-                  [plan]: {
-                      ...prev.permissions[plan as keyof PlanConfig['permissions']],
-                      [feature]: !prev.permissions[plan as keyof PlanConfig['permissions']][feature as keyof PlanFeatures]
-                  }
-              }
-          };
+  // --- LEAD MANAGEMENT ---
+  const handleCreateLead = async () => {
+      if (!leadForm.name) return;
+      await DatabaseService.createLead({
+          name: leadForm.name,
+          contact: leadForm.contact,
+          planId: leadForm.planId,
+          billing: leadForm.billing as any,
+          paymentMethod: leadForm.paymentMethod,
+          timestamp: new Date().toISOString(),
+          status: 'pending_pix'
       });
+      setShowLeadModal(false);
+      setLeadForm({ name: '', contact: '', planId: 'plan_basic', billing: 'monthly', paymentMethod: 'manual' });
+      // Refresh
+      DatabaseService.getLeads().then(l => setLeads(l.reverse()));
   };
 
-  const updatePrice = (plan: UserPlan, price: string) => {
-      if (!planConfig) return;
-      const val = parseFloat(price);
-      if (isNaN(val)) return;
-
-      setPlanConfig(prev => {
-          if (!prev) return null;
-          return {
-              ...prev,
-              prices: {
-                  ...prev.prices,
-                  [plan]: val
-              }
-          };
-      });
+  // --- FINANCE MANAGEMENT ---
+  const handleFinanceAction = async (id: string, action: 'approved' | 'rejected') => {
+      if (!confirm(`Confirmar ${action === 'approved' ? 'APROVAÇÃO' : 'REJEIÇÃO'}?`)) return;
+      await DatabaseService.processRecharge(id, action);
+      // Refresh
+      DatabaseService.getRechargeRequests().then(r => setRecharges(r.reverse()));
   };
 
-  const handleBulkImport = async () => {
-      if (!importText.trim()) return alert("Cole o texto para importar.");
-      setIsImporting(true);
-      // Implementation omitted for brevity
-      setIsImporting(false);
-  };
-
-  const handleSaveTraffic = async () => { try { await DatabaseService.saveTrafficSettings(trafficConfig); alert("Configurações de Tráfego Salvas!"); } catch(e) { alert("Erro ao salvar."); } };
-  const handleEditItem = (item: any, type: any) => { setIsEditing(true); setEditingId(item.id); setViewMode('create'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const handleDeleteItem = async (path: string) => { if (confirm("Tem certeza?")) { await DatabaseService.deletePath(path); alert("Deletado."); } };
-  
-  const handleSaveContent = async () => {
-      if (contentTab === 'subject') {
-          if(!contentForm.sName) return alert("Nome obrigatório");
-          const id = normalizeId(contentForm.sName);
-          await DatabaseService.createSubject({ id, name: contentForm.sName, iconName: contentForm.sIcon, color: contentForm.sColor, category: contentForm.sCategory as any });
-          alert("Matéria Criada!"); fetchConfigData(); return;
-      }
-      alert("Função Salvar executada (lógica mantida).");
-  };
+  const handleSaveTraffic = async () => { try { await DatabaseService.saveTrafficSettings(trafficConfig); alert("Salvo!"); } catch(e) { alert("Erro."); } };
 
   return (
     <div className="space-y-6 animate-slide-up pb-20 relative">
       
-      {/* ACCESS MANAGEMENT MODAL */}
+      {/* ACCESS MODAL */}
       {showUserModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
               <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl w-full max-w-lg animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-                  <h3 className="text-xl font-bold text-white mb-6">Gestão de Acesso</h3>
-                  {/* Inputs ... (simplified for brevity) */}
-                  <div className="flex justify-end gap-3 mt-4">
+                  <h3 className="text-xl font-bold text-white mb-6">Criar Aluno</h3>
+                  <div className="space-y-4">
+                      <input className="w-full glass-input p-3 rounded-lg" placeholder="Nome Completo" value={accessForm.displayName} onChange={e => setAccessForm({...accessForm, displayName: e.target.value})} />
+                      <input className="w-full glass-input p-3 rounded-lg" placeholder="Email" value={accessForm.email} onChange={e => setAccessForm({...accessForm, email: e.target.value})} />
+                      <input className="w-full glass-input p-3 rounded-lg" placeholder="Senha" value={accessForm.password} onChange={e => setAccessForm({...accessForm, password: e.target.value})} />
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                          <select className="glass-input p-3 rounded-lg" value={accessForm.plan} onChange={e => setAccessForm({...accessForm, plan: e.target.value as any})}>
+                              <option value="basic">Básico</option>
+                              <option value="advanced">Advanced (Pro)</option>
+                          </select>
+                          <input type="date" className="glass-input p-3 rounded-lg" value={accessForm.expiryDate} onChange={e => setAccessForm({...accessForm, expiryDate: e.target.value})} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <input type="number" className="glass-input p-3 rounded-lg" placeholder="Créditos Redação" value={accessForm.essayCredits} onChange={e => setAccessForm({...accessForm, essayCredits: Number(e.target.value)})} />
+                          <input type="number" className="glass-input p-3 rounded-lg" placeholder="Saldo R$" value={accessForm.balance} onChange={e => setAccessForm({...accessForm, balance: Number(e.target.value)})} />
+                      </div>
+                  </div>
+                  <div className="flex justify-end gap-3 mt-6">
                       <button onClick={() => setShowUserModal(false)} className="text-slate-400 hover:text-white px-3">Cancelar</button>
-                      <button onClick={handleSubmitAccess} className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold">Salvar</button>
+                      <button onClick={handleSubmitAccess} className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold">Salvar Aluno</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* LEAD MODAL */}
+      {showLeadModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl w-full max-w-sm animate-in zoom-in-95">
+                  <h3 className="text-xl font-bold text-white mb-4">Novo Lead</h3>
+                  <div className="space-y-3">
+                      <input className="w-full glass-input p-3 rounded-lg" placeholder="Nome" value={leadForm.name} onChange={e => setLeadForm({...leadForm, name: e.target.value})} />
+                      <input className="w-full glass-input p-3 rounded-lg" placeholder="Contato/Email" value={leadForm.contact} onChange={e => setLeadForm({...leadForm, contact: e.target.value})} />
+                      <select className="w-full glass-input p-3 rounded-lg" value={leadForm.planId} onChange={e => setLeadForm({...leadForm, planId: e.target.value})}>
+                          <option value="plan_basic">Básico</option>
+                          <option value="plan_advanced">Advanced</option>
+                      </select>
+                  </div>
+                  <div className="flex justify-end gap-3 mt-4">
+                      <button onClick={() => setShowLeadModal(false)} className="text-slate-400">Cancelar</button>
+                      <button onClick={handleCreateLead} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">Criar Lead</button>
                   </div>
               </div>
           </div>
@@ -440,7 +270,7 @@ const AdminPanel: React.FC = () => {
 
       {/* NAVIGATION TABS */}
       <div className="flex gap-4 border-b border-white/10 pb-1 overflow-x-auto mb-6">
-          {['leads', 'users', 'content', 'finance', 'config', 'metrics', 'traffic', 'plans'].map((tab) => (
+          {['leads', 'users', 'finance', 'content', 'config', 'traffic', 'plans'].map((tab) => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -451,86 +281,133 @@ const AdminPanel: React.FC = () => {
           ))}
       </div>
 
-      {/* --- PLANS TAB --- */}
-      {activeTab === 'plans' && planConfig && (
-          <div className="space-y-6 animate-fade-in">
-              <div className="glass-card p-6 rounded-2xl">
-                  <div className="flex justify-between items-center mb-6">
-                      <div>
-                          <h3 className="text-xl font-bold text-white">Configuração de Planos</h3>
-                          <p className="text-slate-400 text-sm">Defina permissões e preços base.</p>
-                      </div>
-                      <button onClick={handleSavePlanConfig} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-2">
-                          <Save size={18} /> Salvar Alterações
+      {/* --- LEADS TAB --- */}
+      {activeTab === 'leads' && (
+          <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-bold text-white">Gestão de Leads (CRM)</h3>
+                  <div className="flex gap-2">
+                      <button onClick={() => setShowLeadModal(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 font-bold border border-white/10">
+                          <UserPlus size={18} /> Novo Lead
+                      </button>
+                      <button onClick={() => handleOpenAccessModal(undefined)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">
+                          <UserCheck size={18} /> Criar Aluno Direto
                       </button>
                   </div>
-
-                  <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm text-slate-400">
-                          <thead className="bg-slate-900/50 text-xs uppercase font-bold text-slate-500 border-b border-white/5">
-                              <tr>
-                                  <th className="p-4">Recurso / Serviço</th>
-                                  <th className="p-4 text-center">Básico</th>
-                                  <th className="p-4 text-center">Avançado (Pro)</th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/5">
-                              {/* Price Row */}
-                              <tr className="bg-indigo-900/10">
-                                  <td className="p-4 font-bold text-white flex items-center gap-2"><CreditCard size={16}/> Preço Base (R$)</td>
-                                  <td className="p-4 text-center">
-                                      <input 
-                                        type="number" 
-                                        value={planConfig.prices.basic} 
-                                        onChange={e => updatePrice('basic', e.target.value)}
-                                        className="bg-slate-900 border border-white/10 rounded p-2 w-24 text-center text-white font-bold"
-                                      />
-                                  </td>
-                                  <td className="p-4 text-center">
-                                      <input 
-                                        type="number" 
-                                        value={planConfig.prices.advanced} 
-                                        onChange={e => updatePrice('advanced', e.target.value)}
-                                        className="bg-slate-900 border border-white/10 rounded p-2 w-24 text-center text-white font-bold"
-                                      />
-                                  </td>
-                              </tr>
-
-                              {/* Features Rows */}
-                              {[
-                                  { key: 'canUseChat', label: 'Chat IA (NeuroTutor)' },
-                                  { key: 'canUseExplanation', label: 'Explicação de Questões' },
-                                  { key: 'canUseEssay', label: 'Correção de Redação' },
-                                  { key: 'canUseSimulations', label: 'Acesso a Simulados' },
-                                  { key: 'canUseCommunity', label: 'Comunidade' },
-                                  { key: 'canUseMilitary', label: 'Conteúdo Militar' },
-                              ].map((feat) => (
-                                  <tr key={feat.key}>
-                                      <td className="p-4 text-slate-300">{feat.label}</td>
-                                      {(['basic', 'advanced'] as UserPlan[]).map(plan => (
-                                          <td key={plan} className="p-4 text-center">
-                                              <input 
-                                                type="checkbox"
-                                                checked={planConfig.permissions[plan as keyof typeof planConfig.permissions][feat.key as keyof PlanFeatures]}
-                                                onChange={() => togglePermission(plan, feat.key as keyof PlanFeatures)}
-                                                className="w-5 h-5 accent-indigo-600 rounded cursor-pointer"
-                                              />
-                                          </td>
-                                      ))}
-                                  </tr>
-                              ))}
-                          </tbody>
-                      </table>
-                  </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {leads.map(l => (
+                      <div key={l.id} className={`glass-card p-5 rounded-2xl border-l-4 ${l.processed ? 'border-l-emerald-500 opacity-60' : 'border-l-yellow-500'}`}>
+                          <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-bold text-white">{l.name}</h4>
+                              {l.processed ? <CheckCircle size={16} className="text-emerald-500"/> : <Clock size={16} className="text-yellow-500"/>}
+                          </div>
+                          <p className="text-slate-400 text-xs mb-1">{l.contact}</p>
+                          <p className="text-slate-300 text-xs font-bold mb-4 uppercase">{l.planId} ({l.billing})</p>
+                          
+                          {!l.processed && (
+                              <button onClick={() => handleOpenAccessModal(l)} className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2">
+                                  <UserCheck size={14}/> Aprovar Acesso
+                              </button>
+                          )}
+                      </div>
+                  ))}
+                  {leads.length === 0 && <p className="text-slate-500">Nenhum lead encontrado.</p>}
               </div>
           </div>
       )}
 
-      {/* Leads Tab (Simplified) */}
-      {activeTab === 'leads' && (
+      {/* --- USERS TAB --- */}
+      {activeTab === 'users' && (
           <div className="space-y-6">
-              <div className="flex justify-end mb-4"><button onClick={() => handleOpenAccessModal(undefined)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold"><UserPlus size={18} /> Manual</button></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{leads.map(l => <div key={l.id} className="glass-card p-5 rounded-2xl border-l-4 border-l-emerald-500"><h4 className="font-bold text-white">{l.name}</h4><p className="text-slate-400 text-xs">{l.planId}</p></div>)}</div>
+              <h3 className="text-xl font-bold text-white mb-4">Base de Alunos ({users.length})</h3>
+              <div className="glass-card rounded-2xl overflow-hidden border border-white/5">
+                  <table className="w-full text-left text-sm text-slate-400">
+                      <thead className="bg-slate-900/50 text-xs uppercase font-bold text-slate-500">
+                          <tr>
+                              <th className="p-4">Aluno</th>
+                              <th className="p-4">Plano</th>
+                              <th className="p-4">Saldo</th>
+                              <th className="p-4">XP</th>
+                              <th className="p-4">Expira em</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                          {users.map(u => (
+                              <tr key={u.uid} className="hover:bg-white/5 transition-colors">
+                                  <td className="p-4">
+                                      <p className="font-bold text-white">{u.displayName}</p>
+                                      <p className="text-xs">{u.email}</p>
+                                  </td>
+                                  <td className="p-4">
+                                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${u.plan === 'advanced' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                                          {u.plan}
+                                      </span>
+                                  </td>
+                                  <td className="p-4 font-mono text-white">R$ {u.balance?.toFixed(2)}</td>
+                                  <td className="p-4 font-mono text-yellow-400">{u.xp || 0}</td>
+                                  <td className="p-4 text-xs">{u.subscriptionExpiry || 'Vitalício'}</td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      )}
+
+      {/* --- FINANCE TAB --- */}
+      {activeTab === 'finance' && (
+          <div className="space-y-6">
+              <h3 className="text-xl font-bold text-white mb-4">Solicitações Financeiras</h3>
+              <div className="grid grid-cols-1 gap-4">
+                  {recharges.filter(r => r.status === 'pending').map(req => (
+                      <div key={req.id} className="glass-card p-4 rounded-xl border border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-900/40">
+                          <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-full ${req.currencyType === 'CREDIT' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                  <DollarSign size={24} />
+                              </div>
+                              <div>
+                                  <p className="font-bold text-white text-lg">
+                                      {req.currencyType === 'CREDIT' ? `${req.quantityCredits} Créditos` : `R$ ${req.amount.toFixed(2)}`}
+                                  </p>
+                                  <p className="text-sm text-slate-400">
+                                      Solicitante (APP): <span className="text-white font-bold">{req.userDisplayName}</span>
+                                  </p>
+                                  {req.planLabel && <p className="text-xs text-yellow-400 font-bold mt-1">{req.planLabel}</p>}
+                                  <p className="text-xs text-slate-500 mt-1">ID: {req.userId.substring(0,8)}... • {new Date(req.timestamp).toLocaleDateString()}</p>
+                              </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                              <button onClick={() => handleFinanceAction(req.id, 'rejected')} className="p-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg transition-colors border border-red-500/30">
+                                  <X size={20} />
+                              </button>
+                              <button onClick={() => handleFinanceAction(req.id, 'approved')} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-colors flex items-center gap-2 shadow-lg">
+                                  <CheckCircle size={20} /> Aprovar
+                              </button>
+                          </div>
+                      </div>
+                  ))}
+                  {recharges.filter(r => r.status === 'pending').length === 0 && (
+                      <div className="text-center py-12 bg-slate-900/20 rounded-2xl border border-dashed border-white/10">
+                          <CheckCircle size={48} className="mx-auto text-slate-600 mb-4" />
+                          <p className="text-slate-500">Tudo limpo! Nenhuma solicitação pendente.</p>
+                      </div>
+                  )}
+              </div>
+              
+              {/* History */}
+              <div className="mt-8 pt-8 border-t border-white/10">
+                  <h4 className="font-bold text-slate-400 mb-4 uppercase text-xs tracking-wider">Histórico Recente</h4>
+                  <div className="opacity-60 text-sm space-y-2">
+                      {recharges.filter(r => r.status !== 'pending').slice(0, 5).map(r => (
+                          <div key={r.id} className="flex justify-between p-3 bg-slate-900/30 rounded-lg">
+                              <span>{r.userDisplayName} - R$ {r.amount}</span>
+                              <span className={r.status === 'approved' ? 'text-emerald-400' : 'text-red-400'}>{r.status.toUpperCase()}</span>
+                          </div>
+                      ))}
+                  </div>
+              </div>
           </div>
       )}
       

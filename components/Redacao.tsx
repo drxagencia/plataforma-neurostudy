@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
@@ -23,6 +24,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
+  const [payerName, setPayerName] = useState(''); // NEW
   
   // Upgrade Flow
   const [isUpgrading, setIsUpgrading] = useState(false);
@@ -151,6 +153,10 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   const handleConfirmPayment = async () => {
       if (!auth.currentUser) return;
+      if (!payerName.trim()) {
+          setNotification({ type: 'error', message: "Informe o nome do pagador." });
+          return;
+      }
       
       if (isUpgrading) {
           let upgradeCost = user.billingCycle === 'yearly' ? 100 : 10;
@@ -158,7 +164,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           
           await DatabaseService.createRechargeRequest(
               auth.currentUser.uid, 
-              auth.currentUser.displayName || 'User', 
+              payerName, // Use user provided payer name
               upgradeCost, 
               'BRL', 
               undefined, 
@@ -166,12 +172,19 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           );
           setNotification({ type: 'success', message: "Upgrade solicitado! Aguarde a aprovação." });
       } else {
-          await DatabaseService.createRechargeRequest(auth.currentUser.uid, auth.currentUser.displayName || 'User', totalPrice, 'CREDIT', buyQty);
+          await DatabaseService.createRechargeRequest(
+              auth.currentUser.uid, 
+              payerName, 
+              totalPrice, 
+              'CREDIT', 
+              buyQty
+          );
           setNotification({ type: 'success', message: "Solicitação enviada! Aguarde a aprovação." });
       }
       
       setShowPix(false);
       setIsUpgrading(false);
+      setPayerName('');
       setView('home');
   };
 
@@ -705,16 +718,26 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-48 h-48 mix-blend-multiply" />
                       </div>
                       
-                      <div className="flex gap-2 mb-8">
+                      <div className="flex gap-2 mb-6">
                           <input readOnly value={pixPayload || ''} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 text-xs text-slate-400 truncate" />
                           <button onClick={() => {navigator.clipboard.writeText(pixPayload || ''); setCopied(true);}} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-white transition-colors">
                               {copied ? <Check size={18} className="text-emerald-400"/> : <Copy size={18}/>}
                           </button>
                       </div>
-                      
-                      <button onClick={handleConfirmPayment} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-                          <CheckCircle size={20} /> Já realizei o pagamento
-                      </button>
+
+                      <div className="space-y-4 pt-4 border-t border-white/5">
+                          <input 
+                              value={payerName}
+                              onChange={e => setPayerName(e.target.value)}
+                              placeholder="Nome do Pagador (Comprovante)"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
+                          />
+                          
+                          <button onClick={handleConfirmPayment} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                              <CheckCircle size={20} /> Já realizei o pagamento
+                          </button>
+                          <p className="text-[10px] text-slate-500">A liberação ocorre após conferência pelo administrador.</p>
+                      </div>
                   </div>
               )}
           </div>

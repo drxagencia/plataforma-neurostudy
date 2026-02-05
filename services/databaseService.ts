@@ -340,13 +340,10 @@ export const DatabaseService = {
       }
 
       // SAFETY: Robust update logic
-      // Only update fields if they are critically missing.
-      // NEVER overwrite plan if it exists in DB.
       const updates: any = {};
       let needsUpdate = false;
 
       // 1. Check Plan - Only default to basic if strictly undefined/null/empty
-      // If 'existing.plan' is present (even if it differs from defaultData), KEEP IT.
       if (!existing.plan) {
           updates.plan = defaultData.plan || 'basic';
           needsUpdate = true;
@@ -380,9 +377,7 @@ export const DatabaseService = {
   },
 
   saveUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
-      // SECURITY CHECK
       if (isBase64Image(data.photoURL)) {
-          // Replace with generated if user tries to save base64
           data.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.displayName || 'User')}`;
       }
       await update(ref(database, `users/${uid}`), sanitizeData(data));
@@ -476,28 +471,20 @@ export const DatabaseService = {
   },
 
   getLeaderboard: async (period: 'total' | 'weekly' = 'total'): Promise<UserProfile[]> => {
-      // NOTE: Removed orderByChild('xp') to avoid "Index not defined" error if rules are missing.
-      // We fetch all users (or a large chunk) and sort client-side.
-      // For scalability, users should add ".indexOn": "xp" to firebase rules and use orderByChild.
       const q = query(ref(database, 'users'));
       const snap = await get(q);
       
       if (snap.exists()) {
           const users = Object.values(snap.val()) as UserProfile[];
-          
-          // Sanitize Images client-side before rendering
           users.forEach(u => {
               if (isBase64Image(u.photoURL)) {
                   u.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.displayName)}&background=random`;
               }
           });
 
-          // Sort Logic
           if (period === 'weekly') {
               return users.sort((a, b) => (b.weeklyXp || 0) - (a.weeklyXp || 0)).slice(0, 50);
           }
-          
-          // Total XP
           return users.sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 50);
       }
       return [];
@@ -509,7 +496,6 @@ export const DatabaseService = {
       const snap = await get(q);
       if (snap.exists()) {
           const posts = Object.values(snap.val()) as CommunityPost[];
-          // Sanitize heavy avatars on read
           posts.forEach(p => {
               if (isBase64Image(p.authorAvatar)) {
                   p.authorAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.authorName)}&background=random`;
@@ -521,7 +507,6 @@ export const DatabaseService = {
   },
 
   createPost: async (post: Partial<CommunityPost>, uid: string): Promise<void> => {
-      // SECURITY: Replace avatar if it's base64
       if (isBase64Image(post.authorAvatar)) {
           post.authorAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(post.authorName || 'User')}`;
       }
@@ -616,7 +601,7 @@ export const DatabaseService = {
       const req: RechargeRequest = {
           id: newRef.key!,
           userId: uid,
-          userDisplayName: name,
+          userDisplayName: name, // This can now be the Payer's name provided by input
           amount,
           currencyType,
           quantityCredits,
@@ -643,7 +628,6 @@ export const DatabaseService = {
 
           // SPECIAL LOGIC: Handle Plan Upgrade
           if (req.planLabel && req.planLabel.includes('UPGRADE')) {
-              // Strict normalization for plan assignment
               let newPlan: UserPlan = 'basic';
               const labelLower = req.planLabel.toLowerCase();
               if (labelLower.includes('advanced') || labelLower.includes('pro')) newPlan = 'advanced';
@@ -680,7 +664,6 @@ export const DatabaseService = {
   getPlanConfig: async (): Promise<PlanConfig> => {
       const snap = await get(ref(database, 'config/plans'));
       if (snap.exists()) return snap.val();
-      // Default Config if none exists (Strict Basic vs Advanced)
       return {
           permissions: {
               basic: { canUseChat: false, canUseExplanation: true, canUseEssay: false, canUseSimulations: false, canUseCommunity: true, canUseMilitary: false },
@@ -718,7 +701,6 @@ export const DatabaseService = {
   },
 
   updatePath: async (path: string, data: any): Promise<void> => {
-      // Prevent updates with Base64 images
       if (isBase64Image(data.imageUrl) || isBase64Image(data.photoURL)) {
           throw new Error("Imagens Base64 bloqueadas.");
       }
@@ -736,20 +718,16 @@ export const DatabaseService = {
       return essays;
   },
 
-  // Deleted getEssayImage to prevent heavy loads.
-
   saveEssayCorrection: async (uid: string, correction: EssayCorrection): Promise<void> => {
-      // Create ID
       const newRef = push(ref(database, `user_essays/${uid}`)); 
       const essayId = newRef.key;
       
       if (!essayId) throw new Error("ID gen failed");
 
-      // STRICTLY DELETE IMAGE DATA BEFORE SAVING
       const cleanCorrection = { 
           ...correction, 
           id: essayId, 
-          imageUrl: null // Never save the blob
+          imageUrl: null 
       };
       
       await set(newRef, sanitizeData(cleanCorrection));

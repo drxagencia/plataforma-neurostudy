@@ -127,6 +127,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   const [selectedUnlimitedPlan, setSelectedUnlimitedPlan] = useState<{id: string, label: string, price: number, months: number, badge?: string} | null>(null);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [payerName, setPayerName] = useState(''); // NEW: For admin verification
   
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -225,15 +226,6 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
           setShowRecharge(true);
       } else if (error.message.includes('403')) {
           triggerNotification('error', 'Seu plano não permite o uso do chat livre.');
-      } else if (error.message.includes('Server Config Error') || error.message.includes('500')) {
-          // Specific handling for the error you are seeing
-          const errorMsg: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            role: 'ai',
-            content: '⚠️ **Erro de Configuração**\n\nO servidor não conseguiu acessar a API Key da IA. Por favor, contate o administrador para configurar a variável de ambiente `API_KEY`.'
-          };
-          setMessages(prev => [...prev, errorMsg]);
-          triggerNotification('error', 'Erro interno de configuração (500).');
       } else {
           const errorMsg: ChatMessage = {
             id: (Date.now() + 1).toString(),
@@ -266,7 +258,6 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
           }
 
           if (paymentMethod === 'card') {
-              // Redirect to generic balance recharge
               const link = KIRVANO_LINKS.balance_recharge;
               window.open(link, '_blank');
               triggerNotification('success', 'Redirecionando para pagamento seguro...');
@@ -282,7 +273,6 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
           val = selectedUnlimitedPlan.price;
 
           if (paymentMethod === 'card') {
-              // Redirect to specific subscription plan
               let link = '';
               if (selectedUnlimitedPlan.id === 'monthly') link = KIRVANO_LINKS.ai_unlimited_monthly;
               else if (selectedUnlimitedPlan.id === 'semester') link = KIRVANO_LINKS.ai_unlimited_semester;
@@ -329,12 +319,15 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
       }
 
       if (!auth.currentUser || isNaN(val)) return;
+      if (!payerName.trim()) {
+          triggerNotification('error', 'Digite o nome do pagador para conferência.');
+          return;
+      }
 
       try {
-          // Send real name
           await DatabaseService.createRechargeRequest(
               auth.currentUser.uid, 
-              auth.currentUser.displayName || 'Usuário Sem Nome', 
+              payerName, // Send the user-provided payer name
               val, 
               'BRL', 
               undefined, 
@@ -342,7 +335,6 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
           );
           
           handleCloseRecharge();
-          // Delay notification slightly for effect
           setTimeout(() => {
               triggerNotification('success', 'Comprovante enviado! Aguarde a aprovação.');
           }, 300);
@@ -358,6 +350,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
       setSelectedUnlimitedPlan(null);
       setRechargeTab('credits');
       setPaymentMethod('pix');
+      setPayerName('');
   };
 
   const isBasic = user.plan === 'basic';
@@ -706,15 +699,25 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                             </div>
                         </div>
 
-                        <div className="pt-4 border-t border-white/5">
+                        <div className="pt-4 border-t border-white/5 space-y-4">
+                            <div>
+                                <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Nome do Pagador (Comprovante)</label>
+                                <input 
+                                    value={payerName} 
+                                    onChange={e => setPayerName(e.target.value)}
+                                    placeholder="Nome completo de quem fez o PIX"
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-indigo-500"
+                                />
+                            </div>
+
                             <button 
                                 onClick={handleConfirmPayment}
                                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
                             >
                                 <Check size={20} /> Já fiz o pagamento
                             </button>
-                            <p className="text-[10px] text-slate-500 mt-3">
-                                A liberação ocorre após verificação do administrador.
+                            <p className="text-[10px] text-slate-500 mt-1">
+                                A liberação ocorre após conferência pelo administrador.
                             </p>
                         </div>
                     </div>
