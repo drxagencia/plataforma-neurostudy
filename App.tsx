@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Navigation from './components/Navigation';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -17,8 +17,8 @@ import AccessDenied from './components/AccessDenied';
 import FullScreenPrompt from './components/FullScreenPrompt'; 
 import RankUpOverlay from './components/RankUpOverlay'; 
 import LandingPage from './components/LandingPage'; 
-import UpgradeModal from './components/UpgradeModal'; // NEW
-import { User, View, UserProfile, PlanConfig } from './types';
+import UpgradeModal from './components/UpgradeModal'; 
+import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
@@ -28,10 +28,11 @@ import { getRank } from './constants';
 
 const XP_TOAST_DURATION = 3000;
 
-// Sub-component for XP Notification
-const XpToast = () => {
+// Sub-component for XP Notification (Memoized)
+const XpToast = React.memo(() => {
     const [xpNotification, setXpNotification] = useState<{amount: number, reason: string} | null>(null);
     const [isVisible, setIsVisible] = useState(false);
+    
     useEffect(() => {
         const unsubscribe = DatabaseService.onXpEarned((amount, reason) => {
             setXpNotification({ amount, reason });
@@ -40,6 +41,7 @@ const XpToast = () => {
         });
         return () => unsubscribe();
     }, []);
+
     if (!xpNotification) return null;
     return (
         <div className={`fixed bottom-20 md:bottom-6 left-1/2 md:left-6 -translate-x-1/2 md:translate-x-0 z-[100] transition-all duration-500 ease-out transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
@@ -49,7 +51,7 @@ const XpToast = () => {
             </div>
         </div>
     );
-};
+});
 
 const App: React.FC = () => {
   const [showLanding, setShowLanding] = useState(() => {
@@ -72,31 +74,39 @@ const App: React.FC = () => {
   // Upgrade Modal State
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  // Responsive Check
+  // Responsive Check (Optimized)
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    let timeoutId: any;
+    const handleResize = () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => setIsMobile(window.innerWidth < 768), 100);
+    };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+        window.removeEventListener('resize', handleResize);
+        clearTimeout(timeoutId);
+    };
   }, []);
 
-  // Theme Application Logic
+  // Theme Application Logic (Guarded)
   useEffect(() => {
-      const root = document.documentElement;
-      root.classList.remove('light');
-      root.classList.add('dark');
+      if (user?.theme) {
+          const root = document.documentElement;
+          root.classList.remove('light', 'dark');
+          root.classList.add(user.theme);
+      } else {
+          document.documentElement.classList.add('dark');
+      }
   }, [user?.theme]);
 
-  // Auth Persistence & DB Structure Enforcement
+  // Auth Persistence
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
           const mappedUser = mapUser(firebaseUser);
-          
-          // Initial assumption (Admin check is safe here as it relies on email)
           const initialPlan = mappedUser.isAdmin ? 'admin' : 'basic';
 
-          // FETCH DB USER - SOURCE OF TRUTH
           const dbUser = await DatabaseService.ensureUserProfile(firebaseUser.uid, {
                  displayName: mappedUser.displayName,
                  email: mappedUser.email,
@@ -108,37 +118,23 @@ const App: React.FC = () => {
           if (prevXpRef.current === 0 && dbUser?.xp) prevXpRef.current = dbUser.xp;
           const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
 
-          // PLAN NORMALIZATION: Extreme Robustness
+          // Robust Plan Logic
           let finalPlan: 'basic' | 'advanced' | 'admin' = 'basic';
-
-          // 1. If DB User exists, we TRUST the DB Plan above all else.
           if (dbUser && dbUser.plan) {
               const rawDbPlan = String(dbUser.plan).trim().toLowerCase();
-              
-              if (rawDbPlan === 'admin' || mappedUser.isAdmin) {
-                  finalPlan = 'admin';
-              } else if (
-                  rawDbPlan === 'advanced' || 
-                  rawDbPlan === 'pro' || 
-                  rawDbPlan === 'vip' ||
-                  rawDbPlan.includes('adv') // Catch 'Advanced' or 'advanced '
-              ) {
-                  finalPlan = 'advanced';
-              } else {
-                  finalPlan = 'basic';
-              }
+              if (rawDbPlan === 'admin' || mappedUser.isAdmin) finalPlan = 'admin';
+              else if (rawDbPlan.includes('advanced') || rawDbPlan.includes('pro')) finalPlan = 'advanced';
+              else finalPlan = 'basic';
           } else {
-              // Fallback only if DB read failed or field missing completely
               finalPlan = initialPlan as any;
           }
 
-          // Set User with DB Data taking precedence
           setUser({
-              ...mappedUser, // Auth basics
-              ...dbUser,     // DB specifics (overwrite auth basics if needed)
+              ...mappedUser, 
+              ...dbUser,     
               displayName: dbUser?.displayName || mappedUser.displayName,
               photoURL: dbUser?.photoURL || mappedUser.photoURL,
-              plan: finalPlan, // The calculated robust plan
+              plan: finalPlan, 
               theme: safeTheme
           });
           
@@ -147,7 +143,7 @@ const App: React.FC = () => {
           setUser(null);
         }
       } catch (error) {
-        console.error("Failed to load user profile:", error);
+        console.error("Auth Load Error:", error);
         setUser(null);
       } finally {
         setLoadingAuth(false);
@@ -180,42 +176,21 @@ const App: React.FC = () => {
       try {
           const url = new URL(window.location.href);
           if (url.pathname.endsWith('/lp')) url.pathname = '/';
-          if (url.hash === '#lp') url.hash = '';
-          if (url.searchParams.has('lp')) url.searchParams.delete('lp');
+          url.hash = ''; url.search = '';
           window.history.pushState({}, '', url.toString());
       } catch (e) { window.history.pushState({}, '', '/'); }
       setShowLanding(false);
   };
 
-  // DYNAMIC ACCESS CHECK - ENFORCED STRICT LOGIC
   const checkAccess = (view: View): boolean => {
-    // If not loaded yet, allow safe views
     if (!user) return ['dashboard', 'aulas', 'questoes', 'competitivo', 'ajustes'].includes(view);
-
-    // Normalize plan just in case
     const userPlan = (user.plan || 'basic').toLowerCase();
-
-    // 1. Admin & Advanced users have full access
     if (user.isAdmin || userPlan === 'admin' || userPlan === 'advanced') return true;
-
-    // 2. Basic users have strict limitations
     if (userPlan === 'basic') {
-        const restrictedViews: View[] = [
-            'tutor',       // AI Tutor
-            'redacao',     // Redação AI
-            'simulados',   // Simulados & Provas
-            'militares',   // Conteúdo Militar
-            'competitivo'  // [NEW] Leaderboard Blocked
-        ];
-        
-        // Block restricted views
+        const restrictedViews: View[] = ['tutor', 'redacao', 'simulados', 'militares', 'competitivo'];
         if (restrictedViews.includes(view)) return false;
-        
-        // Note: 'comunidade' is allowed for basic but with limitations logic inside component if needed
         return true; 
     }
-
-    // Default Fallback (Block unknown plans)
     return false;
   };
 
@@ -231,12 +206,17 @@ const App: React.FC = () => {
       <XpToast /> 
       {showRankUp && rankTransition && <RankUpOverlay oldRank={rankTransition.old} newRank={rankTransition.new} onClose={() => setShowRankUp(false)} />}
       
-      {/* GLOBAL UPGRADE MODAL */}
       {showUpgradeModal && user && (
           <UpgradeModal user={user} onClose={() => setShowUpgradeModal(false)} />
       )}
 
-      <div className="stars-container"><div className="star-layer stars-1"></div><div className="star-layer stars-2"></div><div className="star-layer stars-3"></div><div className="nebula-glow"></div></div>
+      {/* Stars are now in index.html for performance, only nebula glow remains if needed or handled by CSS */}
+      <div className="stars-container">
+          <div className="star-layer stars-1"></div>
+          <div className="star-layer stars-2"></div>
+          <div className="star-layer stars-3"></div>
+          <div className="nebula-glow"></div>
+      </div>
 
       <Navigation currentView={currentView} onNavigate={setCurrentView} onLogout={handleLogout} isMobile={isMobile} isAdmin={user.isAdmin} />
 

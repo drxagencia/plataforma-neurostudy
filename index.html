@@ -19,7 +19,6 @@
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
     fbq('init', '4307606122862550');
-    // fbq('track', 'PageView'); REMOVIDO: O rastreamento é controlado manualmente pelo LandingPage.tsx
     </script>
     <!-- End Meta Pixel Code -->
 
@@ -34,17 +33,16 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['"Plus Jakarta Sans"', 'sans-serif'], // Professional Body Font
-              display: ['"Outfit"', 'sans-serif'], // Stylized Heading Font
+              sans: ['"Plus Jakarta Sans"', 'sans-serif'], 
+              display: ['"Outfit"', 'sans-serif'], 
             },
-            // Hack to make the entire UI look thinner/cleaner automatically
             fontWeight: {
               light: '300',
               normal: '400',
               medium: '500',
               semibold: '600',
-              bold: '600', // Remapping 'bold' to 600 makes everything cleaner
-              extrabold: '700', // Remapping 'extrabold' to 700
+              bold: '600', 
+              extrabold: '700', 
             },
             colors: {
               glass: {
@@ -78,82 +76,72 @@
         --bg-body: #000000;
         --glass-bg: rgba(15, 23, 42, 0.6);
         --glass-border: rgba(255, 255, 255, 0.05);
-        /* UPDATED: White stars for maximum visibility in dark mode */
         --star-color: #ffffff;
       }
 
-      /* Dark Mode (Default) - Deep Universe Background */
+      /* PERFORMANCE FIX: Moved background to a fixed div (z-index -2) instead of body */
+      /* Body scrolling with fixed background-attachment is a major lag cause */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow-x: hidden;
+      }
+
       html.dark body {
         background-color: #000000;
-        /* Much darker gradients for deep space feel */
-        background-image: 
-          radial-gradient(circle at 50% 0%, #0f172a, transparent 80%),
-          radial-gradient(circle at 0% 100%, #020617, transparent 60%),
-          radial-gradient(circle at 100% 100%, #171717, transparent 60%);
-        background-attachment: fixed;
         color: #f8fafc;
-        overflow-x: hidden; 
         font-feature-settings: "cv11", "ss01"; 
         letter-spacing: -0.015em; 
       }
 
-      /* LIGHT MODE OVERHAUL */
-      html.light {
-        --glass-bg: rgba(255, 255, 255, 0.85); /* Frosted White */
-        --glass-border: rgba(0, 0, 0, 0.08);
-        --star-color: #6366f1; /* Indigo-500 for visible stars in day mode */
+      /* The optimized background layer */
+      #app-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: -2;
+        background-color: #000000;
+        background-image: 
+          radial-gradient(circle at 50% 0%, #0f172a, transparent 80%),
+          radial-gradient(circle at 0% 100%, #020617, transparent 60%),
+          radial-gradient(circle at 100% 100%, #171717, transparent 60%);
+        pointer-events: none;
+        /* Promote to GPU layer */
+        transform: translateZ(0);
       }
 
-      html.light body {
-        background-color: #f8fafc; /* Slate-50 */
+      html.light #app-background {
+        background-color: #f8fafc;
         background-image: 
           radial-gradient(circle at 50% 0%, #eff6ff, transparent 70%),
           radial-gradient(circle at 0% 100%, #f0f9ff, transparent 60%),
           radial-gradient(circle at 100% 100%, #eef2ff, transparent 60%);
-        color: #0f172a; /* Slate 900 */
-        background-attachment: fixed;
-        overflow-x: hidden;
       }
 
-      /* 
-         GLOBAL CONTRAST FIX FOR LIGHT MODE 
-         This forces elements hardcoded as dark to invert in light mode.
-      */
+      html.light {
+        --glass-bg: rgba(255, 255, 255, 0.85);
+        --glass-border: rgba(0, 0, 0, 0.08);
+        --star-color: #6366f1;
+      }
       
-      /* Invert Texts */
-      html.light .text-white { color: #1e293b !important; } /* Default swap to Slate-800 */
+      html.light body { color: #0f172a; }
+
+      /* Global contrast fixes for Light Mode */
+      html.light .text-white { color: #1e293b !important; }
       html.light .text-slate-200 { color: #334155 !important; }
       html.light .text-slate-300 { color: #475569 !important; }
       html.light .text-slate-400 { color: #64748b !important; }
-      
-      /* Invert Backgrounds (Crucial for cards hardcoded as bg-slate-900) */
-      html.light .bg-slate-950, 
-      html.light .bg-black { 
-          background-color: #f8fafc !important; /* White/Slate-50 */
-          border-color: #e2e8f0 !important;
-      }
-      
-      html.light .bg-slate-900 { 
-          background-color: #ffffff !important; 
-          border-color: #e2e8f0 !important; 
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-      }
-      
-      html.light .bg-slate-800 { 
-          background-color: #f1f5f9 !important; /* Slate-100 */
-          border-color: #cbd5e1 !important;
-      }
+      html.light .bg-slate-950, html.light .bg-black { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+      html.light .bg-slate-900 { background-color: #ffffff !important; border-color: #e2e8f0 !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+      html.light .bg-slate-800 { background-color: #f1f5f9 !important; border-color: #cbd5e1 !important; }
+      html.light .bg-black\/20 { background-color: rgba(255, 255, 255, 0.6) !important; }
+      html.light .border-white\/5, html.light .border-white\/10 { border-color: rgba(0,0,0,0.08) !important; }
 
-      html.light .bg-black\/20 {
-          background-color: rgba(255, 255, 255, 0.6) !important;
-      }
-
-      html.light .border-white\/5, 
-      html.light .border-white\/10 { 
-          border-color: rgba(0,0,0,0.08) !important; 
-      }
-
-      /* EXCEPTIONS: Preserve white text on colored components (Buttons, Badges) */
+      /* Exceptions for components that should remain dark/colored */
       html.light .bg-indigo-600 .text-white,
       html.light .bg-emerald-600 .text-white,
       html.light .bg-red-600 .text-white,
@@ -178,20 +166,15 @@
       }
       html.light .glass-input::placeholder { color: #94a3b8; }
 
-      h1, h2, h3, h4, h5, h6 {
-        font-family: 'Outfit', sans-serif;
-        letter-spacing: -0.025em;
-      }
+      h1, h2, h3, h4, h5, h6 { font-family: 'Outfit', sans-serif; letter-spacing: -0.025em; }
 
-      /* Scrollbar */
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
       html.light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
       ::-webkit-scrollbar-thumb:hover { background: #334155; }
 
-      /* --- OPTIMIZED INFINITE RISING STARS ANIMATION --- */
-      /* PERFORMANCE FIX: Reduced shadow counts significantly */
+      /* --- OPTIMIZED STARS ANIMATION --- */
       .stars-container {
         position: fixed;
         top: 0;
@@ -199,11 +182,10 @@
         width: 100%;
         height: 100%;
         pointer-events: none;
-        z-index: 0;
+        z-index: -1; /* Behind content but above background */
         overflow: hidden;
-        /* Optimization: GPU Layer promotion */
-        transform: translateZ(0); 
-        will-change: transform;
+        /* PERFORMANCE: Isolate layout/paint */
+        contain: strict;
       }
 
       .star-layer {
@@ -211,8 +193,9 @@
         top: 0;
         left: 0;
         background: transparent;
-        /* Optimization: Tell browser this will animate */
-        will-change: transform; 
+        /* PERFORMANCE: Force GPU */
+        will-change: transform;
+        transform: translateZ(0); 
       }
 
       .star-layer::after {
@@ -226,47 +209,34 @@
         box-shadow: inherit;
       }
 
-      /* Layer 1: Small stars (Reduced count by 80%) */
+      /* REDUCED SHADOW COUNT FOR PERFORMANCE */
       .stars-1 {
-        width: 1.5px; 
-        height: 1.5px;
-        background: transparent;
+        width: 1px; height: 1px;
         box-shadow: 
-          10vw 15vh var(--star-color), 30vw 35vh var(--star-color), 
-          50vw 10vh var(--star-color), 70vw 60vh var(--star-color), 
-          90vw 25vh var(--star-color), 15vw 85vh var(--star-color), 
-          45vw 70vh var(--star-color), 80vw 90vh var(--star-color);
-        animation: animStar 120s linear infinite;
-        opacity: 0.4;
+          10vw 10vh var(--star-color), 20vw 80vh var(--star-color), 
+          40vw 40vh var(--star-color), 60vw 20vh var(--star-color), 
+          80vw 60vh var(--star-color), 90vw 90vh var(--star-color);
+        animation: animStar 100s linear infinite;
+        opacity: 0.3;
       }
 
-      /* Layer 2: Medium stars (Reduced count by 80%) */
       .stars-2 {
-        width: 2px;
-        height: 2px;
-        background: transparent;
+        width: 2px; height: 2px;
         box-shadow: 
-          20vw 25vh var(--star-color), 60vw 10vh var(--star-color), 
-          85vw 50vh var(--star-color), 10vw 90vh var(--star-color), 
-          40vw 40vh var(--star-color);
-        animation: animStar 80s linear infinite;
-        opacity: 0.6;
+          15vw 50vh var(--star-color), 35vw 20vh var(--star-color), 
+          55vw 80vh var(--star-color), 75vw 40vh var(--star-color), 
+          95vw 10vh var(--star-color);
+        animation: animStar 70s linear infinite;
+        opacity: 0.5;
       }
       .stars-2::after { width: 2px; height: 2px; }
 
-      /* Layer 3: Large stars (Minimal count, removed heavy filters) */
       .stars-3 {
-        width: 3px; 
-        height: 3px;
-        background: transparent;
+        width: 3px; height: 3px;
         box-shadow: 
-          50vw 30vh var(--star-color), 10vw 80vh var(--star-color), 95vw 15vh var(--star-color);
+          25vw 30vh var(--star-color), 70vw 70vh var(--star-color);
         animation: animStar 50s linear infinite;
-        opacity: 0.8;
-        /* PERFORMANCE FIX: Removed filter: drop-shadow */
-      }
-      html.light .stars-3 { 
-          opacity: 0.6; 
+        opacity: 0.7;
       }
       .stars-3::after { width: 3px; height: 3px; }
 
@@ -275,36 +245,35 @@
         to { transform: translateY(-100vh); }
       }
 
-      /* Nebula Glows - Optimized */
+      /* OPTIMIZED NEBULA GLOW */
       .nebula-glow {
         position: fixed;
         width: 100vw;
         height: 100vh;
         z-index: -1;
-        /* Using will-change to optimize opacity animation */
-        will-change: opacity, transform;
-        /* Use translate3d to force hardware acceleration */
-        transform: translate3d(0,0,0);
+        will-change: opacity;
+        transform: translateZ(0);
         background: 
-          radial-gradient(circle at 15% 55%, rgba(30, 27, 75, 0.08), transparent 40%),
-          radial-gradient(circle at 85% 25%, rgba(49, 46, 129, 0.05), transparent 40%);
-        animation: pulseGlow 15s ease-in-out infinite alternate;
+          radial-gradient(circle at 20% 50%, rgba(30, 27, 75, 0.05), transparent 40%),
+          radial-gradient(circle at 80% 30%, rgba(49, 46, 129, 0.03), transparent 40%);
+        animation: pulseGlow 10s ease-in-out infinite alternate;
+        pointer-events: none;
       }
       
       html.light .nebula-glow {
           background: 
-          radial-gradient(circle at 15% 55%, rgba(14, 165, 233, 0.08), transparent 40%),
-          radial-gradient(circle at 85% 25%, rgba(99, 102, 241, 0.08), transparent 40%);
+          radial-gradient(circle at 15% 55%, rgba(14, 165, 233, 0.05), transparent 40%),
+          radial-gradient(circle at 85% 25%, rgba(99, 102, 241, 0.05), transparent 40%);
       }
 
       @keyframes pulseGlow {
-        0% { opacity: 0.3; transform: scale(1) translate3d(0,0,0); }
-        100% { opacity: 0.6; transform: scale(1.02) translate3d(0,0,0); }
+        0% { opacity: 0.4; }
+        100% { opacity: 0.7; }
       }
       
       .glass-card {
         background: var(--glass-bg);
-        /* Optimized blur: Reduced from 12px to 8px for performance */
+        /* OPTIMIZATION: Reduced blur from 12px to 8px */
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         border: 1px solid var(--glass-border);
@@ -337,14 +306,12 @@
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
-    <!-- Meta Pixel Code (Noscript) moved to body -->
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=4307606122862550&ev=PageView&noscript=1"
-    /></noscript>
-    <!-- End Meta Pixel Code (Noscript) -->
+    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=4307606122862550&ev=PageView&noscript=1" /></noscript>
+    
+    <!-- Fixed Background Layer -->
+    <div id="app-background"></div>
     
     <div id="root"></div>
-    <!-- Vite entry point -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
