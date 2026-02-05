@@ -64,12 +64,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   // VSL Logic
   const [showEarlyOffer, setShowEarlyOffer] = useState(false);
   const [showFinalOffer, setShowFinalOffer] = useState(false);
+  
+  // Visibility Logic (Anti-Pixel confusion)
+  const [showPricingSection, setShowPricingSection] = useState(false);
 
   // Enemy Shooting Logic
   const [deadEnemies, setDeadEnemies] = useState<number[]>([]);
 
   // Pricing / Checkout Logic
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  // DEFAULT YEARLY AS REQUESTED
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [showPixModal, setShowPixModal] = useState(false);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [pixAmount, setPixAmount] = useState(0);
@@ -87,6 +91,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
       ref.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleRevealOffer = () => {
+      setShowPricingSection(true);
+      // Small timeout to allow render before scroll
+      setTimeout(() => {
+          scrollToSection(pricingRef);
+      }, 100);
   };
 
   const handleKillEnemy = (index: number) => {
@@ -122,6 +134,36 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           } catch (e) {
               alert("Erro ao gerar PIX");
           }
+      }
+  };
+
+  // Helper to display price based on cycle
+  const getPriceDisplay = (plan: 'basic' | 'advanced') => {
+      if (billingCycle === 'monthly') {
+          // Monthly Display
+          const val = plan === 'basic' ? '9,90' : '19,90';
+          return (
+              <div className="mb-6 opacity-80">
+                  <span className="text-3xl font-black text-white">R$ {val}</span>
+                  <span className="text-zinc-500 text-sm font-bold">/mês</span>
+              </div>
+          );
+      } else {
+          // Yearly Display (Shown as Monthly Equivalent)
+          const total = plan === 'basic' ? 97.00 : 197.00;
+          const monthlyEq = (total / 12).toFixed(2).replace('.', ',');
+          
+          return (
+              <div className="mb-6">
+                  <div className="flex items-baseline gap-1">
+                      <span className="text-5xl font-black text-white">R$ {monthlyEq}</span>
+                      <span className="text-zinc-400 text-sm font-bold">/mês</span>
+                  </div>
+                  <p className="text-xs text-emerald-400 font-bold mt-1 bg-emerald-900/20 inline-block px-2 py-1 rounded border border-emerald-500/20">
+                      ou R$ {total.toFixed(2).replace('.', ',')} à vista
+                  </p>
+              </div>
+          );
       }
   };
 
@@ -299,7 +341,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       {showFinalOffer ? (
                           <div className="animate-in zoom-in-50 duration-500 w-full">
                               <button 
-                                onClick={() => scrollToSection(pricingRef)}
+                                onClick={handleRevealOffer}
                                 className="w-full md:w-auto px-12 py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-2xl rounded-xl shadow-[0_0_60px_rgba(16,185,129,0.4)] hover:scale-105 transition-all animate-pulse-slow flex items-center justify-center gap-3 mx-auto uppercase tracking-widest border border-emerald-400/50"
                               >
                                   <Rocket size={28} className="fill-white" />
@@ -309,7 +351,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                           </div>
                       ) : showEarlyOffer && (
                           <button 
-                            onClick={() => scrollToSection(pricingRef)}
+                            onClick={handleRevealOffer}
                             className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-6 py-3 rounded-lg text-sm font-bold animate-in fade-in transition-all flex items-center gap-2 border border-white/10 hover:border-white/30"
                           >
                               <Eye size={16} /> Espiar Oferta
@@ -321,7 +363,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
           {/* === TELA 4: CHECKOUT / PREÇOS === */}
           <section ref={pricingRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/40 backdrop-blur-lg">
-              <div className="max-w-6xl w-full relative">
+              {showPricingSection ? (
+              <div className="max-w-6xl w-full relative animate-in slide-in-from-bottom-8 duration-700">
                   
                   <div className="text-center mb-12">
                       <div className="inline-block mb-4">
@@ -360,10 +403,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                               </div>
                           </div>
                           
-                          <div className="mb-6 opacity-80">
-                              <span className="text-3xl font-black text-white">R$ {billingCycle === 'monthly' ? '9,90' : '97,00'}</span>
-                              <span className="text-zinc-500 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
-                          </div>
+                          {getPriceDisplay('basic')}
 
                           <ul className="space-y-4 mb-8 text-zinc-400 text-sm">
                               <li className="flex gap-2"><CheckCircle size={16} className="text-zinc-600" /> Acesso às Aulas Gravadas</li>
@@ -395,14 +435,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                           </h3>
                           <p className="text-zinc-300 text-xs mb-6 font-bold uppercase tracking-wide">Ecossistema Completo</p>
                           
-                          <div className="mb-2">
-                              <span className="text-5xl font-black text-white">R$ {billingCycle === 'monthly' ? '19,90' : '197,00'}</span>
-                              <span className="text-zinc-400 text-sm font-bold">/{billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
-                          </div>
-                          
-                          {billingCycle === 'yearly' && (
-                              <p className="text-[10px] text-emerald-400 font-bold mb-6 bg-emerald-900/20 inline-block px-2 py-1 rounded border border-emerald-500/20">Menos de R$ 0,60 por dia</p>
-                          )}
+                          {getPriceDisplay('advanced')}
 
                           <ul className="space-y-3 mb-8 text-white text-sm font-medium">
                               <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-white fill-white/20" /> Tudo do Básico</li>
@@ -439,6 +472,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       </button>
                   </div>
               </div>
+              ) : (
+                  <div className="h-64 flex flex-col items-center justify-center">
+                      <p className="text-zinc-500 animate-pulse text-sm">Assista ao vídeo para desbloquear as ofertas...</p>
+                  </div>
+              )}
           </section>
 
       </div>
