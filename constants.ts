@@ -21,20 +21,27 @@ export const APP_NAME = "NeuroStudy AI";
 
 // Links de Pagamento
 export const KIRVANO_LINKS = {
-    balance_recharge: "https://kirvano.com/checkout/...", // Link genérico ou específico para saldo
-    essay_credits: "https://kirvano.com/checkout/...",    // Link genérico (fallback)
-    
-    // Novos Pacotes de Redação (Cartão)
-    essay_pack_basic: "https://kirvano.com/checkout/...",        // 8 Créditos - R$ 17
-    essay_pack_advanced: "https://kirvano.com/checkout/...",     // 30 Créditos - R$ 47
+    // Planos Principais
+    plan_basic: "https://pay.kirvano.com/2e8b154f-522d-4168-a056-0b991f51ebf0",
+    plan_advanced: "https://pay.kirvano.com/9364ce1c-9acd-48d1-ba53-1c8f764dcca6",
 
-    // Planos IA Ilimitada (Cartão)
-    ai_unlimited_monthly: "https://kirvano.com/checkout/...",   // R$ 37
-    ai_unlimited_semester: "https://kirvano.com/checkout/...",  // R$ 57
-    ai_unlimited_yearly: "https://kirvano.com/checkout/...",    // R$ 97
+    // Pacotes de Redação
+    essay_pack_basic: "https://pay.kirvano.com/83638982-90c9-48d3-bf1d-8501dd285914",        // Básico
+    essay_pack_intermediate: "https://pay.kirvano.com/68671170-9b25-4bcc-93e0-5e04ffbd4151", // Intermediário
+    essay_pack_advanced: "https://pay.kirvano.com/c476c796-86e4-4de2-9871-eef7fbc966a7",     // Avançado
 
-    upgrade_monthly: "https://kirvano.com/checkout/...",  // Upgrade Mensal
-    upgrade_yearly: "https://kirvano.com/checkout/..."    // Upgrade Anual
+    // IA Ilimitada (Link único fornecido)
+    ai_unlimited_monthly: "https://pay.kirvano.com/2b01fe5f-9b22-4325-8d6c-835ed83119d8",
+    ai_unlimited_semester: "https://pay.kirvano.com/2b01fe5f-9b22-4325-8d6c-835ed83119d8",
+    ai_unlimited_yearly: "https://pay.kirvano.com/2b01fe5f-9b22-4325-8d6c-835ed83119d8",
+
+    // Upgrades (Direcionam para o Advanced)
+    upgrade_monthly: "https://pay.kirvano.com/9364ce1c-9acd-48d1-ba53-1c8f764dcca6",
+    upgrade_yearly: "https://pay.kirvano.com/9364ce1c-9acd-48d1-ba53-1c8f764dcca6",
+
+    // Fallbacks
+    balance_recharge: "https://pay.kirvano.com/2e8b154f-522d-4168-a056-0b991f51ebf0",
+    essay_credits: "https://pay.kirvano.com/83638982-90c9-48d3-bf1d-8501dd285914",
 };
 
 export const ANNOUNCEMENTS: Announcement[] = [

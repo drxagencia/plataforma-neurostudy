@@ -339,9 +339,12 @@ export const DatabaseService = {
           existing.photoURL = cleanPhoto;
       }
 
+      // SAFETY: Ensure plan is not undefined, but prefer existing plan over default
       if (existing.plan === undefined || existing.balance === undefined) {
            const updated = {
                ...existing,
+               // CRITICAL: Prefer existing plan > default data plan > basic.
+               // Never overwrite an existing plan unless it is undefined/null.
                plan: existing.plan || defaultData.plan || 'basic',
                balance: existing.balance || 0
            };
@@ -628,10 +631,10 @@ export const DatabaseService = {
 
           // SPECIAL LOGIC: Handle Plan Upgrade
           if (req.planLabel && req.planLabel.includes('UPGRADE')) {
-              // Parse plan from label (Hack, but works for the MVP context)
-              // Label format: "UPGRADE: Basic to Pro (Mensal)"
+              // Strict normalization for plan assignment
               let newPlan: UserPlan = 'basic';
-              if (req.planLabel.toLowerCase().includes('advanced') || req.planLabel.toLowerCase().includes('pro')) newPlan = 'advanced';
+              const labelLower = req.planLabel.toLowerCase();
+              if (labelLower.includes('advanced') || labelLower.includes('pro')) newPlan = 'advanced';
               
               await update(userRef, { plan: newPlan });
           } 

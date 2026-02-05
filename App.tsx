@@ -92,21 +92,32 @@ const App: React.FC = () => {
       try {
         if (firebaseUser) {
           const mappedUser = mapUser(firebaseUser);
-          // CRITICAL: Ensure we get the profile from Realtime Database to confirm Plan
+          
+          // CRITICAL: Force initial assumption to match mapped user, BUT DB OVERRIDES LATER
+          const initialPlan = mappedUser.isAdmin ? 'admin' : 'basic';
+
           const dbUser = await DatabaseService.ensureUserProfile(firebaseUser.uid, {
                  displayName: mappedUser.displayName,
                  email: mappedUser.email,
                  photoURL: mappedUser.photoURL || '',
-                 plan: mappedUser.isAdmin ? 'admin' : 'basic',
+                 plan: initialPlan,
                  isAdmin: mappedUser.isAdmin
           });
 
           if (prevXpRef.current === 0 && dbUser?.xp) prevXpRef.current = dbUser.xp;
           const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
 
-          // PLAN NORMALIZATION: Force lowercase to prevent matching errors
-          const rawPlan = dbUser?.plan || (mappedUser.isAdmin ? 'admin' : 'basic');
-          const finalPlan = rawPlan.toLowerCase() as 'basic' | 'advanced' | 'admin';
+          // PLAN NORMALIZATION: Extreme Robustness
+          // 1. Get raw plan from DB (priority) or fallback to initial
+          const rawPlan = dbUser?.plan || initialPlan;
+          // 2. Clean string: remove extra spaces, quotes, lower case
+          const cleanPlan = String(rawPlan).replace(/['"]+/g, '').trim().toLowerCase();
+          // 3. Strict type casting
+          let finalPlan: 'basic' | 'advanced' | 'admin' = 'basic';
+          
+          if (cleanPlan === 'admin' || mappedUser.isAdmin) finalPlan = 'admin';
+          else if (cleanPlan === 'advanced' || cleanPlan === 'pro' || cleanPlan === 'vip') finalPlan = 'advanced';
+          else finalPlan = 'basic';
 
           // Set User with DB Data taking precedence over Auth Data
           setUser({
@@ -168,7 +179,7 @@ const App: React.FC = () => {
     if (!user) return ['dashboard', 'aulas', 'questoes', 'competitivo', 'ajustes'].includes(view);
 
     // Normalize plan just in case
-    const userPlan = user.plan.toLowerCase();
+    const userPlan = (user.plan || 'basic').toLowerCase();
 
     // 1. Admin & Advanced users have full access
     if (user.isAdmin || userPlan === 'admin' || userPlan === 'advanced') return true;

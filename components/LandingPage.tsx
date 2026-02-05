@@ -3,6 +3,7 @@ import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangl
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { TrafficConfig, Lead } from '../types';
+import { KIRVANO_LINKS } from '../constants';
 
 interface LandingPageProps {
   onStartGame: () => void;
@@ -106,9 +107,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       }
 
       if (method === 'card') {
-          const link = billingCycle === 'yearly' ? config.checkoutLinkYearly : config.checkoutLinkMonthly;
-          const finalLink = link || "https://kirvano.com"; 
-          window.open(finalLink, '_blank');
+          let link = "https://kirvano.com";
+          // Use specific Plan links from constants if available
+          if (plan === 'basic') link = KIRVANO_LINKS.plan_basic;
+          else if (plan === 'advanced') link = KIRVANO_LINKS.plan_advanced;
+          
+          window.open(link, '_blank');
       } else {
           try {
               const payload = PixService.generatePayload(price);
