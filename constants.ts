@@ -26,7 +26,6 @@ export const KIRVANO_LINKS = {
     
     // Novos Pacotes de Redação (Cartão)
     essay_pack_basic: "https://kirvano.com/checkout/...",        // 8 Créditos - R$ 17
-    essay_pack_intermediate: "https://kirvano.com/checkout/...", // 14 Créditos - R$ 27
     essay_pack_advanced: "https://kirvano.com/checkout/...",     // 30 Créditos - R$ 47
 
     // Planos IA Ilimitada (Cartão)

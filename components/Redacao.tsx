@@ -136,8 +136,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       setIsUpgrading(false);
 
       if (paymentMethod === 'card') {
-          // This path handles generic card requests from calculator if needed, 
-          // but we mostly direct to cards via specific packages now.
           window.open(KIRVANO_LINKS.essay_credits, '_blank');
           setNotification({ type: 'success', message: "Redirecionando para pagamento..." });
           return;
@@ -537,7 +535,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
               {paymentMethod === 'pix' && !showPix && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start animate-in fade-in">
                       {/* Left: Tiers Info */}
-                      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="glass-card p-6 rounded-2xl border border-white/5 flex flex-col justify-between hover:border-white/20 transition-all">
                               <div>
                                 <h3 className="font-bold text-white text-lg">Básico</h3>
@@ -549,17 +547,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                               </div>
                               <div className="mt-6 pt-4 border-t border-white/5"><p className="text-xs text-slate-400">1 a 4 créditos</p></div>
                           </div>
-                          <div className="glass-card p-6 rounded-2xl border border-indigo-500/30 flex flex-col justify-between bg-indigo-900/5 hover:bg-indigo-900/10 transition-all">
-                              <div>
-                                <h3 className="font-bold text-indigo-300 text-lg">Médio</h3>
-                                <div className="mt-4">
-                                    <span className={`text-3xl font-bold ${isBasicPlan ? 'text-red-400 line-through decoration-white/50 text-2xl' : 'text-white'}`}>R$ 3,75</span>
-                                    {isBasicPlan && <span className="block text-3xl font-bold text-white">R$ 15,00</span>}
-                                    <span className="text-slate-500 text-sm"> /un</span>
-                                </div>
-                              </div>
-                              <div className="mt-6 pt-4 border-t border-white/5"><p className="text-xs text-indigo-300 font-bold">5 a 9 créditos</p></div>
-                          </div>
                           <div className="glass-card p-6 rounded-2xl border border-emerald-500/50 flex flex-col justify-between bg-emerald-900/10 hover:bg-emerald-900/20 transition-all shadow-lg shadow-emerald-900/20">
                               <div className="absolute top-0 right-0 bg-emerald-500 text-slate-900 text-[10px] font-bold px-3 py-1 rounded-bl-xl">MELHOR PREÇO</div>
                               <div>
@@ -570,7 +557,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                     <span className="text-slate-500 text-sm"> /un</span>
                                 </div>
                               </div>
-                              <div className="mt-6 pt-4 border-t border-white/5"><p className="text-xs text-emerald-400 font-bold">10+ créditos</p></div>
+                              <div className="mt-6 pt-4 border-t border-white/5"><p className="text-xs text-emerald-400 font-bold">5+ créditos</p></div>
                           </div>
                       </div>
 
@@ -615,7 +602,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                           </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-end">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto items-end">
                           {/* Basic Plan */}
                           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 hover:border-slate-500 transition-all flex flex-col items-center text-center group h-fit">
                               <div className="w-14 h-14 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -634,27 +621,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                                 className="w-full py-3 rounded-xl border border-white/10 hover:bg-white/5 transition-colors font-bold text-white flex items-center justify-center gap-2 text-sm"
                               >
                                   <CreditCard size={16}/> Assinar Básico
-                              </button>
-                          </div>
-
-                          {/* Intermediate Plan */}
-                          <div className="bg-indigo-900/10 border border-indigo-500/30 rounded-3xl p-6 hover:border-indigo-500/60 transition-all flex flex-col items-center text-center group relative overflow-hidden h-fit">
-                              <div className="w-14 h-14 bg-indigo-900/30 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border border-indigo-500/20">
-                                  <Layers size={28} className="text-indigo-400" />
-                              </div>
-                              <h3 className="text-xl font-bold text-indigo-100 mb-1">Intermediário</h3>
-                              <p className="text-indigo-300/60 text-xs mb-4">Constância nos estudos</p>
-                              <div className="text-3xl font-black text-white mb-1">R$ 27,00</div>
-                              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-4">/mês</p>
-
-                              <div className="bg-indigo-500/20 px-4 py-2 rounded-lg text-sm font-bold text-indigo-300 mb-6 border border-indigo-500/30 w-full">
-                                  14 Correções
-                              </div>
-                              <button 
-                                onClick={() => window.open(KIRVANO_LINKS.essay_pack_intermediate, '_blank')}
-                                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors font-bold text-white shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 text-sm"
-                              >
-                                  <CreditCard size={16}/> Assinar Intermediário
                               </button>
                           </div>
 

@@ -17,6 +17,7 @@ import AccessDenied from './components/AccessDenied';
 import FullScreenPrompt from './components/FullScreenPrompt'; 
 import RankUpOverlay from './components/RankUpOverlay'; 
 import LandingPage from './components/LandingPage'; 
+import UpgradeModal from './components/UpgradeModal'; // NEW
 import { User, View, UserProfile, PlanConfig } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
@@ -29,7 +30,6 @@ const XP_TOAST_DURATION = 3000;
 
 // Sub-component for XP Notification
 const XpToast = () => {
-    // ... (Keep existing toast logic)
     const [xpNotification, setXpNotification] = useState<{amount: number, reason: string} | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     useEffect(() => {
@@ -63,12 +63,14 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [planConfig, setPlanConfig] = useState<PlanConfig | null>(null);
-
+  
   // Rank Up Logic
   const [showRankUp, setShowRankUp] = useState(false);
   const prevXpRef = useRef<number>(0);
   const [rankTransition, setRankTransition] = useState<{old: any, new: any} | null>(null);
+
+  // Upgrade Modal State
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Responsive Check
   useEffect(() => {
@@ -84,17 +86,13 @@ const App: React.FC = () => {
       root.classList.add('dark');
   }, [user?.theme]);
 
-  // Load Plan Config
-  useEffect(() => {
-      DatabaseService.getPlanConfig().then(config => setPlanConfig(config));
-  }, []);
-
   // Auth Persistence & DB Structure Enforcement
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
           const mappedUser = mapUser(firebaseUser);
+          // CRITICAL: Ensure we get the profile from Realtime Database to confirm Plan
           const dbUser = await DatabaseService.ensureUserProfile(firebaseUser.uid, {
                  displayName: mappedUser.displayName,
                  email: mappedUser.email,
@@ -106,6 +104,7 @@ const App: React.FC = () => {
           if (prevXpRef.current === 0 && dbUser?.xp) prevXpRef.current = dbUser.xp;
           const safeTheme = (dbUser?.theme === 'light') ? 'light' : 'dark';
 
+          // Set User with DB Data taking precedence over Auth Data
           setUser({
               ...mappedUser,
               ...dbUser, 
@@ -159,30 +158,33 @@ const App: React.FC = () => {
       setShowLanding(false);
   };
 
-  // DYNAMIC ACCESS CHECK
+  // DYNAMIC ACCESS CHECK - ENFORCED STRICT LOGIC
   const checkAccess = (view: View): boolean => {
-    if (!user || !planConfig) return true; // Default allow if loading or error
-    if (user.isAdmin || user.plan === 'admin') return true;
+    // If not loaded yet, allow safe views
+    if (!user) return ['dashboard', 'aulas', 'questoes', 'competitivo', 'ajustes'].includes(view);
 
-    const permissions = planConfig.permissions[user.plan as keyof typeof planConfig.permissions];
-    if (!permissions) return true; // Fallback
+    // 1. Admin & Advanced users have full access
+    if (user.isAdmin || user.plan === 'admin' || user.plan === 'advanced') return true;
 
-    switch (view) {
-        case 'tutor': return permissions.canUseChat;
-        case 'redacao': return permissions.canUseEssay;
-        case 'simulados': return permissions.canUseSimulations;
-        case 'comunidade': return permissions.canUseCommunity;
-        case 'militares': return permissions.canUseMilitary;
-        // Default views are always open
-        case 'dashboard':
-        case 'aulas':
-        case 'questoes':
-        case 'competitivo': // Rank is usually public/gamified
-        case 'ajustes':
-            return true;
-        default:
-            return true;
+    // 2. Basic users have strict limitations
+    if (user.plan === 'basic') {
+        const restrictedViews: View[] = [
+            'tutor',       // AI Tutor
+            'redacao',     // Redação AI
+            'simulados',   // Simulados & Provas
+            'militares',   // Conteúdo Militar
+            'competitivo'  // [NEW] Leaderboard Blocked
+        ];
+        
+        // Block restricted views
+        if (restrictedViews.includes(view)) return false;
+        
+        // Note: 'comunidade' is allowed for basic but with limitations logic inside component if needed
+        return true; 
     }
+
+    // Default Fallback (Block unknown plans)
+    return false;
   };
 
   const handleUpdateUser = (updatedUser: UserProfile) => { setUser(updatedUser); };
@@ -196,6 +198,12 @@ const App: React.FC = () => {
       <FullScreenPrompt /> 
       <XpToast /> 
       {showRankUp && rankTransition && <RankUpOverlay oldRank={rankTransition.old} newRank={rankTransition.new} onClose={() => setShowRankUp(false)} />}
+      
+      {/* GLOBAL UPGRADE MODAL */}
+      {showUpgradeModal && user && (
+          <UpgradeModal user={user} onClose={() => setShowUpgradeModal(false)} />
+      )}
+
       <div className="stars-container"><div className="star-layer stars-1"></div><div className="star-layer stars-2"></div><div className="star-layer stars-3"></div><div className="nebula-glow"></div></div>
 
       <Navigation currentView={currentView} onNavigate={setCurrentView} onLogout={handleLogout} isMobile={isMobile} isAdmin={user.isAdmin} />
@@ -203,7 +211,7 @@ const App: React.FC = () => {
       <main className={`flex-1 relative overflow-y-auto overflow-x-hidden transition-all duration-300 z-10 ${isMobile ? 'pb-24 p-4' : 'ml-64 p-8'}`} style={{ height: '100vh' }}>
         <div className="max-w-7xl mx-auto h-full relative">
             {!checkAccess(currentView) 
-                ? <AccessDenied currentPlan={user.plan} requiredPlan="Upgrade Necessário" />
+                ? <AccessDenied currentPlan={user.plan} requiredPlan="advanced" onUnlock={() => setShowUpgradeModal(true)} />
                 : (
                     <>
                     {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} />}

@@ -629,9 +629,8 @@ export const DatabaseService = {
           // SPECIAL LOGIC: Handle Plan Upgrade
           if (req.planLabel && req.planLabel.includes('UPGRADE')) {
               // Parse plan from label (Hack, but works for the MVP context)
-              // Label format: "UPGRADE: Basic to Pro (Mensal)" or "UPGRADE: Intermediate"
+              // Label format: "UPGRADE: Basic to Pro (Mensal)"
               let newPlan: UserPlan = 'basic';
-              if (req.planLabel.toLowerCase().includes('intermediate')) newPlan = 'intermediate';
               if (req.planLabel.toLowerCase().includes('advanced') || req.planLabel.toLowerCase().includes('pro')) newPlan = 'advanced';
               
               await update(userRef, { plan: newPlan });
@@ -666,16 +665,14 @@ export const DatabaseService = {
   getPlanConfig: async (): Promise<PlanConfig> => {
       const snap = await get(ref(database, 'config/plans'));
       if (snap.exists()) return snap.val();
-      // Default Config if none exists
+      // Default Config if none exists (Strict Basic vs Advanced)
       return {
           permissions: {
               basic: { canUseChat: false, canUseExplanation: true, canUseEssay: false, canUseSimulations: false, canUseCommunity: true, canUseMilitary: false },
-              intermediate: { canUseChat: true, canUseExplanation: true, canUseEssay: true, canUseSimulations: true, canUseCommunity: true, canUseMilitary: false },
               advanced: { canUseChat: true, canUseExplanation: true, canUseEssay: true, canUseSimulations: true, canUseCommunity: true, canUseMilitary: true },
           },
           prices: {
               basic: 29.90,
-              intermediate: 49.90,
               advanced: 79.90
           }
       };

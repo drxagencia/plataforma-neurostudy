@@ -22,7 +22,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   // Plan Config & Upgrade State
   const [planConfig, setPlanConfig] = useState<PlanConfig | null>(null);
   const [upgradeMode, setUpgradeMode] = useState(false);
-  const [upgradeTarget, setUpgradeTarget] = useState<'intermediate' | 'advanced'>('advanced');
+  const [upgradeTarget, setUpgradeTarget] = useState<'advanced'>('advanced');
   const [upgradePaymentMethod, setUpgradePaymentMethod] = useState<'pix' | 'card'>('pix');
   const [upgradePixPayload, setUpgradePixPayload] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -103,11 +103,8 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
 
   const handleUpgradeAction = () => {
       const cost = calculateUpgradeCost();
-      const targetPrice = planConfig?.prices[upgradeTarget] || 0;
 
       if (upgradePaymentMethod === 'card') {
-          // Card: User pays full price (system refunds diff later manually as per requirements)
-          // Or strictly speaking, we just send them to checkout.
           const link = user.billingCycle === 'yearly' ? KIRVANO_LINKS.upgrade_yearly : KIRVANO_LINKS.upgrade_monthly;
           window.open(link, '_blank');
           return;
@@ -221,26 +218,18 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
                             onClick={() => setUpgradeMode(!upgradeMode)}
                             className="w-full py-3 bg-white text-indigo-950 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all shadow-lg"
                           >
-                              <ArrowUpCircle size={20} /> Fazer Upgrade
+                              <ArrowUpCircle size={20} /> Fazer Upgrade para Pro
                           </button>
 
                           {upgradeMode && planConfig && (
                               <div className="animate-in slide-in-from-top-2 pt-4 border-t border-white/5">
-                                  <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Selecione o novo plano</label>
+                                  <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Plano</label>
                                   <div className="flex gap-2 mb-4">
-                                      {user.plan === 'basic' && (
-                                          <button 
-                                            onClick={() => setUpgradeTarget('intermediate')}
-                                            className={`flex-1 p-3 rounded-lg border text-sm font-bold transition-all ${upgradeTarget === 'intermediate' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}`}
-                                          >
-                                              Intermediário
-                                          </button>
-                                      )}
                                       <button 
                                         onClick={() => setUpgradeTarget('advanced')}
                                         className={`flex-1 p-3 rounded-lg border text-sm font-bold transition-all ${upgradeTarget === 'advanced' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}`}
                                       >
-                                          Avançado
+                                          Advanced (Acesso Total)
                                       </button>
                                   </div>
 

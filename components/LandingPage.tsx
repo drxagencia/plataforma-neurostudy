@@ -116,11 +116,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       {/* Overrides for Star Visibility */}
       <style>{`
         :root { --star-color: #ffffff !important; }
-        .nebula-glow { opacity: 0.15 !important; background-image: none !important; } /* Reduce purple fog to almost nothing */
+        .nebula-glow { opacity: 0.15 !important; background-image: none !important; } 
         .star-layer { opacity: 1 !important; }
       `}</style>
 
-      {/* Background Fixado (Visível em toda a rolagem) */}
+      {/* Background Fixado (Visível em toda a rolagem - z-0) */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-black">
           <div className="star-layer stars-1"></div>
           <div className="star-layer stars-2"></div>
@@ -131,16 +131,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
           {/* === TELA 1: HERO === */}
           <section ref={heroRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-transparent">
-              <div className="absolute top-10 flex flex-col items-center animate-in fade-in duration-1000">
+              <div className="absolute top-8 flex flex-col items-center animate-in fade-in duration-1000">
                  <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/20 mb-4 shadow-[0_0_30px_rgba(255,255,255,0.1)] animate-pulse-slow">
                      <BrainCircuit size={40} className="text-white" />
                  </div>
-                 <h3 className="text-zinc-400 font-bold tracking-[0.3em] text-xs uppercase">NeuroStudy OS</h3>
+                 <h3 className="text-zinc-400 font-bold tracking-[0.3em] text-xs uppercase mt-2">NeuroStudy OS</h3>
               </div>
 
-              <div className="text-center space-y-8 max-w-4xl z-10">
-                  <h1 className="text-6xl md:text-9xl font-black tracking-tighter text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.3)] animate-in zoom-in-50 duration-1000">
-                      READY PLAYER ONE?
+              <div className="text-center space-y-8 max-w-4xl z-10 mt-24">
+                  <h1 className="text-6xl md:text-9xl font-black tracking-tighter text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.3)] animate-in zoom-in-50 duration-1000 uppercase leading-none">
+                      Você está<br/>pronto?
                   </h1>
                   <p className="text-xl md:text-2xl text-zinc-400 max-w-2xl mx-auto leading-relaxed font-light">
                       Você está prestes a entrar no <strong className="text-white">único sistema</strong> capaz de hackear sua aprovação no ENEM em tempo recorde.
@@ -166,7 +166,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           </section>
 
           {/* === TELA 2: INIMIGOS === */}
-          <section ref={enemiesRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/40 backdrop-blur-sm">
+          <section ref={enemiesRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/20 backdrop-blur-sm">
               <div className="max-w-6xl mx-auto w-full">
                   <div className="text-center mb-16">
                       <span className="text-white font-mono font-bold tracking-widest uppercase text-sm mb-4 block animate-pulse border border-white/20 inline-block px-4 py-1 rounded">System Alert: Threats Detected</span>
@@ -209,7 +209,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           </section>
 
           {/* === TELA 3: VSL === */}
-          <section ref={vslRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/50 backdrop-blur-md">
+          <section ref={vslRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/30 backdrop-blur-md">
               <div className="max-w-5xl w-full">
                   <div className="bg-black/80 rounded-3xl border border-white/20 shadow-[0_0_100px_rgba(255,255,255,0.05)] backdrop-blur-xl relative overflow-hidden">
                       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-zinc-900/50">
@@ -266,7 +266,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           </section>
 
           {/* === TELA 4: CHECKOUT / PREÇOS === */}
-          <section ref={pricingRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/60 backdrop-blur-lg">
+          <section ref={pricingRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/40 backdrop-blur-lg">
               <div className="max-w-6xl w-full relative">
                   
                   <div className="text-center mb-12">
@@ -354,7 +354,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                               <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-white fill-white/20" /> Tudo do Básico</li>
                               <li className="flex gap-2 items-center"><BrainCircuit size={18} className="text-white fill-white/20" /> NeuroTutor IA (Tire dúvidas 24h)</li>
                               <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-white fill-white/20" /> Correção de Redação Instantânea</li>
-                              <li className="flex gap-2 items-center"><Trophy size={18} className="text-white fill-white/20" /> Simulados com Ranking</li>
+                              {/* NEW ITEMS */}
+                              <li className="flex gap-2 items-center"><Trophy size={18} className="text-white fill-white/20" /> Sistema de Gamificação com XP</li>
+                              <li className="flex gap-2 items-center"><Swords size={18} className="text-white fill-white/20" /> Ranking Competitivo com Alunos</li>
+                              
                               <li className="flex gap-2 items-center"><Shield size={18} className="text-white fill-white/20" /> Acesso à Comunidade VIP</li>
                           </ul>
 

@@ -1,7 +1,7 @@
 
 export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes';
 
-export type UserPlan = 'basic' | 'intermediate' | 'advanced' | 'admin';
+export type UserPlan = 'basic' | 'advanced' | 'admin';
 export type BillingCycle = 'monthly' | 'yearly';
 
 export interface User {
@@ -214,12 +214,10 @@ export interface PlanFeatures {
 export interface PlanConfig {
     permissions: {
         basic: PlanFeatures;
-        intermediate: PlanFeatures;
         advanced: PlanFeatures;
     };
     prices: {
         basic: number;
-        intermediate: number;
         advanced: number;
     };
 }

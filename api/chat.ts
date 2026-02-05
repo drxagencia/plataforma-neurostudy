@@ -51,25 +51,29 @@ export default async function handler(req: any, res: any) {
 
     if (!uid) return res.status(401).json({ error: 'User ID required' });
 
+    // DATABASE CHECK: Ensure we get the source of truth for the plan
     const userRef = ref(db, `users/${uid}`);
-    const configRef = ref(db, `config/ai`);
-    
-    const [userSnap, configSnap] = await Promise.all([get(userRef), get(configRef)]);
+    const userSnap = await get(userRef);
     
     if (!userSnap.exists()) return res.status(404).json({ error: 'User not found' });
     
     const user = userSnap.val();
-    const config = configSnap.val() || { intermediateLimits: { canUseChat: false, canUseExplanation: true } };
-
-    // Initialize OpenAI
-    const openai = new OpenAI({ apiKey });
+    
+    // STRICT PLAN CHECK
+    const isBasic = user.plan === 'basic';
+    const isAdvanced = user.plan === 'advanced' || user.plan === 'admin' || user.isAdmin;
 
     // --- ESSAY CORRECTION LOGIC (VISION) ---
     if (mode === 'essay-correction') {
+        // Basic users CAN perform essay correction IF they have credits (purchased separately)
+        // Advanced users have credits included in subscription
         const credits = user.essayCredits || 0;
         if (credits <= 0) {
             return res.status(402).json({ error: 'Sem créditos de redação.' });
         }
+
+        // Initialize OpenAI
+        const openai = new OpenAI({ apiKey });
 
         // PROMPT CALIBRADO - PADRÃO INEP/ENEM OFICIAL
         const prompt = `
@@ -120,22 +124,21 @@ export default async function handler(req: any, res: any) {
 
     // --- CHAT / TUTOR LOGIC ---
     
-    // Check Permissions
-    const isBasic = user.plan === 'basic';
-    const isIntermediate = user.plan === 'intermediate';
-    
+    // Strict block for Basic Plan on Chat
     if (isBasic && mode === 'chat') {
-        return res.status(403).json({ error: 'Upgrade seu plano para usar o chat livre.' });
-    }
-    if (isIntermediate && mode === 'chat' && !config.intermediateLimits.canUseChat) {
-        return res.status(403).json({ error: 'Seu plano permite apenas explicações de questões.' });
+        return res.status(403).json({ error: 'Upgrade para o plano Advanced necessário para usar o NeuroTutor.' });
     }
 
     // Check Balance (Cost Per Message approx)
-    const COST_PER_REQ = isBasic ? 0.02 : 0.01; // Basic pays double
+    // Advanced users pay standard rate or have optimized consumption
+    const COST_PER_REQ = 0.01; 
+    
     if (user.balance < COST_PER_REQ) {
         return res.status(402).json({ error: 'Saldo insuficiente.' });
     }
+
+    // Initialize OpenAI
+    const openai = new OpenAI({ apiKey });
 
     let systemInstruction = systemOverride || "Você é a NeuroAI, uma tutora educacional de elite. Seja didática, direta e use formatação Markdown rica (negrito, listas).";
 
