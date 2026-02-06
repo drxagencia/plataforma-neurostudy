@@ -206,6 +206,25 @@ export const DatabaseService = {
       }
   },
 
+  // NEW: Fetch subtopic keys dynamically based on Category/Subject/Topic
+  getAvailableSubtopics: async (category: string, subjectId: string, topic: string): Promise<string[]> => {
+      try {
+          // Path: questions/regular/fisica/Cinemática
+          // The keys of this path are the subtopics
+          const path = `questions/${category}/${subjectId}/${topic}`;
+          const snapshot = await get(ref(database, path));
+          
+          if (snapshot.exists()) {
+              // Get keys (subtopics)
+              return Object.keys(snapshot.val());
+          }
+          return [];
+      } catch (e) {
+          console.error("Error fetching available subtopics:", e);
+          return [];
+      }
+  },
+
   getQuestionsFromSubtopics: async (category: string, subjectId: string, topic: string, subtopics: string[]): Promise<Question[]> => {
       try {
            const allQuestions: Question[] = [];
@@ -257,6 +276,7 @@ export const DatabaseService = {
       return {};
   },
 
+  // Legacy or Full Map fetch - Kept for compatibility but superseded by getAvailableSubtopics for UI
   getSubTopics: async (): Promise<Record<string, Record<string, string[]>>> => {
       const snap = await get(ref(database, 'subtopics'));
       if(snap.exists()) {

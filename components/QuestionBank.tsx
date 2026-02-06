@@ -80,8 +80,6 @@ interface QuestionBankProps {
 const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
-  // Updated: Subtopics are now nested by subjectId and topicId
-  const [subtopics, setSubtopics] = useState<Record<string, Record<string, string[]>>>({});
   const [loading, setLoading] = useState(true);
   const [answeredMap, setAnsweredMap] = useState<Record<string, {correct: boolean}>>({});
 
@@ -91,6 +89,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [selectedSubTopic, setSelectedSubTopic] = useState<string>('');
+  
+  // Dynamic Subtopics List
+  const [subTopicsList, setSubTopicsList] = useState<string[]>([]);
   
   // New: Multiple subtopics filter (internal logic, not exposed in manual UI yet to keep it simple, but used by lesson redirect)
   const [multiSubtopicsFilter, setMultiSubtopicsFilter] = useState<string[]>([]);
@@ -136,10 +137,9 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
           }
       }
 
-      const [subs, tops, subtops, answered] = await Promise.all([
+      const [subs, tops, answered] = await Promise.all([
         DatabaseService.getSubjects(),
         DatabaseService.getTopics(),
-        DatabaseService.getSubTopics(),
         auth.currentUser ? DatabaseService.getAnsweredQuestions(auth.currentUser.uid) : Promise.resolve({})
       ]);
       
@@ -147,12 +147,24 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       
       setSubjects(validSubjects);
       setTopics(tops);
-      setSubtopics(subtops);
       setAnsweredMap(answered);
       setLoading(false);
     };
     initData();
   }, []);
+
+  // --- DYNAMIC SUBTOPIC FETCHING ---
+  useEffect(() => {
+      const fetchSubtopics = async () => {
+          if (selectedCategory && selectedSubject && selectedTopic) {
+              const subs = await DatabaseService.getAvailableSubtopics(selectedCategory, selectedSubject, selectedTopic);
+              setSubTopicsList(subs);
+          } else {
+              setSubTopicsList([]);
+          }
+      };
+      fetchSubtopics();
+  }, [selectedCategory, selectedSubject, selectedTopic]);
 
   const handleFetchQuestions = async () => {
       if (!selectedSubject || !selectedTopic) return;
@@ -183,14 +195,18 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       }
   };
 
-  // Trigger fetch when filters change
+  // Trigger fetch when filters change (if valid)
   useEffect(() => {
-      if (selectedSubject && selectedTopic) {
+      // Only auto fetch if triggered by multi-filter redirect or manual selection that is complete
+      // We don't auto-fetch on every dropdown change to avoid thrashing, except when redirected.
+      // Actually, existing logic was auto-fetch on valid state.
+      if (selectedSubject && selectedTopic && (multiSubtopicsFilter.length > 0)) {
           handleFetchQuestions();
-      } else {
-          setQuestions([]);
+      } else if (selectedSubject && selectedTopic && !isFilterOpen && questions.length === 0) {
+          // If panel is closed but we have filters and no questions, fetch (user possibly closed filter manually)
+          handleFetchQuestions();
       }
-  }, [selectedSubject, selectedTopic, selectedSubTopic, selectedCategory, multiSubtopicsFilter]);
+  }, [selectedSubject, selectedTopic, multiSubtopicsFilter]);
 
   const handleAnswerSubmit = async (optionIdx: number) => {
       const currentQ = questions[currentIndex];
@@ -296,13 +312,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const wasCorrect = currentQ?.id ? answeredMap[currentQ.id]?.correct : false;
   const filteredSubjects = subjects.filter(s => s.category === selectedCategory);
   
-  // Helper to safely get subtopics for current selection
+  // Helper to safely get topics for current selection
   const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
-  
-  // Safe Access to nested subtopics
-  const subTopicOptions = (selectedSubject && selectedTopic && subtopics[selectedSubject] && subtopics[selectedSubject][selectedTopic]) 
-      ? subtopics[selectedSubject][selectedTopic] 
-      : [];
 
   return (
     <div className="h-full flex flex-col relative animate-fade-in">
@@ -412,7 +423,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                         className="w-full glass-input p-3 rounded-xl text-sm disabled:opacity-50"
                         >
                         <option value="">Todos</option>
-                        {subTopicOptions.map((st) => (
+                        {subTopicsList.map((st) => (
                             <option key={st} value={st}>{st}</option>
                         ))}
                         </select>
@@ -420,13 +431,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                 )}
 
                 <div className="pt-4 border-t border-white/10 text-center text-xs text-slate-500">
-                    O filtro aplica automaticamente.
+                    Selecione para atualizar.
                 </div>
             </div>
             
             <button 
-                onClick={() => setIsFilterOpen(false)}
-                className="mt-6 w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl md:hidden"
+                onClick={() => handleFetchQuestions()}
+                className="mt-6 w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl"
             >
                 Ver Questões
             </button>

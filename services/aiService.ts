@@ -134,21 +134,25 @@ export const AiService = {
       
       SEU OBJETIVO: Tentar resolver a dúvida do usuário (problemas de acesso, como usar a plataforma, dicas de estudo básico).
       
-      REGRA CRÍTICA DE ESCALONAMENTO:
-      Se você perceber que NÃO CONSEGUE resolver (ex: bug técnico, problema financeiro/pagamento, erro de conta, solicitação complexa), você deve pedir para o usuário informar:
-      1. O Nome Completo dele na plataforma.
-      2. O Relato detalhado do problema.
+      REGRA CRÍTICA DE ESCALONAMENTO E RESPOSTA JSON:
+      Você deve analisar a conversa e decidir se consegue resolver ou se precisa escalar para um humano.
       
-      QUANDO VOCÊ TIVER ESSAS DUAS INFORMAÇÕES (Nome + Problema), e SOMENTE QUANDO TIVER AS DUAS, você deve responder ESTRITAMENTE com o seguinte JSON (sem markdown, apenas o JSON):
+      Se NÃO conseguir resolver (ex: bug técnico, financeiro, solicitação complexa), você deve pedir Nome Completo e Descrição do Problema.
       
+      IMPORTANTE: Você deve SEMPRE responder APENAS com um JSON válido. Não inclua markdown fora do JSON.
+      
+      Cenário 1: Você está conversando/respondendo (ainda não tem todos os dados ou pode resolver):
       {
-        "action": "escalate",
+        "type": "message",
+        "content": "Sua resposta amigável aqui..."
+      }
+      
+      Cenário 2: Você JÁ POSSUI o Nome Completo E o Relato do problema e vai escalar:
+      {
+        "type": "escalate",
         "name": "Nome extraído",
         "issue": "Resumo do problema"
       }
-      
-      Enquanto o usuário não fornecer os dois dados, continue pedindo educadamente.
-      Se puder ajudar sem escalar, ajude e não envie o JSON.
       `;
 
       const openaiHistory = history.map(h => ({
@@ -162,10 +166,11 @@ export const AiService = {
               { role: 'system', content: prompt },
               ...openaiHistory,
               { role: 'user', content: message }
-          ]
+          ],
+          response_format: { type: "json_object" }
       });
 
-      return completion.choices[0]?.message?.content || "Erro no suporte.";
+      return completion.choices[0]?.message?.content || "{\"type\": \"message\", \"content\": \"Erro no suporte.\"}";
   },
 
   explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string, contextLabel: string = 'Ajuda: Questão'): Promise<string> => {

@@ -10,6 +10,19 @@ interface SupportProps {
     user: UserProfile;
 }
 
+const TypingIndicator = () => (
+    <div className="flex gap-4 animate-in fade-in slide-in-from-bottom-2">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-700 text-slate-300">
+            <Bot size={20}/>
+        </div>
+        <div className="bg-slate-800 text-slate-400 p-4 rounded-2xl rounded-tl-none flex items-center gap-1 min-w-[80px]">
+            <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+            <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+            <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce"></span>
+        </div>
+    </div>
+);
+
 const Support: React.FC<SupportProps> = ({ user }) => {
     const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -57,7 +70,7 @@ const Support: React.FC<SupportProps> = ({ user }) => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    useEffect(() => { scrollToBottom(); }, [messages]);
+    useEffect(() => { scrollToBottom(); }, [messages, sending]);
 
     const handleSend = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -83,25 +96,28 @@ const Support: React.FC<SupportProps> = ({ user }) => {
             else {
                 const response = await AiService.sendSupportMessage(userMsgText, newHistory);
                 
-                // Check for Escalation Command (JSON)
                 try {
                     const parsed = JSON.parse(response);
-                    if (parsed.action === 'escalate') {
-                        // CREATE TICKET
+                    
+                    if (parsed.type === 'escalate') {
+                        // CREATE TICKET IMMEDIATELY
                         await DatabaseService.createSupportTicket(user.uid, parsed.name, user.email, parsed.issue);
                         
-                        const confirmMsg = "Entendido! Envio confirmado para nossa equipe de suporte humano. Você receberá uma notificação aqui assim que respondermos.";
+                        const confirmMsg = "Recebido! Suas informações foram salvas e nosso suporte humano foi notificado. Você receberá uma notificação aqui nesta aba assim que respondermos. Obrigado!";
+                        
+                        // Update UI immediately with success message
                         setMessages([...newHistory, { id: (Date.now()+1).toString(), role: 'ai', content: confirmMsg }]);
                         
-                        // Set active ticket state
+                        // Set active ticket state to switch UI mode
                         const newTicket = await DatabaseService.getSupportTicket(user.uid);
                         setActiveTicket(newTicket);
                     } else {
-                        // AI answered normally (but formatted as JSON? rare case fallback)
-                        setMessages([...newHistory, { id: (Date.now()+1).toString(), role: 'ai', content: typeof parsed === 'string' ? parsed : JSON.stringify(parsed) }]);
+                        // Normal chat response
+                        setMessages([...newHistory, { id: (Date.now()+1).toString(), role: 'ai', content: parsed.content || "Entendido." }]);
                     }
                 } catch (jsonError) {
-                    // Not JSON, just normal text answer
+                    console.error("JSON Parse Error", jsonError);
+                    // Fallback if AI messes up JSON (unlikely with response_format, but safe)
                     setMessages([...newHistory, { id: (Date.now()+1).toString(), role: 'ai', content: response }]);
                 }
             }
@@ -166,7 +182,7 @@ const Support: React.FC<SupportProps> = ({ user }) => {
                         const isAdmin = activeTicket && activeTicket.messages[idx]?.role === 'admin';
                         
                         return (
-                            <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                            <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-in fade-in slide-in-from-bottom-2`}>
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'ai' ? (isAdmin ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300') : 'bg-slate-800 text-slate-400'}`}>
                                     {msg.role === 'ai' ? (isAdmin ? <User size={20}/> : <Bot size={20}/>) : <User size={20}/>}
                                 </div>
@@ -177,6 +193,7 @@ const Support: React.FC<SupportProps> = ({ user }) => {
                             </div>
                         )
                     })}
+                    {sending && <TypingIndicator />}
                     <div ref={messagesEndRef} />
                 </div>
 

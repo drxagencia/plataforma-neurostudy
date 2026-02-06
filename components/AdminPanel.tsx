@@ -14,7 +14,6 @@ const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
-  const [subtopicsMap, setSubtopicsMap] = useState<Record<string, Record<string, string[]>>>({}); // Added Subtopics Map
   const [recharges, setRecharges] = useState<RechargeRequest[]>([]);
   const [trafficConfig, setTrafficConfig] = useState({ vslScript: '', checkoutLinkMonthly: '', checkoutLinkYearly: '' });
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]); // New
@@ -25,6 +24,9 @@ const AdminPanel: React.FC = () => {
   const [topicLessons, setTopicLessons] = useState<Lesson[]>([]);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [isNewLesson, setIsNewLesson] = useState(false);
+  
+  // Dynamic Subtopics for Editor
+  const [editorSubtopics, setEditorSubtopics] = useState<string[]>([]);
 
   // Simulation Management State
   const [simulations, setSimulations] = useState<Simulation[]>([]);
@@ -58,14 +60,12 @@ const AdminPanel: React.FC = () => {
   }, []);
 
   const fetchConfigData = async () => {
-    const [s, t, st] = await Promise.all([
+    const [s, t] = await Promise.all([
         DatabaseService.getSubjects(),
         DatabaseService.getTopics(),
-        DatabaseService.getSubTopics() // Fetch subtopics
     ]);
     setSubjects(s);
     setTopics(t);
-    setSubtopicsMap(st);
   };
 
   // --- TAB LOADING LOGIC ---
@@ -88,6 +88,23 @@ const AdminPanel: React.FC = () => {
           });
       }
   }, [selectedSubjectId, selectedTopicId]);
+
+  // Fetch Subtopics dynamically for Editor
+  useEffect(() => {
+      const fetchEditorSubtopics = async () => {
+          if (editingLesson && editingLesson.type === 'exercise_block' && editingLesson.exerciseFilters) {
+              const { category, subject, topic } = editingLesson.exerciseFilters;
+              if (category && subject && topic) {
+                  const subs = await DatabaseService.getAvailableSubtopics(category, subject, topic);
+                  setEditorSubtopics(subs);
+              } else {
+                  setEditorSubtopics([]);
+              }
+          }
+      };
+      fetchEditorSubtopics();
+  }, [editingLesson?.exerciseFilters?.category, editingLesson?.exerciseFilters?.subject, editingLesson?.exerciseFilters?.topic]);
+
 
   // --- CONTENT: LESSONS LOGIC ---
   const handleEditLesson = (lesson: Lesson) => {
@@ -173,12 +190,6 @@ const AdminPanel: React.FC = () => {
   const handleSaveSimulation = async () => {
       if (!editingSim) return;
       if (editingSim.id) {
-          // Find path? We need to use updatePath but we need the key. Simulation obj has key in 'id'
-          // Actually Simulation objects from getSimulations() have the ID.
-          // BUT, DatabaseService.createSimulation uses push.
-          // Let's assume we can't easily update simulations with current service structure without a dedicated update method or knowing path.
-          // Adding specific update method or raw path update.
-          // Path: simulations/{id}
           await DatabaseService.updatePath(`simulations/${editingSim.id}`, editingSim);
       } else {
           await DatabaseService.createSimulation(editingSim);
@@ -242,9 +253,6 @@ const AdminPanel: React.FC = () => {
       // Refresh tickets
       DatabaseService.getAllSupportTickets().then(t => setSupportTickets(t.sort((a,b) => b.lastUpdated - a.lastUpdated)));
   };
-
-  // Helper for available subtopics
-  const availableSubtopics = (selectedSubjectId && selectedTopicId && subtopicsMap[selectedSubjectId] && subtopicsMap[selectedSubjectId][selectedTopicId]) || [];
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in">
@@ -412,6 +420,27 @@ const AdminPanel: React.FC = () => {
                       ) : (
                           <div className="p-4 bg-emerald-900/20 rounded-xl border border-emerald-500/20">
                               <p className="text-emerald-400 font-bold text-sm mb-2 flex items-center gap-2"><ListPlus size={16}/> Configuração do Bloco de Questões</p>
+                              
+                              <div className="mb-3">
+                                  <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Categoria</label>
+                                  <select 
+                                    className="w-full glass-input p-2 rounded-lg text-xs"
+                                    value={editingLesson.exerciseFilters?.category || 'regular'}
+                                    onChange={e => setEditingLesson({
+                                        ...editingLesson, 
+                                        exerciseFilters: { 
+                                            ...editingLesson.exerciseFilters!, 
+                                            category: e.target.value,
+                                            // Reset subtopics when category changes as path changes
+                                            subtopics: []
+                                        }
+                                    })}
+                                  >
+                                      <option value="regular">Regular</option>
+                                      <option value="military">Militar</option>
+                                  </select>
+                              </div>
+
                               <div className="grid grid-cols-2 gap-3 mb-3">
                                   {/* Just reusing current selections for simplicity, could add independent dropdowns */}
                                   <div className="text-xs text-slate-400">Matéria: <span className="text-white">{selectedSubjectId}</span></div>
@@ -436,7 +465,7 @@ const AdminPanel: React.FC = () => {
                                     }}
                                   >
                                       <option value="">Todos os Subtópicos</option>
-                                      {availableSubtopics.map(st => (
+                                      {editorSubtopics.map(st => (
                                           <option key={st} value={st}>{st}</option>
                                       ))}
                                   </select>
