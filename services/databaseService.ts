@@ -8,7 +8,8 @@ import {
   remove, 
   query, 
   orderByChild, 
-  limitToLast
+  limitToLast,
+  onValue
 } from "firebase/database";
 import { database } from "./firebaseConfig";
 import { 
@@ -26,7 +27,9 @@ import {
     UserPlan,
     EssayCorrection,
     TrafficConfig,
-    PlanConfig
+    PlanConfig,
+    SupportTicket,
+    SupportMessage
 } from "../types";
 import { XP_VALUES } from "../constants";
 
@@ -296,10 +299,6 @@ export const DatabaseService = {
       if (!ids || ids.length === 0) return [];
       
       try {
-          // Since our DB is hierarchical and we don't have a flat index, we must traverse to find matches.
-          // In a production app with millions of questions, we would use a dedicated 'questions_index' node.
-          // For this scale, retrieving the questions snapshot is acceptable.
-          
           const snapshot = await get(ref(database, 'questions'));
           if (!snapshot.exists()) return [];
 
@@ -307,14 +306,12 @@ export const DatabaseService = {
           const foundQuestions: Question[] = [];
           const idsSet = new Set(ids);
 
-          // Traverse: Category -> Subject -> Topic -> Subtopic -> QuestionID
           Object.values(allData).forEach((categories: any) => {
               Object.values(categories).forEach((subjects: any) => {
                   Object.values(subjects).forEach((topics: any) => {
                       Object.values(topics).forEach((subtopics: any) => {
                           Object.keys(subtopics).forEach((key) => {
                               const item = subtopics[key];
-                              // Check if item is the question itself (legacy structure) or key is ID
                               if (idsSet.has(key)) {
                                   foundQuestions.push({ ...item, id: key });
                               }
@@ -576,6 +573,90 @@ export const DatabaseService = {
       const replies = snap.exists() ? snap.val() : [];
       const newReplies = [...replies, { ...reply, timestamp: Date.now() }];
       await set(postRef, sanitizeData(newReplies));
+  },
+
+  // --- SUPPORT SYSTEM (NEW) ---
+  createSupportTicket: async (userId: string, userName: string, userEmail: string, issue: string): Promise<void> => {
+      const ticketRef = ref(database, `support_tickets/${userId}`);
+      
+      const initialMessage: SupportMessage = {
+          role: 'user',
+          content: `[TICKET INICIADO]\nNome: ${userName}\nProblema: ${issue}`,
+          timestamp: Date.now()
+      };
+
+      const ticketData: SupportTicket = {
+          id: userId,
+          userId,
+          userName,
+          userEmail,
+          issueDescription: issue,
+          status: 'open',
+          messages: [initialMessage],
+          lastUpdated: Date.now()
+      };
+
+      await set(ticketRef, sanitizeData(ticketData));
+  },
+
+  getSupportTicket: async (userId: string): Promise<SupportTicket | null> => {
+      const ticketRef = ref(database, `support_tickets/${userId}`);
+      const snap = await get(ticketRef);
+      if (snap.exists()) return snap.val() as SupportTicket;
+      return null;
+  },
+
+  getAllSupportTickets: async (): Promise<SupportTicket[]> => {
+      const ticketsRef = ref(database, 'support_tickets');
+      const snap = await get(ticketsRef);
+      if (snap.exists()) return Object.values(snap.val());
+      return [];
+  },
+
+  replySupportTicket: async (userId: string, content: string, role: 'admin' | 'user'): Promise<void> => {
+      const ticketRef = ref(database, `support_tickets/${userId}`);
+      const snap = await get(ticketRef);
+      
+      if (snap.exists()) {
+          const ticket = snap.val() as SupportTicket;
+          const newMessages = [...(ticket.messages || []), {
+              role,
+              content,
+              timestamp: Date.now()
+          }];
+
+          const updates: any = {
+              messages: newMessages,
+              lastUpdated: Date.now()
+          };
+
+          if (role === 'admin') {
+              updates.status = 'answered';
+              // Set notification for user
+              await update(ref(database, `users/${userId}`), { hasSupportNotification: true });
+          } else {
+              updates.status = 'open';
+          }
+
+          await update(ticketRef, updates);
+      }
+  },
+
+  resolveSupportTicket: async (userId: string): Promise<void> => {
+      await remove(ref(database, `support_tickets/${userId}`));
+      await update(ref(database, `users/${userId}`), { hasSupportNotification: false });
+  },
+
+  clearSupportNotification: async (userId: string): Promise<void> => {
+      await update(ref(database, `users/${userId}`), { hasSupportNotification: false });
+  },
+
+  // Real-time listener for user notifications
+  onSupportNotification: (userId: string, callback: (hasNotif: boolean) => void) => {
+      const userRef = ref(database, `users/${userId}/hasSupportNotification`);
+      return onValue(userRef, (snapshot) => {
+          callback(!!snapshot.val());
+      });
   },
 
   // --- SIMULATIONS ---

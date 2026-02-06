@@ -2,12 +2,7 @@
 import { auth, database } from "./firebaseConfig";
 import OpenAI from "openai";
 import { ref, push, set, get, update } from "firebase/database";
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'ai';
-  content: string;
-}
+import { ChatMessage } from "../types";
 
 // Models - Using the cheapest capable model
 const OPENAI_MODEL = "gpt-4o-mini";
@@ -103,7 +98,8 @@ export const AiService = {
       const isBasic = userData.plan === 'basic';
       const baseMultiplier = isBasic ? 2 : 1;
       const baseCost = totalTokens * BASE_COST_PER_TOKEN * baseMultiplier;
-      const billingMultiplier = isBasic ? 80 : 40;
+      // Multiplier updated: Basic 80x, Advanced/Admin 80x
+      const billingMultiplier = 80;
       const finalCost = baseCost * billingMultiplier;
 
       const currentBalance = userData.balance || 0;
@@ -127,6 +123,49 @@ export const AiService = {
       console.error("AI Service Error:", error);
       throw error;
     }
+  },
+
+  // NEW: Support method (No Balance Deduction)
+  sendSupportMessage: async (message: string, history: ChatMessage[]): Promise<string> => {
+      const ai = getAiInstance();
+      
+      const prompt = `
+      Você é um Agente de Suporte da NeuroStudy (Nível 1).
+      
+      SEU OBJETIVO: Tentar resolver a dúvida do usuário (problemas de acesso, como usar a plataforma, dicas de estudo básico).
+      
+      REGRA CRÍTICA DE ESCALONAMENTO:
+      Se você perceber que NÃO CONSEGUE resolver (ex: bug técnico, problema financeiro/pagamento, erro de conta, solicitação complexa), você deve pedir para o usuário informar:
+      1. O Nome Completo dele na plataforma.
+      2. O Relato detalhado do problema.
+      
+      QUANDO VOCÊ TIVER ESSAS DUAS INFORMAÇÕES (Nome + Problema), e SOMENTE QUANDO TIVER AS DUAS, você deve responder ESTRITAMENTE com o seguinte JSON (sem markdown, apenas o JSON):
+      
+      {
+        "action": "escalate",
+        "name": "Nome extraído",
+        "issue": "Resumo do problema"
+      }
+      
+      Enquanto o usuário não fornecer os dois dados, continue pedindo educadamente.
+      Se puder ajudar sem escalar, ajude e não envie o JSON.
+      `;
+
+      const openaiHistory = history.map(h => ({
+          role: h.role === 'ai' ? 'assistant' : 'user',
+          content: h.content
+      })) as OpenAI.Chat.ChatCompletionMessageParam[];
+
+      const completion = await ai.chat.completions.create({
+          model: OPENAI_MODEL,
+          messages: [
+              { role: 'system', content: prompt },
+              ...openaiHistory,
+              { role: 'user', content: message }
+          ]
+      });
+
+      return completion.choices[0]?.message?.content || "Erro no suporte.";
   },
 
   explainError: async (questionText: string, wrongAnswerText: string, correctAnswerText: string, contextLabel: string = 'Ajuda: Questão'): Promise<string> => {
@@ -170,7 +209,8 @@ Use a seguinte estrutura de formatação para renderização profissional:
       const baseMultiplier = isBasic ? 2 : 1;
       const baseCost = totalTokens * BASE_COST_PER_TOKEN * baseMultiplier;
 
-      const billingMultiplier = isBasic ? 80 : 40;
+      // Multiplier updated: Basic 80x, Advanced/Admin 80x
+      const billingMultiplier = 80;
       const finalCost = baseCost * billingMultiplier;
 
       const currentBalance = userData.balance || 0;
@@ -243,7 +283,9 @@ Use a seguinte estrutura de formatação para renderização profissional:
           const totalTokens = usage?.total_tokens || 0;
           const isBasic = userData.plan === 'basic';
           const baseCost = totalTokens * BASE_COST_PER_TOKEN * (isBasic ? 2 : 1);
-          const finalCost = baseCost * (isBasic ? 80 : 40);
+          
+          // Multiplier updated: Basic 80x, Advanced/Admin 80x
+          const finalCost = baseCost * 80;
 
           await update(ref(database, `users/${uid}`), { balance: userData.balance - finalCost });
           const transRef = push(ref(database, `user_transactions/${uid}`));

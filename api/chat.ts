@@ -76,19 +76,25 @@ export default async function handler(req: any, res: any) {
         const openai = new OpenAI({ apiKey });
 
         // PROMPT CALIBRADO - PADRÃO INEP/ENEM OFICIAL
+        // ATUALIZADO: Regra estrita de múltiplos de 20
         const prompt = `
             ATUE COMO: Um Corretor Oficial do ENEM (Banca FGV/Vunesp/Cebraspe).
             TAREFA: Corrigir a redação manuscrita na imagem anexa baseada no tema: "${message}".
             
+            REGRAS DE NOTA (MUITO IMPORTANTE):
+            1. As notas das competências (C1 a C5) DEVEM ser estritamente múltiplos de 20.
+            2. Valores aceitos: 0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200.
+            3. JAMAIS retorne valores quebrados como 125, 130 ou 155. Arredonde sempre para o múltiplo de 20 mais próximo de acordo com o nível do aluno.
+            
             ESTRUTURA DE RESPOSTA (JSON STRICT):
             Retorne APENAS um JSON válido. Não use Markdown. Não use crases.
             {
-              "c1": {"score": number (0-200), "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
-              "c2": {"score": number (0-200), "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
-              "c3": {"score": number (0-200), "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
-              "c4": {"score": number (0-200), "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
-              "c5": {"score": number (0-200), "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
-              "final_score": number (sum),
+              "c1": {"score": number, "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
+              "c2": {"score": number, "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
+              "c3": {"score": number, "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
+              "c4": {"score": number, "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
+              "c5": {"score": number, "analysis": "string", "positivePoints": ["string"], "negativePoints": ["string"]},
+              "final_score": number (soma das competencias),
               "general_feedback": "string (resumo geral)",
               "strengths": ["string", "string"],
               "weaknesses": ["string", "string"],

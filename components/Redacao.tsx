@@ -236,10 +236,18 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           let cleanJson = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
 
-          const parseScore = (val: any) => {
-            const num = Number(val?.score ?? val);
-            return isNaN(num) ? 0 : num;
+          // Force Round to 20 helper
+          const roundToTwenty = (num: any) => {
+              const val = Number(num);
+              if (isNaN(val)) return 0;
+              // Clamp between 0 and 200
+              const clamped = Math.min(Math.max(val, 0), 200);
+              // Round to nearest 20
+              return Math.round(clamped / 20) * 20;
           };
+
+          // Parse and Enforce Scoring Rules
+          const parseScore = (val: any) => roundToTwenty(val?.score ?? val);
 
           const c1Score = parseScore(parsed.c1);
           const c2Score = parseScore(parsed.c2);

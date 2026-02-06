@@ -18,6 +18,7 @@ import FullScreenPrompt from './components/FullScreenPrompt';
 import RankUpOverlay from './components/RankUpOverlay'; 
 import LandingPage from './components/LandingPage'; 
 import UpgradeModal from './components/UpgradeModal'; 
+import Support from './components/Support'; // NEW Import
 import { User, View, UserProfile } from './types';
 import { AuthService, mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
@@ -65,6 +66,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [hasSupportNotif, setHasSupportNotif] = useState(false); // NEW
   
   // Rank Up Logic
   const [showRankUp, setShowRankUp] = useState(false);
@@ -169,6 +171,18 @@ const App: React.FC = () => {
       }
   }, [user?.xp]);
 
+  // Monitor Support Notifications (NEW)
+  useEffect(() => {
+      if (user) {
+          const unsubscribe = DatabaseService.onSupportNotification(user.uid, (hasNotif) => {
+              setHasSupportNotif(hasNotif);
+              // Also update user state deeply to keep sync
+              setUser(prev => prev ? { ...prev, hasSupportNotification: hasNotif } : null);
+          });
+          return () => unsubscribe();
+      }
+  }, [user?.uid]);
+
   const handleLogin = (loggedInUser: User) => { setLoadingAuth(true); };
   const handleLogout = async () => { await AuthService.logout(); setCurrentView('dashboard'); };
   
@@ -183,9 +197,12 @@ const App: React.FC = () => {
   };
 
   const checkAccess = (view: View): boolean => {
-    if (!user) return ['dashboard', 'aulas', 'questoes', 'competitivo', 'ajustes'].includes(view);
+    if (!user) return ['dashboard', 'aulas', 'questoes', 'competitivo', 'ajustes', 'suporte'].includes(view);
     const userPlan = (user.plan || 'basic').toLowerCase();
+    // Admin, Advanced
     if (user.isAdmin || userPlan === 'admin' || userPlan === 'advanced') return true;
+    
+    // Basic
     if (userPlan === 'basic') {
         const restrictedViews: View[] = ['tutor', 'redacao', 'simulados', 'militares', 'competitivo'];
         if (restrictedViews.includes(view)) return false;
@@ -218,7 +235,14 @@ const App: React.FC = () => {
           <div className="nebula-glow"></div>
       </div>
 
-      <Navigation currentView={currentView} onNavigate={setCurrentView} onLogout={handleLogout} isMobile={isMobile} isAdmin={user.isAdmin} />
+      <Navigation 
+        currentView={currentView} 
+        onNavigate={setCurrentView} 
+        onLogout={handleLogout} 
+        isMobile={isMobile} 
+        isAdmin={user.isAdmin} 
+        hasSupportNotification={hasSupportNotif} 
+      />
 
       <main className={`flex-1 relative overflow-y-auto overflow-x-hidden transition-all duration-300 z-10 ${isMobile ? 'pb-24 p-4' : 'ml-64 p-8'}`} style={{ height: '100vh' }}>
         <div className="max-w-7xl mx-auto h-full relative">
@@ -235,6 +259,7 @@ const App: React.FC = () => {
                     {currentView === 'simulados' && <Simulations />}
                     {currentView === 'tutor' && <AiTutor user={user} onUpdateUser={handleUpdateUser} />}
                     {currentView === 'ajustes' && <Settings user={user} onUpdateUser={handleUpdateUser} />}
+                    {currentView === 'suporte' && <Support user={user} />}
                     {currentView === 'competitivo' && <Competitivo />}
                     {currentView === 'admin' && (user.isAdmin ? <AdminPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />)}
                     </>

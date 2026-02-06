@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead, PlanConfig, PlanFeatures, LessonTag } from '../types';
+import { UserProfile, Subject, Question, Lesson, RechargeRequest, AiConfig, UserPlan, LessonMaterial, Simulation, Lead, PlanConfig, PlanFeatures, LessonTag, SupportTicket } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target, Tag, Megaphone, Copy, AlertTriangle, MousePointerClick, Clock, ShoppingCart, User, CreditCard, ChevronRight, ArrowRight, ListPlus } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, UserPlus, FilePlus, BookOpen, Layers, Save, Trash2, Plus, Image as ImageIcon, Wallet, Settings as SettingsIcon, PenTool, Link, FileText, LayoutList, Pencil, Eye, RefreshCw, Upload, Users, UserCheck, Calendar, Shield, BarChart3, TrendingUp, PieChart, DollarSign, Activity, X, Video, Target, Tag, Megaphone, Copy, AlertTriangle, MousePointerClick, Clock, ShoppingCart, User, CreditCard, ChevronRight, ArrowRight, ListPlus, LifeBuoy, MessageSquare, Send } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config' | 'traffic'>('leads');
+  const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'content' | 'finance' | 'config' | 'traffic' | 'support'>('leads');
   const [contentSubTab, setContentSubTab] = useState<'lessons' | 'simulations'>('lessons');
   
   // Data
@@ -14,8 +14,10 @@ const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
+  const [subtopicsMap, setSubtopicsMap] = useState<Record<string, Record<string, string[]>>>({}); // Added Subtopics Map
   const [recharges, setRecharges] = useState<RechargeRequest[]>([]);
   const [trafficConfig, setTrafficConfig] = useState({ vslScript: '', checkoutLinkMonthly: '', checkoutLinkYearly: '' });
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]); // New
   
   // Content Management State
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
@@ -28,6 +30,10 @@ const AdminPanel: React.FC = () => {
   const [simulations, setSimulations] = useState<Simulation[]>([]);
   const [editingSim, setEditingSim] = useState<Simulation | null>(null);
   const [simQuestionPicker, setSimQuestionPicker] = useState<{subject: string, topic: string, available: Question[]}>({ subject: '', topic: '', available: [] });
+
+  // Support Reply State
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [supportReply, setSupportReply] = useState('');
 
   // Lead Modal
   const [showLeadModal, setShowLeadModal] = useState(false);
@@ -52,12 +58,14 @@ const AdminPanel: React.FC = () => {
   }, []);
 
   const fetchConfigData = async () => {
-    const [s, t] = await Promise.all([
+    const [s, t, st] = await Promise.all([
         DatabaseService.getSubjects(),
-        DatabaseService.getTopics()
+        DatabaseService.getTopics(),
+        DatabaseService.getSubTopics() // Fetch subtopics
     ]);
     setSubjects(s);
     setTopics(t);
+    setSubtopicsMap(st);
   };
 
   // --- TAB LOADING LOGIC ---
@@ -66,6 +74,7 @@ const AdminPanel: React.FC = () => {
       if (activeTab === 'leads') DatabaseService.getLeads().then(l => setLeads(l.reverse()));
       if (activeTab === 'finance') DatabaseService.getRechargeRequests().then(r => setRecharges(r.reverse()));
       if (activeTab === 'traffic') DatabaseService.getTrafficSettings().then(setTrafficConfig);
+      if (activeTab === 'support') DatabaseService.getAllSupportTickets().then(t => setSupportTickets(t.sort((a,b) => b.lastUpdated - a.lastUpdated)));
       if (activeTab === 'content') {
           if (contentSubTab === 'simulations') DatabaseService.getSimulations().then(setSimulations);
       }
@@ -223,6 +232,20 @@ const AdminPanel: React.FC = () => {
       } catch (e: any) { alert(e.message); } finally { setLoading(false); }
   };
 
+  // --- SUPPORT LOGIC ---
+  const handleSupportReply = async () => {
+      if (!selectedTicket || !supportReply.trim()) return;
+      
+      await DatabaseService.replySupportTicket(selectedTicket.userId, supportReply, 'admin');
+      setSupportReply('');
+      setSelectedTicket(null);
+      // Refresh tickets
+      DatabaseService.getAllSupportTickets().then(t => setSupportTickets(t.sort((a,b) => b.lastUpdated - a.lastUpdated)));
+  };
+
+  // Helper for available subtopics
+  const availableSubtopics = (selectedSubjectId && selectedTopicId && subtopicsMap[selectedSubjectId] && subtopicsMap[selectedSubjectId][selectedTopicId]) || [];
+
   return (
     <div className="space-y-6 pb-20 animate-in fade-in">
       
@@ -233,7 +256,7 @@ const AdminPanel: React.FC = () => {
               <p className="text-slate-400">Gestão centralizada da NeuroStudy.</p>
           </div>
           <div className="flex gap-2 bg-slate-900 p-1 rounded-lg border border-white/10 overflow-x-auto">
-              {['leads', 'users', 'content', 'finance', 'traffic'].map(tab => (
+              {['leads', 'users', 'content', 'finance', 'support', 'traffic'].map(tab => (
                   <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-md text-sm font-bold capitalize transition-all ${activeTab === tab ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>
                       {tab}
                   </button>
@@ -389,12 +412,37 @@ const AdminPanel: React.FC = () => {
                       ) : (
                           <div className="p-4 bg-emerald-900/20 rounded-xl border border-emerald-500/20">
                               <p className="text-emerald-400 font-bold text-sm mb-2 flex items-center gap-2"><ListPlus size={16}/> Configuração do Bloco de Questões</p>
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-2 gap-3 mb-3">
                                   {/* Just reusing current selections for simplicity, could add independent dropdowns */}
                                   <div className="text-xs text-slate-400">Matéria: <span className="text-white">{selectedSubjectId}</span></div>
                                   <div className="text-xs text-slate-400">Tópico: <span className="text-white">{selectedTopicId}</span></div>
                               </div>
-                              <p className="text-[10px] text-slate-500 mt-2">O sistema buscará questões automaticamente deste tópico.</p>
+                              
+                              {/* Subtopic Selector */}
+                              <div>
+                                  <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Subtópico Específico</label>
+                                  <select 
+                                    className="w-full glass-input p-2 rounded-lg text-xs" 
+                                    value={editingLesson.exerciseFilters?.subtopics?.[0] || ''} 
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setEditingLesson({
+                                            ...editingLesson, 
+                                            exerciseFilters: { 
+                                                ...editingLesson.exerciseFilters!, 
+                                                subtopics: val ? [val] : []
+                                            }
+                                        });
+                                    }}
+                                  >
+                                      <option value="">Todos os Subtópicos</option>
+                                      {availableSubtopics.map(st => (
+                                          <option key={st} value={st}>{st}</option>
+                                      ))}
+                                  </select>
+                              </div>
+
+                              <p className="text-[10px] text-slate-500 mt-2">O sistema buscará questões automaticamente baseadas nestes filtros.</p>
                           </div>
                       )}
 
@@ -564,6 +612,91 @@ const AdminPanel: React.FC = () => {
                   <input className="w-full glass-input p-3 rounded-lg mb-2" value={accessForm.email} onChange={e => setAccessForm({...accessForm, email: e.target.value})} placeholder="Email" />
                   <div className="flex gap-2 mb-4"><select className="glass-input p-3 rounded-lg flex-1" value={accessForm.plan} onChange={e => setAccessForm({...accessForm, plan: e.target.value as any})}><option value="basic">Básico</option><option value="advanced">Advanced</option></select><input type="number" className="glass-input p-3 rounded-lg w-24" value={accessForm.essayCredits} onChange={e => setAccessForm({...accessForm, essayCredits: +e.target.value})} placeholder="Créditos" /></div>
                   <div className="flex justify-end gap-2"><button onClick={() => setShowUserModal(false)} className="text-slate-400 px-3">Cancelar</button><button onClick={handleSubmitAccess} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold">{loading ? <Loader2 className="animate-spin"/> : "Criar Aluno"}</button></div>
+              </div>
+          </div>
+      )}
+
+      {/* --- SUPPORT TAB --- */}
+      {activeTab === 'support' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[calc(100vh-200px)]">
+              {/* Ticket List */}
+              <div className="glass-card rounded-2xl flex flex-col overflow-hidden">
+                  <div className="p-4 border-b border-white/5 bg-slate-900/50">
+                      <h3 className="font-bold text-white flex items-center gap-2">
+                          <LifeBuoy size={18} className="text-indigo-400"/> Tickets de Suporte
+                      </h3>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
+                      {supportTickets.map(ticket => (
+                          <div 
+                            key={ticket.id}
+                            onClick={() => setSelectedTicket(ticket)}
+                            className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedTicket?.id === ticket.id ? 'bg-indigo-600/20 border-indigo-500' : 'bg-slate-900 border-white/5 hover:bg-slate-800'}`}
+                          >
+                              <div className="flex justify-between items-start mb-1">
+                                  <span className="font-bold text-white text-sm">{ticket.userName}</span>
+                                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${ticket.status === 'open' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                      {ticket.status}
+                                  </span>
+                              </div>
+                              <p className="text-xs text-slate-400 line-clamp-1">{ticket.issueDescription}</p>
+                              <span className="text-[10px] text-slate-600 mt-2 block">{new Date(ticket.lastUpdated).toLocaleString()}</span>
+                          </div>
+                      ))}
+                      {supportTickets.length === 0 && <p className="text-center text-slate-500 p-4">Nenhum ticket aberto.</p>}
+                  </div>
+              </div>
+
+              {/* Chat View */}
+              <div className="glass-card rounded-2xl flex flex-col overflow-hidden relative">
+                  {selectedTicket ? (
+                      <>
+                          <div className="p-4 border-b border-white/5 bg-slate-900/50 flex justify-between items-center">
+                              <div>
+                                  <h4 className="font-bold text-white">{selectedTicket.userName}</h4>
+                                  <p className="text-xs text-slate-400">{selectedTicket.userEmail}</p>
+                              </div>
+                              <span className="text-xs font-mono text-indigo-400">ID: {selectedTicket.id.substring(0,6)}</span>
+                          </div>
+                          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/20 custom-scrollbar">
+                              <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg text-yellow-200 text-xs">
+                                  <strong>Problema Original:</strong> {selectedTicket.issueDescription}
+                              </div>
+                              {selectedTicket.messages.map((msg, idx) => (
+                                  <div key={idx} className={`flex gap-3 ${msg.role === 'admin' ? 'flex-row-reverse' : ''}`}>
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'admin' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                                          {msg.role === 'admin' ? <Shield size={16}/> : <User size={16}/>}
+                                      </div>
+                                      <div className={`p-3 rounded-xl max-w-[80%] text-sm ${msg.role === 'admin' ? 'bg-emerald-900/40 text-emerald-100 border border-emerald-500/30' : 'bg-slate-800 text-slate-200'}`}>
+                                          {msg.content}
+                                          <span className="text-[9px] opacity-50 block mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                          <div className="p-4 border-t border-white/5 bg-slate-900 relative">
+                              <input 
+                                className="w-full glass-input p-3 pr-12 rounded-xl text-sm"
+                                placeholder="Responder usuário..."
+                                value={supportReply}
+                                onChange={e => setSupportReply(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleSupportReply()}
+                              />
+                              <button 
+                                onClick={handleSupportReply} 
+                                disabled={!supportReply.trim()}
+                                className="absolute right-6 top-1/2 -translate-y-1/2 text-emerald-400 hover:text-white disabled:opacity-50"
+                              >
+                                  <Send size={18}/>
+                              </button>
+                          </div>
+                      </>
+                  ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                          <MessageSquare size={48} className="mb-4 opacity-50" />
+                          <p>Selecione um ticket para responder.</p>
+                      </div>
+                  )}
               </div>
           </div>
       )}

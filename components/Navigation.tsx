@@ -14,7 +14,8 @@ import {
   Bot,
   BrainCircuit,
   PenTool,
-  Skull
+  Skull,
+  LifeBuoy
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -23,10 +24,11 @@ interface NavigationProps {
   onLogout: () => void;
   isMobile: boolean;
   isAdmin?: boolean;
+  hasSupportNotification?: boolean; // NEW prop
 }
 
-const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogout, isMobile, isAdmin }) => {
-  const menuItems: { id: View; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
+const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogout, isMobile, isAdmin, hasSupportNotification }) => {
+  const menuItems: { id: View; label: string; icon: React.ReactNode; adminOnly?: boolean; hasNotif?: boolean }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'aulas', label: 'Aulas', icon: <BookOpen size={20} /> },
     { id: 'militares', label: 'Militares', icon: <Skull size={20} /> },
@@ -38,6 +40,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
     { id: 'competitivo', label: 'Competitivo', icon: <Trophy size={20} /> },
     { id: 'admin', label: 'Admin', icon: <ShieldAlert size={20} />, adminOnly: true },
     { id: 'ajustes', label: 'Ajustes', icon: <Settings size={20} /> },
+    { id: 'suporte', label: 'Suporte', icon: <LifeBuoy size={20} />, hasNotif: hasSupportNotification },
   ];
 
   const visibleMenuItems = menuItems.filter(item => !item.adminOnly || (item.adminOnly && isAdmin));
@@ -49,17 +52,18 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
-            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all active:scale-95 flex-1 ${
+            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-all active:scale-95 flex-1 relative ${
               currentView === item.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
+            {item.hasNotif && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
             <div className={`${currentView === item.id ? 'bg-indigo-500/20 p-1.5 rounded-lg' : ''} transition-all`}>
               {item.icon}
             </div>
             <span className="text-[9px] mt-1 font-medium font-sans">{item.label}</span>
           </button>
         ))}
-        {/* Overflow Menu item if needed, for now limiting to 5 main items for clean UI */}
+        {/* Mobile menu overflow handled elsewhere or limited to 5 main items */}
       </nav>
     );
   }
@@ -90,8 +94,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
              {/* Hover Glow Effect */}
             <div className={`absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-r-full transition-all duration-300 ${currentView === item.id ? 'opacity-100' : 'opacity-0'}`} />
 
-            <span className={`transition-transform duration-300 ${currentView === item.id ? 'scale-110' : 'group-hover:scale-110'}`}>
+            <span className={`transition-transform duration-300 relative ${currentView === item.id ? 'scale-110' : 'group-hover:scale-110'}`}>
               {item.icon}
+              {item.hasNotif && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse" />}
             </span>
             <span className="font-medium tracking-wide">{item.label}</span>
           </button>

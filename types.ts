@@ -1,8 +1,14 @@
 
-export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes';
+export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes' | 'suporte';
 
 export type UserPlan = 'basic' | 'advanced' | 'admin';
 export type BillingCycle = 'monthly' | 'yearly';
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'ai';
+  content: string;
+}
 
 export interface User {
   uid: string;
@@ -27,8 +33,26 @@ export interface UserProfile extends User {
   dailyLikesGiven?: number;
   lastPostedAt?: number;
   theme?: 'dark' | 'light';
+  hasSupportNotification?: boolean; // New: Notification flag
   // REMOVED HEAVY OBJECTS FROM MAIN PROFILE FETCH
   // essays and transactions are now fetched on demand from separate root nodes
+}
+
+export interface SupportMessage {
+  role: 'user' | 'ai' | 'admin';
+  content: string;
+  timestamp: number;
+}
+
+export interface SupportTicket {
+  id: string; // usually userId
+  userId: string;
+  userName: string; // Nome completo informado
+  userEmail: string;
+  issueDescription: string;
+  status: 'open' | 'answered'; // open = waiting admin, answered = waiting user
+  messages: SupportMessage[];
+  lastUpdated: number;
 }
 
 export interface Subject {

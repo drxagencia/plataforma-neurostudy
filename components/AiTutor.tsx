@@ -1,10 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit, Infinity, CreditCard, Crown, Rocket, Zap, ArrowRight, Circle, Diamond } from 'lucide-react';
-import { AiService, ChatMessage } from '../services/aiService';
+import { AiService } from '../services/aiService';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
-import { Transaction, UserProfile } from '../types';
+import { Transaction, UserProfile, ChatMessage } from '../types';
 import { auth } from '../services/firebaseConfig';
 import { KIRVANO_LINKS } from '../constants';
 
