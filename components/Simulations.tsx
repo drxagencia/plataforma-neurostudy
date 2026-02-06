@@ -1,8 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { DatabaseService } from '../services/databaseService';
-import { Simulation, Question, SimulationResult } from '../types';
-import { Timer, FileText, ChevronRight, Loader2, Trophy, Clock, CheckCircle, AlertTriangle, ArrowRight, XCircle, ArrowLeft, BrainCircuit } from 'lucide-react';
+import { AiService } from '../services/aiService';
+import { Simulation, Question, SimulationResult, View } from '../types';
+import { Timer, FileText, ChevronRight, Loader2, Trophy, Clock, CheckCircle, AlertTriangle, ArrowRight, XCircle, ArrowLeft, BrainCircuit, Zap, Target } from 'lucide-react';
 import { auth } from '../services/firebaseConfig';
 
 const Simulations: React.FC = () => {
@@ -18,6 +19,10 @@ const Simulations: React.FC = () => {
   
   // Results State
   const [result, setResult] = useState<SimulationResult | null>(null);
+  
+  // AI Analysis State
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiPlan, setAiPlan] = useState<{analysis: string, recommendations: {subjectId: string, topicName: string, reason: string}[]} | null>(null);
 
   useEffect(() => {
     fetchSimulations();
@@ -57,7 +62,7 @@ const Simulations: React.FC = () => {
 
           const fetchedQuestions = await DatabaseService.getQuestionsByIds(qIds);
           if (fetchedQuestions.length === 0) {
-               alert("Erro ao carregar questões.");
+               alert("Erro ao carregar questões. Tente novamente.");
                setLoading(false);
                return;
           }
@@ -68,6 +73,7 @@ const Simulations: React.FC = () => {
           setAnswers({});
           setTimeLeft(sim.durationMinutes * 60);
           setResult(null);
+          setAiPlan(null); // Reset AI plan
       } catch (e) {
           console.error(e);
           alert("Erro ao iniciar simulado.");
@@ -118,6 +124,36 @@ const Simulations: React.FC = () => {
       setLoading(false);
   };
 
+  const generateAiStudyPlan = async () => {
+      if (!activeSim || !result) return;
+      setAiLoading(true);
+      
+      try {
+          // Filter wrong questions
+          const errors = questions.filter((q, idx) => answers[idx] !== q.correctAnswer).map(q => ({
+              topic: q.topic,
+              questionText: q.text
+          }));
+
+          const plan = await AiService.generateStudyPlan(activeSim.title, errors);
+          setAiPlan(plan);
+      } catch (e: any) {
+          if (e.message.includes('402')) alert("Saldo insuficiente para gerar análise.");
+          else alert("Erro ao gerar plano de estudos.");
+      } finally {
+          setAiLoading(false);
+      }
+  };
+
+  const handleNavigateToStudy = (subjectId: string, topicName: string) => {
+      // Store redirect intent in session storage
+      sessionStorage.setItem('neuro_redirect', JSON.stringify({ subject: subjectId, topic: topicName }));
+      // Force reload to App or trigger navigation if possible. 
+      // Since Simulations is a child component, we rely on the user clicking "Aulas" or we can trigger a reload.
+      // Ideally, pass onNavigate prop, but for quick implementation:
+      window.location.href = window.location.origin + '?page=aulas'; 
+  };
+
   const formatTime = (seconds: number) => {
       const m = Math.floor(seconds / 60);
       const s = seconds % 60;
@@ -130,7 +166,7 @@ const Simulations: React.FC = () => {
   if (result && activeSim) {
       const percentage = Math.round((result.score / result.totalQuestions) * 100);
       return (
-          <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4">
+          <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 pb-20">
               <div className="text-center space-y-4 py-8">
                   <div className="w-24 h-24 bg-indigo-600 rounded-full flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(79,70,229,0.4)]">
                       <Trophy size={40} className="text-white" />
@@ -140,10 +176,16 @@ const Simulations: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="glass-card p-6 rounded-2xl text-center">
+                  <div className="glass-card p-6 rounded-2xl text-center relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-indigo-500" />
                       <p className="text-sm text-slate-400 uppercase font-bold">Nota Final</p>
-                      <p className="text-5xl font-black text-white mt-2">{percentage}%</p>
-                      <p className="text-sm text-slate-500 mt-1">{result.score} de {result.totalQuestions} acertos</p>
+                      <div className="mt-2 flex items-baseline justify-center gap-1">
+                          <span className="text-5xl font-black text-white">{result.score}</span>
+                          <span className="text-xl font-bold text-slate-500">/ {result.totalQuestions}</span>
+                      </div>
+                      <p className={`text-sm font-bold mt-1 ${percentage >= 70 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                          {percentage}% de Aproveitamento
+                      </p>
                   </div>
                   <div className="glass-card p-6 rounded-2xl text-center">
                       <p className="text-sm text-slate-400 uppercase font-bold">Tempo Gasto</p>
@@ -155,21 +197,71 @@ const Simulations: React.FC = () => {
                   </div>
               </div>
 
-              {/* Topic Analysis */}
-              <div className="glass-card p-8 rounded-2xl">
-                  <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><BrainCircuit size={20}/> Análise de Desempenho</h3>
-                  <div className="space-y-4">
+              {/* AI Study Plan Section */}
+              <div className="glass-card p-8 rounded-2xl border border-indigo-500/30 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  <div className="relative z-10">
+                      <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                          <BrainCircuit size={24} className="text-indigo-400" />
+                          Análise Inteligente
+                      </h3>
+                      <p className="text-slate-400 text-sm mb-6 max-w-xl">
+                          A NeuroAI pode analisar seus erros neste simulado e criar um plano de estudo personalizado instantâneo.
+                      </p>
+
+                      {!aiPlan ? (
+                          <button 
+                            onClick={generateAiStudyPlan}
+                            disabled={aiLoading}
+                            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
+                          >
+                              {aiLoading ? <Loader2 className="animate-spin" /> : <Zap size={18} className="fill-white" />}
+                              Gerar Plano de Estudos (IA)
+                          </button>
+                      ) : (
+                          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                              <div className="bg-slate-900/50 p-4 rounded-xl border border-white/10">
+                                  <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{aiPlan.analysis}</p>
+                              </div>
+                              
+                              <div>
+                                  <h4 className="text-sm font-bold text-white uppercase tracking-widest mb-3 flex items-center gap-2"><Target size={14} className="text-emerald-400" /> Recomendação de Estudo</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                      {aiPlan.recommendations.map((rec, idx) => (
+                                          <div key={idx} className="bg-slate-800 p-4 rounded-xl border border-white/5 flex flex-col">
+                                              <span className="text-xs text-indigo-400 font-bold uppercase mb-1">{rec.topicName}</span>
+                                              <p className="text-slate-400 text-xs mb-4 flex-1">{rec.reason}</p>
+                                              <button 
+                                                onClick={() => handleNavigateToStudy(rec.subjectId, rec.topicName)}
+                                                className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
+                                              >
+                                                  Estudar Agora <ArrowRight size={12} />
+                                              </button>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              </div>
+
+              {/* Simple Topic Breakdown */}
+              <div className="glass-card p-8 rounded-2xl opacity-80">
+                  <h3 className="text-lg font-bold text-white mb-4">Desempenho por Tópico</h3>
+                  <div className="space-y-3">
                       {result.topicPerformance && Object.entries(result.topicPerformance).map(([topic, statsData]) => {
                           const stats = statsData as { correct: number; total: number };
                           return (
                           <div key={topic}>
-                              <div className="flex justify-between text-sm mb-1">
-                                  <span className="text-slate-300 font-medium">{topic}</span>
-                                  <span className="text-slate-400">{stats.correct}/{stats.total}</span>
+                              <div className="flex justify-between text-xs mb-1">
+                                  <span className="text-slate-400">{topic}</span>
+                                  <span className="text-white font-bold">{stats.correct}/{stats.total}</span>
                               </div>
-                              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                   <div 
-                                    className={`h-full ${stats.correct/stats.total > 0.7 ? 'bg-emerald-500' : stats.correct/stats.total > 0.4 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                                    className={`h-full ${stats.correct/stats.total > 0.7 ? 'bg-emerald-500' : 'bg-red-500'}`} 
                                     style={{ width: `${(stats.correct/stats.total)*100}%` }}
                                   />
                               </div>
@@ -178,12 +270,12 @@ const Simulations: React.FC = () => {
                   </div>
               </div>
 
-              <div className="flex justify-center">
+              <div className="flex justify-center pt-8">
                   <button 
-                    onClick={() => { setActiveSim(null); setResult(null); }}
-                    className="px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors"
+                    onClick={() => { setActiveSim(null); setResult(null); setAiPlan(null); }}
+                    className="px-8 py-3 text-slate-400 hover:text-white font-bold transition-colors flex items-center gap-2"
                   >
-                      Voltar para Lista
+                      <ArrowLeft size={18} /> Voltar para Lista
                   </button>
               </div>
           </div>

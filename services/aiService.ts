@@ -13,9 +13,6 @@ export interface ChatMessage {
 const OPENAI_MODEL = "gpt-4o-mini";
 
 // Pricing Configuration (BRL per Token)
-// gpt-4o-mini is approx $0.15 / 1M tokens input. 
-// We set a base margin. 
-// 0.00002 BRL per token approx covers costs + margin.
 const BASE_COST_PER_TOKEN = 0.00002; 
 
 // Helper: Get API Key safely for Vite Environment
@@ -23,7 +20,6 @@ const getApiKey = () => {
     return (import.meta as any).env?.VITE_OPENAI_API_KEY || (typeof process !== 'undefined' ? process.env?.OPENAI_API_KEY : '') || '';
 };
 
-// Lazy initialization to prevent app crash on load if key is missing
 let aiInstance: OpenAI | null = null;
 
 const getAiInstance = () => {
@@ -35,7 +31,7 @@ const getAiInstance = () => {
         }
         aiInstance = new OpenAI({ 
             apiKey: key, 
-            dangerouslyAllowBrowser: true // Allowed for client-side demo; ideally use backend proxy
+            dangerouslyAllowBrowser: true 
         });
     }
     return aiInstance;
@@ -61,20 +57,16 @@ REGRAS DE FORMATAÇÃO ESTRITA:
 `;
 
 export const AiService = {
-  // Added optional 'systemContext' parameter to inject Lesson details or specific persona instructions
   sendMessage: async (message: string, history: ChatMessage[], actionLabel: string = 'NeuroAI Tutor', systemContext?: string): Promise<string> => {
     if (!auth.currentUser) throw new Error("User not authenticated");
     const uid = auth.currentUser.uid;
 
     try {
-      // 1. Get User Data for Plan Check (Optimistic check before call)
       const userData = await getUserData(uid);
-      // Allow if balance > 0 (even if tiny). Block if already <= 0.
       if (userData.balance <= 0) {
           throw new Error("402: Saldo insuficiente");
       }
 
-      // 2. Call OpenAI
       const ai = getAiInstance();
       
       let systemInstruction = `
@@ -83,12 +75,10 @@ export const AiService = {
         ${FORMATTING_RULES}
       `;
 
-      // If specific context is provided (e.g. Lesson Title + Task Persona), use it but append formatting rules
       if (systemContext) {
           systemInstruction = `${systemContext}\n\n${FORMATTING_RULES}`;
       }
       
-      // Map history to OpenAI format
       const openaiHistory = history.map(h => ({
           role: h.role === 'ai' ? 'assistant' : 'user',
           content: h.content
@@ -107,36 +97,28 @@ export const AiService = {
 
       const responseText = completion.choices[0]?.message?.content || "Sem resposta.";
       
-      // 3. Calculate Token Usage & Cost
       const usage = completion.usage;
       const totalTokens = usage?.total_tokens || 0;
       
       const isBasic = userData.plan === 'basic';
-      
-      // Base Cost Calculation
       const baseMultiplier = isBasic ? 2 : 1;
       const baseCost = totalTokens * BASE_COST_PER_TOKEN * baseMultiplier;
-
-      // Apply Visual Multiplier to the ACTUAL DEBIT (x80 for Basic, x40 for Others)
       const billingMultiplier = isBasic ? 80 : 40;
       const finalCost = baseCost * billingMultiplier;
 
-      // 4. Deduct Balance (Allow negative)
       const currentBalance = userData.balance || 0;
       
-      // Removed zero clamp to allow negative balance for one-time overage
       await update(ref(database, `users/${uid}`), { balance: currentBalance - finalCost });
 
-      // 5. Log Transaction
       const transRef = push(ref(database, `user_transactions/${uid}`));
       await set(transRef, {
           id: transRef.key,
           type: 'debit',
-          amount: finalCost, // Storing the inflated cost so history matches debit
-          description: actionLabel, // Use specific label, e.g. "NeuroTutor: Resumo"
+          amount: finalCost, 
+          description: actionLabel, 
           timestamp: Date.now(),
           currencyType: 'BRL',
-          tokensUsed: totalTokens // Kept for analytics
+          tokensUsed: totalTokens 
       });
 
       return responseText;
@@ -153,7 +135,6 @@ export const AiService = {
 
     try {
       const userData = await getUserData(uid);
-      // Allow if balance > 0
       if (userData.balance <= 0) throw new Error("402: Saldo insuficiente");
 
       const ai = getAiInstance();
@@ -182,7 +163,6 @@ Use a seguinte estrutura de formatação para renderização profissional:
 
       const responseText = completion.choices[0]?.message?.content || "Não foi possível gerar a explicação.";
 
-      // Billing for explanation
       const usage = completion.usage;
       const totalTokens = usage?.total_tokens || 0;
       const isBasic = userData.plan === 'basic';
@@ -194,14 +174,13 @@ Use a seguinte estrutura de formatação para renderização profissional:
       const finalCost = baseCost * billingMultiplier;
 
       const currentBalance = userData.balance || 0;
-      // Removed zero clamp to allow negative balance
       await update(ref(database, `users/${uid}`), { balance: currentBalance - finalCost });
 
       const transRef = push(ref(database, `user_transactions/${uid}`));
       await set(transRef, {
           id: transRef.key,
           type: 'debit',
-          amount: finalCost, // Storing the inflated cost
+          amount: finalCost, 
           description: contextLabel,
           timestamp: Date.now(),
           currencyType: 'BRL',
@@ -214,5 +193,74 @@ Use a seguinte estrutura de formatação para renderização profissional:
       console.error("AI Explanation Error:", error);
       throw error;
     }
+  },
+
+  generateStudyPlan: async (simulationTitle: string, errors: { topic: string, questionText: string }[]): Promise<{analysis: string, recommendations: {subjectId: string, topicName: string, reason: string}[]}> => {
+      if (!auth.currentUser) throw new Error("User not authenticated");
+      const uid = auth.currentUser.uid;
+
+      try {
+          const userData = await getUserData(uid);
+          if (userData.balance <= 0.05) throw new Error("402: Saldo insuficiente");
+
+          const ai = getAiInstance();
+          const errorsText = errors.map(e => `- Tópico: ${e.topic} | Questão: ${e.questionText.substring(0, 50)}...`).join('\n');
+          
+          const prompt = `
+            Você é um Mentor de Estudos Estratégico para o ENEM.
+            O aluno acabou de realizar o simulado: "${simulationTitle}".
+            
+            ERROS COMETIDOS:
+            ${errorsText}
+
+            TAREFA:
+            1. Analise brevemente os pontos fracos.
+            2. Recomende até 3 tópicos prioritários para estudar AGORA.
+            3. Para cada recomendação, forneça o ID da Matéria (ex: 'fisica', 'matematica', 'quimica', 'biologia', 'historia', 'geografia') e o Nome do Tópico (ex: 'Cinemática', 'Estequiometria'). Tente mapear para os tópicos padrão do ensino médio.
+
+            RETORNE APENAS UM JSON VÁLIDO:
+            {
+                "analysis": "Texto motivacional curto e análise dos erros (use markdown simples).",
+                "recommendations": [
+                    { "subjectId": "string (id da materia)", "topicName": "string (nome do topico)", "reason": "Por que estudar isso?" }
+                ]
+            }
+          `;
+
+          const completion = await ai.chat.completions.create({
+              model: OPENAI_MODEL,
+              messages: [{ role: 'user', content: prompt }],
+              response_format: { type: "json_object" }
+          });
+
+          const jsonContent = completion.choices[0]?.message?.content;
+          if(!jsonContent) throw new Error("Falha na geração");
+          
+          const result = JSON.parse(jsonContent);
+
+          // Billing
+          const usage = completion.usage;
+          const totalTokens = usage?.total_tokens || 0;
+          const isBasic = userData.plan === 'basic';
+          const baseCost = totalTokens * BASE_COST_PER_TOKEN * (isBasic ? 2 : 1);
+          const finalCost = baseCost * (isBasic ? 80 : 40);
+
+          await update(ref(database, `users/${uid}`), { balance: userData.balance - finalCost });
+          const transRef = push(ref(database, `user_transactions/${uid}`));
+          await set(transRef, {
+              id: transRef.key,
+              type: 'debit',
+              amount: finalCost,
+              description: `Plano de Estudo: ${simulationTitle}`,
+              timestamp: Date.now(),
+              currencyType: 'BRL'
+          });
+
+          return result;
+
+      } catch (error) {
+          console.error("AI Study Plan Error:", error);
+          throw error;
+      }
   }
 };

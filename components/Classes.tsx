@@ -146,6 +146,29 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
       }
 
       setLoading(false);
+
+      // Check for redirect from Simulation AI Analysis
+      const redirectData = sessionStorage.getItem('neuro_redirect');
+      if (redirectData && filtered.length > 0) {
+          try {
+              const { subject, topic } = JSON.parse(redirectData);
+              const targetSubject = filtered.find(s => s.id === subject);
+              
+              if (targetSubject) {
+                  // Simulate Selection
+                  setSelectedSubject(targetSubject);
+                  setLoadingContent(true);
+                  const data = await DatabaseService.getLessonsByTopic(targetSubject.id);
+                  setTopicsWithLessons(data);
+                  setLoadingContent(false);
+                  
+                  if (topic && data[topic]) {
+                      setSelectedTopic(topic);
+                  }
+              }
+              sessionStorage.removeItem('neuro_redirect');
+          } catch(e) { console.error("Redirect error", e); }
+      }
     };
     fetchAndFilterSubjects();
   }, [user.uid]);

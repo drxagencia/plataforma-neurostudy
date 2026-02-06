@@ -254,14 +254,12 @@ export const DatabaseService = {
       return {};
   },
 
-  // Updated to return nested structure Record<SubjectId, Record<TopicId, SubtopicList>>
   getSubTopics: async (): Promise<Record<string, Record<string, string[]>>> => {
       const snap = await get(ref(database, 'subtopics'));
       if(snap.exists()) {
           const data = snap.val();
           const result: Record<string, Record<string, string[]>> = {};
           
-          // Data structure: subtopics -> subjectId -> topicId -> { subtopicName: true }
           Object.keys(data).forEach(subjectId => {
               result[subjectId] = {};
               const topicsMap = data[subjectId];
@@ -296,11 +294,41 @@ export const DatabaseService = {
   
   getQuestionsByIds: async (ids: string[]): Promise<Question[]> => {
       if (!ids || ids.length === 0) return [];
-      // Simulation logic often needs a direct fetch. 
-      // If we don't know the path, this is hard in RTDB without a global index.
-      // For now, returning empty or we need to change Simulation structure to store paths.
-      // Assuming for this update we focus on the hierarchical browsing.
-      return [];
+      
+      try {
+          // Since our DB is hierarchical and we don't have a flat index, we must traverse to find matches.
+          // In a production app with millions of questions, we would use a dedicated 'questions_index' node.
+          // For this scale, retrieving the questions snapshot is acceptable.
+          
+          const snapshot = await get(ref(database, 'questions'));
+          if (!snapshot.exists()) return [];
+
+          const allData = snapshot.val();
+          const foundQuestions: Question[] = [];
+          const idsSet = new Set(ids);
+
+          // Traverse: Category -> Subject -> Topic -> Subtopic -> QuestionID
+          Object.values(allData).forEach((categories: any) => {
+              Object.values(categories).forEach((subjects: any) => {
+                  Object.values(subjects).forEach((topics: any) => {
+                      Object.values(topics).forEach((subtopics: any) => {
+                          Object.keys(subtopics).forEach((key) => {
+                              const item = subtopics[key];
+                              // Check if item is the question itself (legacy structure) or key is ID
+                              if (idsSet.has(key)) {
+                                  foundQuestions.push({ ...item, id: key });
+                              }
+                          });
+                      });
+                  });
+              });
+          });
+
+          return foundQuestions;
+      } catch (e) {
+          console.error("Error fetching questions by IDs:", e);
+          return [];
+      }
   },
 
   // --- USER PROFILE ---
@@ -325,31 +353,26 @@ export const DatabaseService = {
       
       const existing = snapshot.val();
       
-      // Cleanup legacy heavy fields if they exist
       if (existing.essays || existing.essay_images) {
           await update(userRef, { essays: null, essay_images: null });
           delete existing.essays;
           delete existing.essay_images;
       }
 
-      // SECURITY: If we detect a Base64 photoURL in the profile, wipe it.
       if (isBase64Image(existing.photoURL)) {
           const cleanPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(existing.displayName || 'User')}&background=random`;
           await update(userRef, { photoURL: cleanPhoto });
           existing.photoURL = cleanPhoto;
       }
 
-      // SAFETY: Robust update logic
       const updates: any = {};
       let needsUpdate = false;
 
-      // 1. Check Plan - Only default to basic if strictly undefined/null/empty
       if (!existing.plan) {
           updates.plan = defaultData.plan || 'basic';
           needsUpdate = true;
       }
 
-      // 2. Check Balance
       if (existing.balance === undefined) {
           updates.balance = 0;
           needsUpdate = true;
@@ -403,11 +426,9 @@ export const DatabaseService = {
       return [];
   },
 
-  // --- XP & GAMIFICATION ---
   processXpAction: async (uid: string, actionType: string, customAmount?: number): Promise<void> => {
       let xpAmount = 0;
       
-      // Allow custom amount override if provided (useful for dynamic XP like essay scores)
       if (customAmount !== undefined) {
           xpAmount = customAmount;
       } else {
@@ -422,13 +443,12 @@ export const DatabaseService = {
           const userData = snap.val();
           const currentXp = userData.xp || 0;
           
-          // Weekly Logic
           const currentWeekId = getCurrentWeekId();
           let weeklyXp = userData.weeklyXp || 0;
           const lastXpWeek = userData.lastXpWeek || 0;
 
           if (currentWeekId !== lastXpWeek) {
-              weeklyXp = 0; // Reset for new week
+              weeklyXp = 0; 
           }
 
           await update(userRef, { 
@@ -609,7 +629,7 @@ export const DatabaseService = {
       const req: RechargeRequest = {
           id: newRef.key!,
           userId: uid,
-          userDisplayName: name, // This can now be the Payer's name provided by input
+          userDisplayName: name, 
           amount,
           currencyType,
           quantityCredits,
@@ -634,7 +654,6 @@ export const DatabaseService = {
           const userSnap = await get(userRef);
           const userData = userSnap.val();
 
-          // SPECIAL LOGIC: Handle Plan Upgrade
           if (req.planLabel && req.planLabel.includes('UPGRADE')) {
               let newPlan: UserPlan = 'basic';
               const labelLower = req.planLabel.toLowerCase();
@@ -642,7 +661,6 @@ export const DatabaseService = {
               
               await update(userRef, { plan: newPlan });
           } 
-          // Standard Recharge
           else if (req.currencyType === 'CREDIT') {
               const current = userData?.essayCredits || 0;
               await update(userRef, { essayCredits: current + (req.quantityCredits || 0) });
@@ -715,8 +733,6 @@ export const DatabaseService = {
       await update(ref(database, path), sanitizeData(data));
   },
 
-  // --- ESSAY HANDLING (METADATA ONLY) ---
-  
   getEssayCorrections: async (uid: string): Promise<EssayCorrection[]> => {
       const snap = await get(ref(database, `user_essays/${uid}`));
       let essays: EssayCorrection[] = [];
