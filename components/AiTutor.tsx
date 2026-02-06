@@ -1,12 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit, Infinity, CreditCard, Crown, Rocket, Zap, ArrowRight, Circle, Diamond } from 'lucide-react';
+import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit, Infinity, CreditCard, Crown, Rocket, Zap, ArrowRight, Circle, Diamond, Map } from 'lucide-react';
 import { AiService } from '../services/aiService';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { Transaction, UserProfile, ChatMessage } from '../types';
 import { auth } from '../services/firebaseConfig';
 import { KIRVANO_LINKS } from '../constants';
+import UpgradeModal from './UpgradeModal';
 
 interface AiTutorProps {
     user: UserProfile;
@@ -107,7 +108,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
     {
       id: 'welcome',
       role: 'ai',
-      content: 'Olá! Sou a **NeuroAI**. Posso te ajudar com dúvidas de matérias, criar resumos ou explicar questões difíceis. O que vamos estudar hoje?'
+      content: 'Olá! Sou seu **Treinador Pessoal de Aprovação**. Posso analisar seus pontos fracos, tirar dúvidas ou criar planos de estudo. Por onde começamos?'
     }
   ]);
   const [input, setInput] = useState('');
@@ -127,7 +128,10 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   const [selectedUnlimitedPlan, setSelectedUnlimitedPlan] = useState<{id: string, label: string, price: number, months: number, badge?: string} | null>(null);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [payerName, setPayerName] = useState(''); // NEW: For admin verification
+  const [payerName, setPayerName] = useState(''); 
+  
+  // Upgrade Modal
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -237,6 +241,17 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // SMART PAYWALL TRIGGER
+  const handleSmartPlan = () => {
+      if (isBasic) {
+          setShowUpgradeModal(true);
+      } else {
+          // If already advanced, insert a prompt to generate the plan
+          setInput("Analise meus últimos erros e monte um plano de revisão focado nos meus pontos fracos.");
+          // Ideally auto-submit, but letting user confirm is fine
+      }
   };
 
   const handlePaymentAction = () => {
@@ -358,6 +373,8 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   return (
     <div className="h-full flex flex-col max-h-[85vh] relative animate-slide-up">
       
+      {showUpgradeModal && <UpgradeModal user={user} onClose={() => setShowUpgradeModal(false)} />}
+
       {/* GLOBAL NOTIFICATION TOAST */}
       {notification && (
         <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl backdrop-blur-md border animate-in slide-in-from-top-4 duration-300 ${
@@ -375,9 +392,9 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 flex-shrink-0 gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white flex items-center gap-2">
-            <BrainCircuit className="text-indigo-400" /> NeuroAI <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">BETA</span>
+            <BrainCircuit className="text-indigo-400" /> NeuroAI <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">MENTOR</span>
           </h2>
-          <p className="text-slate-400 text-sm">Inteligência Artificial por demanda.</p>
+          <p className="text-slate-400 text-sm">Seu treinador pessoal de aprovação.</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -449,11 +466,29 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                         <Loader2 size={20} className="animate-spin" />
                     </div>
                     <div className="bg-slate-800/80 border border-white/5 p-4 rounded-2xl rounded-tl-none flex items-center gap-2 text-slate-400 text-sm">
-                        <span>Processando...</span>
+                        <span>O Mentor está analisando...</span>
                     </div>
                 </div>
                 )}
                 <div ref={messagesEndRef} />
+            </div>
+
+            {/* SMART ACTION PAYWALL */}
+            <div className="mb-2">
+                <button 
+                    onClick={handleSmartPlan}
+                    className="w-full bg-gradient-to-r from-emerald-900/40 to-indigo-900/40 border border-indigo-500/30 p-3 rounded-xl flex items-center justify-center gap-3 hover:bg-white/5 transition-all group"
+                >
+                    <Map size={18} className="text-indigo-400" />
+                    <span className="text-sm font-bold text-slate-200">
+                        {isBasic ? (
+                            <>Gerar Plano de Revisão Baseado nos Meus Erros <Lock size={12} className="inline ml-1 text-yellow-400"/></>
+                        ) : (
+                            "Gerar Plano de Revisão Baseado nos Meus Erros"
+                        )}
+                    </span>
+                    {isBasic && <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider bg-yellow-900/20 px-2 py-0.5 rounded border border-yellow-500/20 group-hover:scale-105 transition-transform">ADV Exclusivo</span>}
+                </button>
             </div>
 
             <form onSubmit={handleSend} className="relative flex-shrink-0">
@@ -464,7 +499,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Digite sua dúvida aqui..."
+                placeholder="Pergunte ao seu mentor..."
                 disabled={isLoading}
                 className="w-full glass-input rounded-xl py-4 pl-6 pr-14 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-slate-500 shadow-lg"
                 />

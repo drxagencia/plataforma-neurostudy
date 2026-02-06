@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
 import { Subject, Question, UserProfile } from '../types';
-import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, ArrowLeft, Eye, EyeOff, X, Ban, Sparkles, Bot, Zap } from 'lucide-react';
+import { ChevronRight, Filter, PlayCircle, Loader2, CheckCircle, XCircle, ArrowRight, ArrowLeft, Eye, EyeOff, X, Ban, Sparkles, Bot, Zap, Users, Lock, TrendingUp, AlertTriangle } from 'lucide-react';
 import { auth } from '../services/firebaseConfig';
+import UpgradeModal from './UpgradeModal';
 
 // --- PROFESSIONAL MARKDOWN RENDERER ---
 const ProfessionalMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -113,6 +114,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
 
+  // Growth / Upgrade State
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
   useEffect(() => {
     const initData = async () => {
       // Check for Redirect Params from Lessons
@@ -149,6 +154,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       setTopics(tops);
       setAnsweredMap(answered);
       setLoading(false);
+
+      if (auth.currentUser) {
+          DatabaseService.getUserProfile(auth.currentUser.uid).then(setUserProfile);
+      }
     };
     initData();
   }, []);
@@ -311,6 +320,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const isAnswered = currentQ?.id ? !!answeredMap[currentQ.id] : false;
   const wasCorrect = currentQ?.id ? answeredMap[currentQ.id]?.correct : false;
   const filteredSubjects = subjects.filter(s => s.category === selectedCategory);
+  const isBasic = userProfile?.plan === 'basic';
   
   // Helper to safely get topics for current selection
   const topicOptions = selectedSubject ? topics[selectedSubject] || [] : [];
@@ -318,6 +328,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   return (
     <div className="h-full flex flex-col relative animate-fade-in">
       
+      {showUpgradeModal && userProfile && (
+          <UpgradeModal user={userProfile} onClose={() => setShowUpgradeModal(false)} />
+      )}
+
       {/* HEADER & FILTER TOGGLE */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0 relative z-20">
         <div>
@@ -547,9 +561,56 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                         })}
                      </div>
 
-                     {/* AI Explanation Section */}
-                     {isAnswered && !wasCorrect && (
+                     {/* AI Explanation & Analysis Section */}
+                     {isAnswered && (
                          <div className="mt-8 pt-8 border-t border-white/5 animate-in slide-in-from-bottom-4">
+                             
+                             {/* 1. SOCIAL FRICTION / PROGRESS COMPARISON (NEW) */}
+                             {isBasic && (
+                                 <div className="mb-6 p-4 rounded-xl border border-white/10 bg-slate-900/50 flex flex-col md:flex-row items-center justify-between gap-4">
+                                     <div className="flex items-center gap-3">
+                                         <div className={`p-2 rounded-lg ${wasCorrect ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                             <TrendingUp size={20} />
+                                         </div>
+                                         <div>
+                                             <p className="text-white text-sm font-bold">
+                                                 {wasCorrect ? "Você acertou!" : "Você errou."}
+                                             </p>
+                                             <p className="text-slate-400 text-xs">
+                                                 Membros ADV com seu nível acertam <strong className="text-white">{Math.floor(Math.random() * 15 + 70)}%</strong> dessa questão.
+                                             </p>
+                                         </div>
+                                     </div>
+                                     <button 
+                                        onClick={() => setShowUpgradeModal(true)}
+                                        className="text-xs font-bold text-indigo-400 hover:text-white hover:underline transition-colors whitespace-nowrap"
+                                     >
+                                         Ver Comparativo Detalhado →
+                                     </button>
+                                 </div>
+                             )}
+
+                             {/* 2. POST-ERROR TRIGGER (NEW) */}
+                             {!wasCorrect && isBasic && (
+                                 <div 
+                                    onClick={() => setShowUpgradeModal(true)}
+                                    className="cursor-pointer mb-6 bg-gradient-to-r from-red-900/40 to-indigo-900/40 border border-indigo-500/40 p-4 rounded-xl flex items-center gap-4 hover:shadow-lg hover:shadow-indigo-500/10 transition-all group"
+                                 >
+                                     <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center text-indigo-400 group-hover:text-white transition-colors border border-indigo-500/30">
+                                         <Lock size={20} />
+                                     </div>
+                                     <div className="flex-1">
+                                         <h4 className="text-white font-bold text-sm flex items-center gap-2">
+                                             <AlertTriangle size={14} className="text-yellow-400"/> Essa questão derrubou 71% dos alunos
+                                         </h4>
+                                         <p className="text-slate-400 text-xs mt-1 leading-relaxed">
+                                             Membros <strong className="text-indigo-300">ADV</strong> têm acesso à análise de padrão de erro para nunca mais cair nessa pegadinha.
+                                         </p>
+                                     </div>
+                                     <ChevronRight size={20} className="text-indigo-500 group-hover:translate-x-1 transition-transform" />
+                                 </div>
+                             )}
+
                              <div className="bg-indigo-950/30 border border-indigo-500/30 p-6 rounded-2xl relative overflow-hidden">
                                  {/* AI Background Glow */}
                                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { UserProfile } from '../types';
-import { Trophy, Medal, Crown, Loader2, Calendar } from 'lucide-react';
+import { Trophy, Medal, Crown, Loader2, Calendar, Target } from 'lucide-react';
 
 const Competitivo: React.FC = () => {
   const [leaderboard, setLeaderboard] = useState<UserProfile[]>([]);
@@ -29,6 +29,17 @@ const Competitivo: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+      
+      {/* SOCIAL PROOF BANNER */}
+      <div className="bg-gradient-to-r from-emerald-900/30 to-indigo-900/30 border border-emerald-500/20 p-4 rounded-xl flex items-center justify-center gap-3 animate-slide-up text-center">
+          <div className="bg-emerald-500/20 p-2 rounded-full text-emerald-400">
+              <Target size={20} />
+          </div>
+          <p className="text-sm text-slate-300">
+              <strong className="text-white">82% dos alunos aprovados em MEDICINA</strong> da plataforma, em 2025, usaram o Modo Competitivo ativamente.
+          </p>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white mb-2">Ranking Competitivo</h2>

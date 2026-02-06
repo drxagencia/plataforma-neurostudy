@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, View } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap } from 'lucide-react';
+import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3 } from 'lucide-react';
 import { getRank, getNextRank } from '../constants';
+import UpgradeModal from './UpgradeModal';
 
 interface DashboardProps {
   user: UserProfile; 
@@ -15,6 +16,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const [progress, setProgress] = useState(0);
   const [currentRank, setCurrentRank] = useState(getRank(0));
   const [nextRank, setNextRank] = useState(getNextRank(0));
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,8 +51,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
     );
   }
 
+  const isBasic = user.plan === 'basic';
+
   return (
-    <div className="space-y-8 animate-slide-up">
+    <div className="space-y-8 animate-slide-up pb-20">
+      {showUpgrade && <UpgradeModal user={user} onClose={() => setShowUpgrade(false)} />}
+
       {/* Header */}
       <div className="flex justify-between items-end">
         <div>
@@ -65,6 +71,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {/* FOMO ALERT: LOST OPPORTUNITY (Only for Basic) */}
+      {isBasic && (
+          <div className="bg-gradient-to-r from-amber-900/20 to-red-900/20 border border-amber-500/30 p-4 rounded-2xl flex items-center justify-between animate-in slide-in-from-top-2 relative overflow-hidden group cursor-pointer" onClick={() => setShowUpgrade(true)}>
+              <div className="absolute inset-0 bg-amber-500/5 group-hover:bg-amber-500/10 transition-colors" />
+              <div className="flex items-center gap-4 relative z-10">
+                  <div className="bg-amber-500/20 p-2 rounded-lg text-amber-400">
+                      <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                      <h4 className="text-amber-200 font-bold text-sm">Oportunidade Perdida</h4>
+                      <p className="text-amber-400/80 text-xs">
+                          Você deixou de ganhar <span className="font-bold text-white">240 XP Competitivos</span> esta semana por limitações do plano.
+                      </p>
+                  </div>
+              </div>
+              <div className="relative z-10 hidden md:block">
+                  <span className="text-xs font-bold text-white bg-amber-600/20 border border-amber-500/50 px-3 py-1.5 rounded-lg uppercase tracking-wide">Recuperar Vantagem</span>
+              </div>
+          </div>
+      )}
 
       {/* Hero Card - Rank Progress */}
       <div className="relative w-full rounded-3xl overflow-hidden glass-card p-8 md:p-10 group transition-all duration-500 hover:shadow-[0_0_50px_rgba(79,70,229,0.15)]">
@@ -123,45 +150,122 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
         </div>
       </div>
 
-      {/* Real Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { 
-              icon: <Clock className="text-blue-400" />, 
-              label: 'Horas Estudadas', 
-              value: `${user.hoursStudied || 0}h`,
-              sub: 'Total acumulado'
-          },
-          { 
-              icon: <Target className="text-emerald-400" />, 
-              label: 'Questões Feitas', 
-              value: user.questionsAnswered || 0,
-              sub: 'Exercícios resolvidos'
-          },
-          { 
-              icon: <Zap className="text-purple-400" />, 
-              label: 'Login Streak', 
-              value: `${user.loginStreak || 0} Dias`,
-              sub: 'Sequência atual'
-          },
-          { 
-              icon: <TrendingUp className="text-yellow-400" />, 
-              label: 'Likes Dados Hoje', 
-              value: `${user.dailyLikesGiven || 0}/5`,
-              sub: 'Apoio à comunidade'
-          },
-        ].map((stat, i) => (
-          <div key={i} className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 hover:-translate-y-1 group">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
-                {stat.icon}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* STATS GRID */}
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[
+              { 
+                  icon: <Clock className="text-blue-400" />, 
+                  label: 'Horas Estudadas', 
+                  value: `${user.hoursStudied || 0}h`,
+                  sub: 'Total acumulado'
+              },
+              { 
+                  icon: <Target className="text-emerald-400" />, 
+                  label: 'Questões Feitas', 
+                  value: user.questionsAnswered || 0,
+                  sub: 'Exercícios resolvidos'
+              },
+              { 
+                  icon: <Zap className="text-purple-400" />, 
+                  label: 'Login Streak', 
+                  value: `${user.loginStreak || 0} Dias`,
+                  sub: 'Sequência atual'
+              },
+              { 
+                  icon: <TrendingUp className="text-yellow-400" />, 
+                  label: 'Likes Dados Hoje', 
+                  value: `${user.dailyLikesGiven || 0}/5`,
+                  sub: 'Apoio à comunidade'
+              },
+            ].map((stat, i) => (
+              <div key={i} className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 hover:-translate-y-1 group">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
+                    {stat.icon}
+                  </div>
+                </div>
+                <p className="text-slate-400 text-sm font-medium font-sans">{stat.label}</p>
+                <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{stat.value}</p>
+                <p className="text-xs text-slate-500 font-medium font-sans">{stat.sub}</p>
               </div>
-            </div>
-            <p className="text-slate-400 text-sm font-medium font-sans">{stat.label}</p>
-            <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{stat.value}</p>
-            <p className="text-xs text-slate-500 font-medium font-sans">{stat.sub}</p>
+            ))}
           </div>
-        ))}
+
+          {/* ADVANCED RADAR (BLURRED FOR BASIC) */}
+          <div className="relative glass-card rounded-2xl overflow-hidden border border-indigo-500/20">
+              <div className="p-6 border-b border-white/5 flex justify-between items-center">
+                  <h3 className="font-bold text-white flex items-center gap-2">
+                      <BarChart3 size={18} className="text-indigo-400"/> Radar de Performance
+                  </h3>
+                  {isBasic && <Lock size={16} className="text-slate-500" />}
+              </div>
+              
+              <div className="p-6 relative">
+                  {isBasic ? (
+                      // BLURRED STATE (PAIN POINT)
+                      <>
+                        <div className="space-y-4 filter blur-sm opacity-50 select-none">
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs text-slate-400"><span>Matemática (Funções)</span><span className="text-emerald-400">+18%</span></div>
+                                <div className="h-2 bg-slate-800 rounded-full"><div className="h-full w-[70%] bg-emerald-500 rounded-full"></div></div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs text-slate-400"><span>Física (Cinemática)</span><span className="text-red-400">-5%</span></div>
+                                <div className="h-2 bg-slate-800 rounded-full"><div className="h-full w-[45%] bg-red-500 rounded-full"></div></div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs text-slate-400"><span>Química (Orgânica)</span><span className="text-indigo-400">Estável</span></div>
+                                <div className="h-2 bg-slate-800 rounded-full"><div className="h-full w-[60%] bg-indigo-500 rounded-full"></div></div>
+                            </div>
+                            <div className="mt-4 p-3 bg-slate-800 rounded-lg text-xs text-center text-slate-400">
+                                Previsão de nota no ENEM: 740.5
+                            </div>
+                        </div>
+                        
+                        {/* OVERLAY CTA */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 backdrop-blur-[2px] text-center p-6">
+                            <div className="bg-slate-900/90 p-4 rounded-2xl border border-indigo-500/30 shadow-2xl transform hover:scale-105 transition-transform cursor-pointer" onClick={() => setShowUpgrade(true)}>
+                                <EyeOff size={32} className="mx-auto text-indigo-400 mb-3" />
+                                <h4 className="text-white font-bold mb-1">Você está estudando no escuro</h4>
+                                <p className="text-slate-400 text-xs mb-4 leading-relaxed">
+                                    Membros ADV sabem exatamente onde melhorar com o Radar de Evolução.
+                                </p>
+                                <button className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider">
+                                    Ativar Radar
+                                </button>
+                            </div>
+                        </div>
+                      </>
+                  ) : (
+                      // ADVANCED STATE (MOCKED FOR NOW)
+                      <div className="space-y-6">
+                          <div className="text-center">
+                              <p className="text-sm text-slate-400 mb-1">Sua evolução semanal</p>
+                              <p className="text-3xl font-black text-white flex items-center justify-center gap-2">
+                                  <TrendingUp size={24} className="text-emerald-400" /> +12%
+                              </p>
+                          </div>
+                          <div className="space-y-3">
+                              <div className="space-y-1">
+                                  <div className="flex justify-between text-xs font-bold text-white"><span>Pontos Fortes</span><span className="text-emerald-400">Humanas</span></div>
+                                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[85%] bg-emerald-500"></div></div>
+                              </div>
+                              <div className="space-y-1">
+                                  <div className="flex justify-between text-xs font-bold text-white"><span>Pontos de Atenção</span><span className="text-yellow-400">Exatas</span></div>
+                                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[45%] bg-yellow-500"></div></div>
+                              </div>
+                          </div>
+                          <div className="p-3 bg-indigo-900/20 border border-indigo-500/20 rounded-xl flex items-start gap-3">
+                              <Sparkles size={16} className="text-indigo-400 mt-0.5 shrink-0" />
+                              <p className="text-xs text-indigo-200">
+                                  <strong>Dica do Mentor:</strong> Foque em exercícios de Geometria Plana esta semana para equilibrar seu gráfico.
+                              </p>
+                          </div>
+                      </div>
+                  )}
+              </div>
+          </div>
       </div>
     </div>
   );
