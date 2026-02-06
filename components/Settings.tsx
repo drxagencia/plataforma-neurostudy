@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, PlanConfig } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { PixService } from '../services/pixService';
-import { Save, Loader2, CheckCircle, Moon, Sun, Palette, Trophy, Shield, Star, Lock, RefreshCw, User, CreditCard, Zap, ArrowUpCircle, QrCode, Copy, Check } from 'lucide-react';
-import { RANKS, getRank, getNextRank, KIRVANO_LINKS } from '../constants';
+import { Save, Loader2, CheckCircle, Moon, Sun, Palette, Trophy, Shield, Star, Lock, RefreshCw, CreditCard, ArrowUpCircle } from 'lucide-react';
+import { RANKS, getRank, getNextRank } from '../constants';
+import UpgradeModal from './UpgradeModal'; // Ensure this is imported
 
 interface SettingsProps {
   user: UserProfile;
@@ -19,13 +19,8 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   
-  // Plan Config & Upgrade State
-  const [planConfig, setPlanConfig] = useState<PlanConfig | null>(null);
-  const [upgradeMode, setUpgradeMode] = useState(false);
-  const [upgradeTarget, setUpgradeTarget] = useState<'advanced'>('advanced');
-  const [upgradePaymentMethod, setUpgradePaymentMethod] = useState<'pix' | 'card'>('pix');
-  const [upgradePixPayload, setUpgradePixPayload] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  // Upgrade Modal State
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Rank Data
   const currentRank = getRank(user.xp || 0);
@@ -39,9 +34,6 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
     setPhotoURL(user.photoURL || '');
     const theme = user.theme === 'light' ? 'light' : 'dark';
     setSelectedTheme(theme);
-    
-    // Fetch Plan Config for upgrades
-    DatabaseService.getPlanConfig().then(setPlanConfig);
   }, [user]);
 
   const handleThemeChange = (theme: 'dark' | 'light') => {
@@ -90,54 +82,13 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
       setPhotoURL(newUrl);
   };
 
-  // --- UPGRADE CALCULATIONS ---
-  const calculateUpgradeCost = () => {
-      if (!planConfig) return 0;
-      const currentPrice = planConfig.prices[user.plan as keyof typeof planConfig.prices] || 0;
-      const targetPrice = planConfig.prices[upgradeTarget];
-      
-      // If user pays via PIX, we charge only the difference
-      const diff = Math.max(0, targetPrice - currentPrice);
-      return diff;
-  };
-
-  const handleUpgradeAction = () => {
-      const cost = calculateUpgradeCost();
-
-      if (upgradePaymentMethod === 'card') {
-          const link = user.billingCycle === 'yearly' ? KIRVANO_LINKS.upgrade_yearly : KIRVANO_LINKS.upgrade_monthly;
-          window.open(link, '_blank');
-          return;
-      }
-
-      // PIX: Generate payload for difference
-      try {
-          const payload = PixService.generatePayload(cost);
-          setUpgradePixPayload(payload);
-          setCopied(false);
-      } catch (e) {
-          alert("Erro ao gerar PIX.");
-      }
-  };
-
-  const handleConfirmUpgradePix = async () => {
-      const cost = calculateUpgradeCost();
-      // Create request
-      await DatabaseService.createRechargeRequest(
-          user.uid,
-          user.displayName,
-          cost,
-          'BRL',
-          undefined,
-          `UPGRADE: ${user.plan} -> ${upgradeTarget}`
-      );
-      alert("Solicitação de Upgrade enviada! Aguarde a liberação.");
-      setUpgradePixPayload(null);
-      setUpgradeMode(false);
-  };
-
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500 pb-20">
+      
+      {showUpgradeModal && (
+          <UpgradeModal user={user} onClose={() => setShowUpgradeModal(false)} />
+      )}
+
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">Ajustes da Conta</h2>
         <p className="text-slate-400">Gerencie suas informações pessoais, aparência e progresso.</p>
@@ -213,57 +164,13 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
                   </div>
 
                   {user.plan !== 'advanced' && user.plan !== 'admin' && (
-                      <div className="space-y-4">
+                      <div className="space-y-4 relative z-10">
                           <button 
-                            onClick={() => setUpgradeMode(!upgradeMode)}
-                            className="w-full py-3 bg-white text-indigo-950 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all shadow-lg"
+                            onClick={() => setShowUpgradeModal(true)}
+                            className="w-full py-3 bg-white text-indigo-950 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all shadow-lg hover:scale-[1.02]"
                           >
                               <ArrowUpCircle size={20} /> Fazer Upgrade para Pro
                           </button>
-
-                          {upgradeMode && planConfig && (
-                              <div className="animate-in slide-in-from-top-2 pt-4 border-t border-white/5">
-                                  <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Plano</label>
-                                  <div className="flex gap-2 mb-4">
-                                      <button 
-                                        onClick={() => setUpgradeTarget('advanced')}
-                                        className={`flex-1 p-3 rounded-lg border text-sm font-bold transition-all ${upgradeTarget === 'advanced' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}`}
-                                      >
-                                          Advanced (Acesso Total)
-                                      </button>
-                                  </div>
-
-                                  <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Forma de Pagamento</label>
-                                  <div className="flex gap-2 mb-6">
-                                      <button onClick={() => { setUpgradePaymentMethod('pix'); setUpgradePixPayload(null); }} className={`flex-1 p-3 rounded-lg border flex items-center justify-center gap-2 ${upgradePaymentMethod === 'pix' ? 'bg-emerald-900/30 border-emerald-500 text-emerald-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><QrCode size={16}/> PIX (Só a diferença)</button>
-                                      <button onClick={() => { setUpgradePaymentMethod('card'); setUpgradePixPayload(null); }} className={`flex-1 p-3 rounded-lg border flex items-center justify-center gap-2 ${upgradePaymentMethod === 'card' ? 'bg-indigo-900/30 border-indigo-500 text-indigo-400' : 'bg-slate-900 border-slate-700 text-slate-400'}`}><CreditCard size={16}/> Cartão</button>
-                                  </div>
-
-                                  <div className="bg-slate-900 p-4 rounded-xl text-center mb-4 border border-white/5">
-                                      <p className="text-slate-400 text-xs uppercase mb-1">Valor a Pagar</p>
-                                      <p className="text-3xl font-black text-white">
-                                          R$ {upgradePaymentMethod === 'pix' ? calculateUpgradeCost().toFixed(2) : planConfig.prices[upgradeTarget].toFixed(2)}
-                                      </p>
-                                      {upgradePaymentMethod === 'pix' && <p className="text-[10px] text-emerald-400 mt-1">Desconto do que você já pagou aplicado!</p>}
-                                      {upgradePaymentMethod === 'card' && <p className="text-[10px] text-slate-500 mt-1">Valor integral (diferença estornada após confirmação)</p>}
-                                  </div>
-
-                                  {!upgradePixPayload ? (
-                                      <button onClick={handleUpgradeAction} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all">
-                                          {upgradePaymentMethod === 'card' ? 'Ir para Pagamento' : 'Gerar QR Code'}
-                                      </button>
-                                  ) : (
-                                      <div className="text-center animate-in zoom-in-95">
-                                          <div className="bg-white p-2 rounded-xl inline-block mb-4"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upgradePixPayload)}`} className="w-32 h-32 mix-blend-multiply"/></div>
-                                          <div className="flex gap-2 mb-4">
-                                              <input readOnly value={upgradePixPayload} className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 text-xs text-slate-400 truncate" />
-                                              <button onClick={() => {navigator.clipboard.writeText(upgradePixPayload); setCopied(true);}} className="p-2 bg-slate-800 rounded-lg text-white">{copied ? <Check size={16}/> : <Copy size={16}/>}</button>
-                                          </div>
-                                          <button onClick={handleConfirmUpgradePix} className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl">Já paguei</button>
-                                      </div>
-                                  )}
-                              </div>
-                          )}
                       </div>
                   )}
               </div>
