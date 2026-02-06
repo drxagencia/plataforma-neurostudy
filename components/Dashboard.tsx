@@ -52,6 +52,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   }
 
   const isBasic = user.plan === 'basic';
+  // Dynamic Lost XP Calculation: 1.5x Weekly XP (Fallback to 150 if 0 to ensure trigger works)
+  const lostXpAmount = Math.floor((user.weeklyXp || 100) * 1.5);
 
   return (
     <div className="space-y-8 animate-slide-up pb-20">
@@ -83,7 +85,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                   <div>
                       <h4 className="text-amber-200 font-bold text-sm">Oportunidade Perdida</h4>
                       <p className="text-amber-400/80 text-xs">
-                          Você deixou de ganhar <span className="font-bold text-white">240 XP Competitivos</span> esta semana por limitações do plano.
+                          Você deixou de ganhar <span className="font-bold text-white">{lostXpAmount} XP Competitivos</span> esta semana por limitações do plano.
                       </p>
                   </div>
               </div>

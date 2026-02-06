@@ -577,7 +577,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                                                  {wasCorrect ? "Você acertou!" : "Você errou."}
                                              </p>
                                              <p className="text-slate-400 text-xs">
-                                                 Membros ADV com seu nível acertam <strong className="text-white">{Math.floor(Math.random() * 15 + 70)}%</strong> dessa questão.
+                                                 <strong className="text-white">{Math.floor(Math.random() * (95 - 75 + 1) + 75)}%</strong> dos Membros ADV com seu nível acertaram essa questão.
                                              </p>
                                          </div>
                                      </div>

@@ -204,7 +204,8 @@ const App: React.FC = () => {
     
     // Basic
     if (userPlan === 'basic') {
-        const restrictedViews: View[] = ['tutor', 'redacao', 'simulados', 'militares', 'competitivo'];
+        // ALLOW access to tutor and competitivo so they can see the "Smart Paywall" screens inside them.
+        const restrictedViews: View[] = ['redacao', 'simulados', 'militares'];
         if (restrictedViews.includes(view)) return false;
         return true; 
     }
