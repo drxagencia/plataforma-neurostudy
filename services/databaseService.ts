@@ -404,9 +404,17 @@ export const DatabaseService = {
   },
 
   // --- XP & GAMIFICATION ---
-  processXpAction: async (uid: string, actionType: keyof typeof XP_VALUES): Promise<void> => {
-      const xpAmount = XP_VALUES[actionType];
-      if (!xpAmount) return;
+  processXpAction: async (uid: string, actionType: string, customAmount?: number): Promise<void> => {
+      let xpAmount = 0;
+      
+      // Allow custom amount override if provided (useful for dynamic XP like essay scores)
+      if (customAmount !== undefined) {
+          xpAmount = customAmount;
+      } else {
+          xpAmount = XP_VALUES[actionType as keyof typeof XP_VALUES] || 0;
+      }
+
+      if (!xpAmount || xpAmount <= 0) return;
       
       const userRef = ref(database, `users/${uid}`);
       const snap = await get(userRef);

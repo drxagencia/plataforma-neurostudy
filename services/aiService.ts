@@ -52,7 +52,7 @@ const getUserData = async (uid: string) => {
 const FORMATTING_RULES = `
 REGRAS DE FORMATAÇÃO ESTRITA:
 1. Use '### ' para Títulos e Subtítulos importantes.
-2. Use '**' para destacar palavras-chave e conceitos centrais (Isso será renderizado com cores especiais).
+2. Use '**' para destacar MUITO as palavras-chave e conceitos centrais. (IMPORTANTE: Estes destaques serão exibidos em cores NEON brilhantes (Ciano/Sky) para alto contraste no fundo escuro. Use com sabedoria).
 3. Use listas com '- ' para passo-a-passo ou tópicos.
 4. Use '> ' para notas de destaque, avisos ou "Dicas de Ouro".
 5. NÃO use formatações complexas como tabelas Markdown ou LaTeX cru sem explicação.
@@ -171,7 +171,7 @@ INSTRUÇÃO:
 Você é um Professor Particular Senior. Explique onde está o erro conceitual do aluno e como chegar na resposta correta.
 Use a seguinte estrutura de formatação para renderização profissional:
 - Use '### ' para separar "Análise do Erro" e "Caminho Correto".
-- Use '**' para destacar termos técnicos.
+- Use '**' para destacar termos técnicos. (Estes ficarão em NEON brilhante).
 - Use '> ' para uma "Dica Final" ou macete de memorização.
       `;
 

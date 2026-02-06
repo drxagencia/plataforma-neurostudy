@@ -91,9 +91,9 @@ const parseInlineStyles = (text: string) => {
     const parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, i) => {
         if (part.startsWith('**') && part.endsWith('**')) {
-            // Stylized Bold: Gradient Text
+            // Stylized Bold: Gradient Text - Updated to brighter colors (Cyan/Sky) for better contrast on dark bg
             return (
-                <span key={i} className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-purple-300 to-indigo-300 animate-pulse-slow">
+                <span key={i} className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-cyan-200 to-sky-300 animate-pulse-slow">
                     {part.slice(2, -2)}
                 </span>
             );

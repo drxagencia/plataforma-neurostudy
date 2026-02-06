@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye, Sparkles, Crosshair } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
@@ -462,15 +463,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                           </div>
                       </div>
                   </div>
-
-                  <div className="mt-16 text-center">
-                      <p className="text-zinc-500 text-xs flex items-center justify-center gap-2">
-                          <span className="text-emerald-500 font-bold ml-4 flex items-center gap-1"><User size={14}/> {purchasedCount} alunos entraram hoje para vencer.</span>
-                      </p>
-                      <button onClick={onStartGame} className="mt-6 text-zinc-600 hover:text-white text-xs underline transition-colors">
-                          Já tenho conta, fazer login
-                      </button>
-                  </div>
+                  
+                  {/* Removed "Já tenho conta" section as requested */}
               </div>
               ) : (
                   <div className="h-64 flex flex-col items-center justify-center">

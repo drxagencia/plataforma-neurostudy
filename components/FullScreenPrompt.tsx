@@ -23,10 +23,7 @@ const FullScreenPrompt: React.FC = () => {
   const handleDismiss = () => {
     setIsVisible(false);
     sessionStorage.setItem('seen_fullscreen_prompt', 'true');
-    // Award XP for engaging with the prompt (assuming they press F11 or click the button)
-    if (auth.currentUser) {
-        DatabaseService.processXpAction(auth.currentUser.uid, 'FULLSCREEN_MODE');
-    }
+    // Removed XP logic
   };
 
   if (!isVisible) return null;
@@ -70,7 +67,7 @@ const FullScreenPrompt: React.FC = () => {
             </button>
 
             <p className="text-slate-500 text-sm mt-4">
-                Ganhe XP extra por estudar em modo focado.
+                Foco total no conteúdo.
             </p>
         </div>
       </div>

@@ -271,10 +271,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
-          await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_CORRECTION');
-          if (finalTotal > 800) {
-              await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_GOOD_SCORE_BONUS');
-          }
+          // Calculate Dynamic XP: Score * 0.6
+          const xpEarned = Math.floor(finalTotal * 0.6);
+          await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_CORRECTION', xpEarned);
 
           const currentCredits = Number(user.essayCredits || 0);
           onUpdateUser({

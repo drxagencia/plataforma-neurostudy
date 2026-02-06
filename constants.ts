@@ -64,17 +64,28 @@ export const ANNOUNCEMENTS: Announcement[] = [
 // --- GAMIFICATION SYSTEM ---
 
 export const XP_VALUES = {
-    QUESTION_CORRECT: 15,
-    QUESTION_WRONG: 5,
-    LESSON_WATCHED: 50,
-    SIMULATION_FINISH: 100, // + score * 2
-    ESSAY_CORRECTION: 50,
-    ESSAY_GOOD_SCORE_BONUS: 100, // if > 800
+    // 2. Fazer Questão: Erro = 10, Acerto = 50 (5x mais, cumprindo o "no mínimo 2.5x")
+    QUESTION_CORRECT: 50, 
+    QUESTION_WRONG: 10,
+    
+    // 2. Concluir Aula: Valor constante e alto
+    LESSON_WATCHED: 100,
+    
+    SIMULATION_FINISH: 150, // + score * 2
+    
+    // 2. Corrigir Redação: Valor base é 0, pois será calculado dinamicamente (Nota * 0.6)
+    ESSAY_CORRECTION: 0, 
+    ESSAY_GOOD_SCORE_BONUS: 0, // Deprecated in favor of dynamic formula
+    
     AI_CHAT_MESSAGE: 5,
     DAILY_LOGIN_BASE: 50,
     DAILY_LOGIN_STREAK_BONUS: 10,
-    LIKE_COMMENT: 10, // Max 5 per day
-    FULLSCREEN_MODE: 20
+    
+    // 3. Curtir comentário: Reduzido pela metade (era 10)
+    LIKE_COMMENT: 5, 
+    
+    // 1. F11 não dá mais XP
+    FULLSCREEN_MODE: 0 
 };
 
 export interface Rank {
