@@ -5,13 +5,13 @@
 ![Tech Stack](https://img.shields.io/badge/stack-React_|_TypeScript_|_Firebase-blue?style=for-the-badge)
 ![AI Powered](https://img.shields.io/badge/AI-OpenAI_GPT_4o-purple?style=for-the-badge)
 
-> **Uma solução EdTech completa que une Gamificação, Inteligência Artificial e Gestão de Negócios em um ecossistema imersivo.**
+> **Uma solução completa que une Gamificação, Inteligência Artificial e Gestão de Negócios em um ecossistema imersivo.**
 
 ---
 
 ## 🚀 Sobre o Projeto
 
-O **NeuroStudy AI** não é apenas um site de cursos; é um **SaaS (Software as a Service) educacional completo**. O projeto foi concebido para resolver três dores principais do ensino online: falta de engajamento (resolvido via Gamificação), falta de personalização (resolvido via Tutoria por IA) e gestão de vendas (resolvido via Painel Administrativo integrado e Pixel Tracking).
+O **NeuroStudy AI** não é apenas um site de cursos, é um **SaaS educacional completo**. O projeto foi concebido para resolver três dores principais do ensino online: falta de engajamento (resolvido via Gamificação), falta de personalização (resolvido via Tutoria por IA) e gestão de vendas (resolvido via Painel Administrativo integrado e Pixel Tracking).
 
 A aplicação utiliza uma arquitetura moderna, focada em performance, escalabilidade e uma UX (Experiência do Usuário) premium baseada em Glassmorphism.
 
@@ -68,39 +68,6 @@ O projeto segue os princípios de **Clean Code** e **Separation of Concerns**.
 
 ---
 
-## 📸 Previews
-
-| Dashboard do Aluno | Correção de Redação IA |
-|:------------------:|:----------------------:|
-| *Visualização de métricas e progresso* | *Análise de manuscrito e feedback* |
-
-| Ranking Competitivo | Painel Administrativo |
-|:-------------------:|:---------------------:|
-| *Leaderboard semanal e geral* | *Gestão de usuários e conteúdo* |
-
----
-
-## ⚙️ Instalação e Execução
-
-Este projeto utiliza Node.js e NPM/Yarn.
-
-```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/neurostudy-platform.git
-
-# 2. Instale as dependências
-npm install
-
-# 3. Configure as variáveis de ambiente (.env)
-# VITE_FIREBASE_API_KEY=...
-# VITE_OPENAI_API_KEY=...
-
-# 4. Execute o servidor de desenvolvimento
-npm run dev
-```
-
----
-
 ## 💡 Destaques de Código
 
 ### Algoritmo de Geração de PIX (Interoperabilidade Bancária)
@@ -134,8 +101,8 @@ Uso de `React.memo` e virtualização de listas para renderizar bancos de quest�
 
 Desenvolvido com foco em excelência técnica e impacto de produto.
 
-**[Seu Nome]**
-*Senior Frontend Engineer*
+**Herick Moraes**
+*Junior Fullstack Developer*
 
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/seu-perfil)
-[![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=About.me&logoColor=white)](https://seu-portfolio.com)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/herickdavi)
+[![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=About.me&logoColor=white)](https://herickmoraes.com)
