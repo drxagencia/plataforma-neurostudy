@@ -18,10 +18,14 @@ export interface User {
   isAdmin?: boolean;
 }
 
-// Stats Structure for Radar
+// Stats Structure for Radar - Decoupled from UserProfile
 export interface TopicStats {
     correct: number;
     wrong: number;
+}
+
+export interface UserStatsMap {
+    [subjectId: string]: Record<string, TopicStats>;
 }
 
 export interface UserProfile extends User {
@@ -40,9 +44,6 @@ export interface UserProfile extends User {
   lastPostedAt?: number;
   theme?: 'dark' | 'light';
   hasSupportNotification?: boolean; // New: Notification flag
-  
-  // Real Performance Data: Subject -> Topic -> Stats
-  stats?: Record<string, Record<string, TopicStats>>; 
 }
 
 export interface SupportMessage {

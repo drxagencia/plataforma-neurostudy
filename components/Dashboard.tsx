@@ -1,11 +1,55 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { UserProfile, View } from '../types';
+import { UserProfile, View, UserStatsMap } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
 import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3, Bot } from 'lucide-react';
 import { getRank, getNextRank } from '../constants';
 import UpgradeModal from './UpgradeModal';
+
+// --- PROFESSIONAL MARKDOWN RENDERER (ADAPTED FOR DASHBOARD) ---
+const ProfessionalMarkdown: React.FC<{ text: string }> = ({ text }) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+
+    return (
+        <div className="space-y-2 font-sans text-sm leading-relaxed">
+            {lines.map((line, idx) => {
+                const trimmed = line.trim();
+                
+                if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                    const content = trimmed.replace(/^[-*]\s*/, '');
+                    return (
+                        <div key={idx} className="flex gap-2 pl-1 group items-start">
+                            <div className="mt-1.5 min-w-[6px] h-[6px] rounded-full bg-indigo-400 shrink-0" />
+                            <p className="text-slate-300">{parseInlineStyles(content)}</p>
+                        </div>
+                    );
+                }
+
+                if (!trimmed) return <div key={idx} className="h-1"></div>;
+
+                return <p key={idx} className="text-slate-200">{parseInlineStyles(line)}</p>;
+            })}
+        </div>
+    );
+};
+
+// Styles parser: Removes '**' but keeps the styling
+const parseInlineStyles = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            // REMOVE the asterisks, keep the text inside, apply neon style
+            return (
+                <span key={i} className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-cyan-200 to-sky-300">
+                    {part.slice(2, -2)}
+                </span>
+            );
+        }
+        return part;
+    });
+};
 
 interface DashboardProps {
   user: UserProfile; 
@@ -18,6 +62,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const [currentRank, setCurrentRank] = useState(getRank(0));
   const [nextRank, setNextRank] = useState(getNextRank(0));
   const [showUpgrade, setShowUpgrade] = useState(false);
+  
+  // Stats State (Fetched independently)
+  const [userStats, setUserStats] = useState<UserStatsMap | null>(null);
   
   // AI Mentor State
   const [mentorLoading, setMentorLoading] = useState(false);
@@ -42,6 +89,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
             setProgress(100); // Max level
         }
 
+        // 2. Fetch independent stats
+        const stats = await DatabaseService.getUserStats(user.uid);
+        setUserStats(stats);
+
         setLoading(false);
     };
 
@@ -50,11 +101,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
 
   // --- STATS CALCULATION ---
   const performanceData = useMemo(() => {
-      if (!user.stats) return { strengths: [], weaknesses: [], totalStats: null };
+      if (!userStats) return { strengths: [], weaknesses: [], totalStats: null };
 
       const allTopics: { name: string, correct: number, wrong: number, total: number, percentage: number }[] = [];
 
-      Object.entries(user.stats).forEach(([subject, topics]) => {
+      Object.entries(userStats).forEach(([subject, topics]) => {
           Object.entries(topics).forEach(([topicName, stats]) => {
               const total = stats.correct + stats.wrong;
               if (total >= 3) { // Filter out statistically insignificant
@@ -77,7 +128,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
           weaknesses: allTopics.slice(-3).reverse(), // Bottom 3 (reversed to show worst first)
           totalStats: allTopics
       };
-  }, [user.stats]);
+  }, [userStats]);
 
   // --- AI MENTOR HANDLER ---
   const handleGenerateTip = async () => {
@@ -105,7 +156,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
               prompt += "\n(Sem dados suficientes de pontos fracos)";
           }
 
-          prompt += "\n\nTAREFA: Aja como um treinador de alta performance. Dê UMA dica prática e curta (máx 2 frases) focada em como melhorar os pontos fracos usando a confiança dos pontos fortes. Seja direto.";
+          prompt += "\n\nTAREFA: Aja como um treinador de alta performance. Dê uma estratégia curta (máx 3 linhas).";
+          prompt += "\nESTILO: Use **negrito** apenas para palavras-chave de impacto. Seja motivador mas técnico.";
 
           const response = await AiService.sendMessage(prompt, [], "Dica Mentor Dashboard");
           setMentorTip(response);
@@ -343,27 +395,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                       )}
                                   </div>
 
-                                  <div className="p-3 bg-indigo-900/20 border border-indigo-500/20 rounded-xl">
-                                      <div className="flex items-start gap-3 mb-2">
-                                          <Sparkles size={16} className="text-indigo-400 mt-0.5 shrink-0" />
-                                          <p className="text-xs text-indigo-200">
-                                              {mentorTip ? (
-                                                  <span className="animate-in fade-in">{mentorTip}</span>
-                                              ) : (
-                                                  <span>Solicite uma análise da IA sobre seus dados atuais para otimizar sua rotina.</span>
-                                              )}
-                                          </p>
+                                  <div className="p-4 bg-indigo-950/20 border border-indigo-500/20 rounded-xl relative overflow-hidden">
+                                      <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-600/10 rounded-full blur-2xl" />
+                                      
+                                      <div className="flex items-center gap-2 mb-3">
+                                          <div className="p-1.5 bg-indigo-500/20 rounded-lg text-indigo-400">
+                                              <Sparkles size={16} />
+                                          </div>
+                                          <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Estratégia do Mentor</span>
                                       </div>
-                                      {!mentorTip && (
-                                          <button 
-                                            onClick={handleGenerateTip}
-                                            disabled={mentorLoading}
-                                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                                          >
-                                              {mentorLoading ? <Loader2 className="animate-spin" size={14} /> : <Bot size={14} />}
-                                              Gerar Dica do Mentor
-                                          </button>
-                                      )}
+                                      
+                                      <div className="min-h-[60px]">
+                                          {mentorTip ? (
+                                              <div className="animate-in fade-in">
+                                                  <ProfessionalMarkdown text={mentorTip} />
+                                              </div>
+                                          ) : (
+                                              <div className="text-center py-2">
+                                                  <p className="text-xs text-slate-500 mb-3">Solicite uma análise da IA baseada nos seus últimos erros e acertos.</p>
+                                                  <button 
+                                                    onClick={handleGenerateTip}
+                                                    disabled={mentorLoading}
+                                                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-lg shadow-indigo-900/20 hover:scale-[1.02]"
+                                                  >
+                                                      {mentorLoading ? <Loader2 className="animate-spin" size={14} /> : <Bot size={14} />}
+                                                      Gerar Estratégia
+                                                  </button>
+                                              </div>
+                                          )}
+                                      </div>
                                   </div>
                               </>
                           ) : (

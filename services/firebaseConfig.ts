@@ -1,5 +1,5 @@
 
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import * as firebaseApp from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 
@@ -15,14 +15,14 @@ const firebaseConfig = {
 };
 
 // Use named initializeApp. Check if app already initialized to avoid hot-reload errors.
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const app = firebaseApp.getApps().length > 0 ? firebaseApp.getApp() : firebaseApp.initializeApp(firebaseConfig);
 
 // Initialize a SECONDARY app instance for Admin User Creation.
-let secondaryApp: FirebaseApp;
+let secondaryApp: firebaseApp.FirebaseApp;
 try {
-    secondaryApp = getApp("SecondaryApp");
+    secondaryApp = firebaseApp.getApp("SecondaryApp");
 } catch (e) {
-    secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+    secondaryApp = firebaseApp.initializeApp(firebaseConfig, "SecondaryApp");
 }
 
 export const auth = getAuth(app);

@@ -114,7 +114,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const handleCheckout = (plan: 'basic' | 'advanced', method: 'pix' | 'card') => {
       let price = 0;
       if (plan === 'basic') {
-          price = billingCycle === 'monthly' ? 9.90 : 97.00;
+          // UPDATE: Basic Yearly is now 94.00
+          price = billingCycle === 'monthly' ? 9.90 : 94.00;
       } else {
           price = billingCycle === 'monthly' ? 19.90 : 197.00;
       }
@@ -151,7 +152,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           );
       } else {
           // Yearly Display (Shown as Monthly Equivalent)
-          const total = plan === 'basic' ? 97.00 : 197.00;
+          // UPDATE: Basic Yearly is now 94.00
+          const total = plan === 'basic' ? 94.00 : 197.00;
           const monthlyEq = (total / 12).toFixed(2).replace('.', ',');
           
           return (

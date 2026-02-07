@@ -20,7 +20,7 @@ import {
     UserProfile, 
     CommunityPost, 
     Simulation, 
-    SimulationResult,
+    SimulationResult, 
     Lead,
     RechargeRequest, 
     Transaction,
@@ -30,7 +30,8 @@ import {
     TrafficConfig,
     PlanConfig,
     SupportTicket,
-    SupportMessage
+    SupportMessage,
+    UserStatsMap
 } from "../types";
 import { XP_VALUES } from "../constants";
 
@@ -417,6 +418,19 @@ export const DatabaseService = {
     }
   },
 
+  // NEW: Fetch separated stats for performance optimization
+  getUserStats: async (uid: string): Promise<UserStatsMap> => {
+      try {
+          const snapshot = await get(ref(database, `user_stats/${uid}`));
+          if (snapshot.exists()) {
+              return snapshot.val();
+          }
+          return {};
+      } catch (e) {
+          return {};
+      }
+  },
+
   saveUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
       if (isBase64Image(data.photoURL)) {
           data.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.displayName || 'User')}`;
@@ -505,16 +519,16 @@ export const DatabaseService = {
       return {};
   },
 
-  // UPDATED: Now accepts Subject/Topic to update stats
+  // UPDATED: Now updates stats in dedicated 'user_stats' node to prevent 'users' node bloat
   markQuestionAsAnswered: async (uid: string, questionId: string, correct: boolean, subjectId?: string, topic?: string): Promise<void> => {
       const updates: any = {};
       
       // 1. Mark basic log
       updates[`users/${uid}/answeredQuestions/${questionId}`] = { correct, timestamp: Date.now() };
       
-      // 2. Update Stats (Atomic Increment)
+      // 2. Update Stats (Atomic Increment in ISOLATED NODE)
       if (subjectId && topic) {
-          const statsPath = `users/${uid}/stats/${subjectId}/${topic}`;
+          const statsPath = `user_stats/${uid}/${subjectId}/${topic}`;
           updates[`${statsPath}/${correct ? 'correct' : 'wrong'}`] = increment(1);
       }
 
@@ -702,7 +716,7 @@ export const DatabaseService = {
       await set(newRef, sanitizeData({ ...sim, id: newRef.key }));
   },
 
-  // UPDATED: Now saves batch stats to user profile
+  // UPDATED: Now saves batch stats to 'user_stats' (Performance Fix)
   saveSimulationResult: async (result: SimulationResult): Promise<void> => {
       const newRef = push(ref(database, `user_simulations/${result.userId}`));
       await set(newRef, sanitizeData(result));
@@ -714,26 +728,11 @@ export const DatabaseService = {
       const updates: any = {};
       updates[`users/${result.userId}/xp`] = increment(xpBase + xpBonus);
 
-      // Batch update topic stats
+      // Batch update topic stats in ISOLATED node
       if (result.topicPerformance) {
           Object.entries(result.topicPerformance).forEach(([topicName, stats]) => {
-              // Note: Simulation result only has TopicName, we need to infer subject or store it.
-              // For simplicity, we might iterate questions or assume a default 'mixed' subject if not available.
-              // Ideally, questions in simulation should carry subjectId.
-              // Assuming 'topicPerformance' logic in component knows the subject, OR we rely on a simplified 'simulations' key in stats.
-              // Let's store under 'simulations' pseudo-subject for now to avoid complexity of reverse looking up subject ID from Topic Name here.
-              // OR better: The component passed stats. If we want robustness, we assume topic names are unique enough or prefixed.
-              
-              // To properly sync with Dashboard radar, we really need the subject ID. 
-              // Since existing Logic in Simulation.tsx builds topicPerformance just by topic Name, let's stick to a generic "simulated_stats" or try to guess.
-              // Recommendation: Update SimulationResult type to include subjectId in keys or pass a map. 
-              // Fallback: We will just log under 'simulados' subject for radar visibility if we can't map.
-              
-              // However, since we want real Radar data, let's iterate the questions in Simulation.tsx component before calling this, 
-              // OR accept that we update 'topic' stats globally.
-              
-              // Let's assume topic names are unique for now or just log them.
-              const path = `users/${result.userId}/stats/simulados/${topicName}`;
+              // Note: Assuming 'simulados' as pseudo-subject for generic radar tracking if subjectId absent.
+              const path = `user_stats/${result.userId}/simulados/${topicName}`;
               updates[`${path}/correct`] = increment(stats.correct);
               updates[`${path}/wrong`] = increment(stats.total - stats.correct);
           });

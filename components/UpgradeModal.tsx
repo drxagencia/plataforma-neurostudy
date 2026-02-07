@@ -23,7 +23,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose }) => {
 
     // Configuração de Preços
     const PRICES = {
-        basic: { monthly: 9.90, yearly: 97.00 },
+        basic: { monthly: 9.90, yearly: 94.00 }, // Updated: Basic Yearly is 94.00
         advanced: { monthly: 19.90, yearly: 197.00 }
     };
 
@@ -34,7 +34,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose }) => {
         const currentPaid = isCurrentYearly ? PRICES.basic.yearly : PRICES.basic.monthly;
         const targetPrice = targetCycle === 'yearly' ? PRICES.advanced.yearly : PRICES.advanced.monthly;
         
-        // Se o usuário é Basic Anual e quer Adv Anual: 197 - 97 = 100
+        // Se o usuário é Basic Anual e quer Adv Anual: 197 - 94 = 103
         // Se o usuário é Basic Mensal e quer Adv Mensal: 19.90 - 9.90 = 10
         // Se o usuário é Basic Mensal e quer Adv Anual: 197 - 9.90 (Desconto do que já pagou no mês) = 187.10
         
