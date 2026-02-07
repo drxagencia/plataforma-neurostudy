@@ -230,7 +230,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
       // Optimistic update map
       setAnsweredMap(prev => ({...prev, [currentQ.id!]: { correct: isCorrect }}));
 
-      await DatabaseService.markQuestionAsAnswered(auth.currentUser.uid, currentQ.id, isCorrect);
+      // UPDATED: Pass subject and topic for Radar stats
+      await DatabaseService.markQuestionAsAnswered(auth.currentUser.uid, currentQ.id, isCorrect, currentQ.subjectId, currentQ.topic);
       
       // Award XP based on correctness
       if (isCorrect) {

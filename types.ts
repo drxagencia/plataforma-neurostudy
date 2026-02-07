@@ -18,6 +18,12 @@ export interface User {
   isAdmin?: boolean;
 }
 
+// Stats Structure for Radar
+export interface TopicStats {
+    correct: number;
+    wrong: number;
+}
+
 export interface UserProfile extends User {
   plan: UserPlan;
   billingCycle?: BillingCycle;
@@ -34,8 +40,9 @@ export interface UserProfile extends User {
   lastPostedAt?: number;
   theme?: 'dark' | 'light';
   hasSupportNotification?: boolean; // New: Notification flag
-  // REMOVED HEAVY OBJECTS FROM MAIN PROFILE FETCH
-  // essays and transactions are now fetched on demand from separate root nodes
+  
+  // Real Performance Data: Subject -> Topic -> Stats
+  stats?: Record<string, Record<string, TopicStats>>; 
 }
 
 export interface SupportMessage {

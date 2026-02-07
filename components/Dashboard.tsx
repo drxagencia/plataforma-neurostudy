@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, View } from '../types';
 import { DatabaseService } from '../services/databaseService';
-import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3 } from 'lucide-react';
+import { AiService } from '../services/aiService';
+import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3, Bot } from 'lucide-react';
 import { getRank, getNextRank } from '../constants';
 import UpgradeModal from './UpgradeModal';
 
@@ -17,6 +18,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const [currentRank, setCurrentRank] = useState(getRank(0));
   const [nextRank, setNextRank] = useState(getNextRank(0));
   const [showUpgrade, setShowUpgrade] = useState(false);
+  
+  // AI Mentor State
+  const [mentorLoading, setMentorLoading] = useState(false);
+  const [mentorTip, setMentorTip] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,6 +47,75 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
 
     fetchData();
   }, [user]);
+
+  // --- STATS CALCULATION ---
+  const performanceData = useMemo(() => {
+      if (!user.stats) return { strengths: [], weaknesses: [], totalStats: null };
+
+      const allTopics: { name: string, correct: number, wrong: number, total: number, percentage: number }[] = [];
+
+      Object.entries(user.stats).forEach(([subject, topics]) => {
+          Object.entries(topics).forEach(([topicName, stats]) => {
+              const total = stats.correct + stats.wrong;
+              if (total >= 3) { // Filter out statistically insignificant
+                  allTopics.push({
+                      name: `${topicName} (${subject})`,
+                      correct: stats.correct,
+                      wrong: stats.wrong,
+                      total,
+                      percentage: (stats.correct / total) * 100
+                  });
+              }
+          });
+      });
+
+      // Sort by percentage
+      allTopics.sort((a, b) => b.percentage - a.percentage);
+
+      return {
+          strengths: allTopics.slice(0, 3), // Top 3
+          weaknesses: allTopics.slice(-3).reverse(), // Bottom 3 (reversed to show worst first)
+          totalStats: allTopics
+      };
+  }, [user.stats]);
+
+  // --- AI MENTOR HANDLER ---
+  const handleGenerateTip = async () => {
+      if (mentorLoading) return;
+      if (user.balance < 0.01) {
+          alert("Saldo insuficiente para gerar dica.");
+          return;
+      }
+      
+      setMentorLoading(true);
+      try {
+          const { strengths, weaknesses } = performanceData;
+          
+          let prompt = "Analise os dados de desempenho do aluno:\n";
+          
+          if (strengths.length > 0) {
+              prompt += `\nPONTOS FORTES:\n${strengths.map(s => `- ${s.name}: ${s.percentage.toFixed(0)}% acerto`).join('\n')}`;
+          } else {
+              prompt += "\n(Sem dados suficientes de pontos fortes)";
+          }
+
+          if (weaknesses.length > 0) {
+              prompt += `\n\nPONTOS FRACOS (Prioridade):\n${weaknesses.map(w => `- ${w.name}: ${w.percentage.toFixed(0)}% acerto`).join('\n')}`;
+          } else {
+              prompt += "\n(Sem dados suficientes de pontos fracos)";
+          }
+
+          prompt += "\n\nTAREFA: Aja como um treinador de alta performance. Dê UMA dica prática e curta (máx 2 frases) focada em como melhorar os pontos fracos usando a confiança dos pontos fortes. Seja direto.";
+
+          const response = await AiService.sendMessage(prompt, [], "Dica Mentor Dashboard");
+          setMentorTip(response);
+      } catch (e) {
+          console.error(e);
+          setMentorTip("Não foi possível gerar a dica agora. Tente resolver mais questões!");
+      } finally {
+          setMentorLoading(false);
+      }
+  };
 
   if (loading) {
     return (
@@ -208,6 +282,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       // BLURRED STATE (PAIN POINT)
                       <>
                         <div className="space-y-4 filter blur-sm opacity-50 select-none">
+                            {/* Fake data just for blur effect */}
                             <div className="space-y-1">
                                 <div className="flex justify-between text-xs text-slate-400"><span>Matemática (Funções)</span><span className="text-emerald-400">+18%</span></div>
                                 <div className="h-2 bg-slate-800 rounded-full"><div className="h-full w-[70%] bg-emerald-500 rounded-full"></div></div>
@@ -215,10 +290,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                             <div className="space-y-1">
                                 <div className="flex justify-between text-xs text-slate-400"><span>Física (Cinemática)</span><span className="text-red-400">-5%</span></div>
                                 <div className="h-2 bg-slate-800 rounded-full"><div className="h-full w-[45%] bg-red-500 rounded-full"></div></div>
-                            </div>
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-xs text-slate-400"><span>Química (Orgânica)</span><span className="text-indigo-400">Estável</span></div>
-                                <div className="h-2 bg-slate-800 rounded-full"><div className="h-full w-[60%] bg-indigo-500 rounded-full"></div></div>
                             </div>
                             <div className="mt-4 p-3 bg-slate-800 rounded-lg text-xs text-center text-slate-400">
                                 Previsão de nota no ENEM: 740.5
@@ -240,30 +311,67 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                         </div>
                       </>
                   ) : (
-                      // ADVANCED STATE (MOCKED FOR NOW)
+                      // ADVANCED REAL DATA STATE
                       <div className="space-y-6">
-                          <div className="text-center">
-                              <p className="text-sm text-slate-400 mb-1">Sua evolução semanal</p>
-                              <p className="text-3xl font-black text-white flex items-center justify-center gap-2">
-                                  <TrendingUp size={24} className="text-emerald-400" /> +12%
-                              </p>
-                          </div>
-                          <div className="space-y-3">
-                              <div className="space-y-1">
-                                  <div className="flex justify-between text-xs font-bold text-white"><span>Pontos Fortes</span><span className="text-emerald-400">Humanas</span></div>
-                                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[85%] bg-emerald-500"></div></div>
+                          {performanceData.totalStats && performanceData.totalStats.length > 0 ? (
+                              <>
+                                  <div className="space-y-3">
+                                      {/* Strengths */}
+                                      {performanceData.strengths.length > 0 && (
+                                          <div className="space-y-1 animate-in fade-in slide-in-from-left-2">
+                                              <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Seus Pontos Fortes</p>
+                                              {performanceData.strengths.map((s, idx) => (
+                                                  <div key={idx} className="space-y-1">
+                                                      <div className="flex justify-between text-xs font-bold text-white"><span>{s.name}</span><span className="text-emerald-400">{s.percentage.toFixed(0)}%</span></div>
+                                                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all duration-1000" style={{width: `${s.percentage}%`}}></div></div>
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      )}
+                                      
+                                      {/* Weaknesses */}
+                                      {performanceData.weaknesses.length > 0 && (
+                                          <div className="space-y-1 pt-2 animate-in fade-in slide-in-from-left-2 delay-100">
+                                              <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Precisa Melhorar</p>
+                                              {performanceData.weaknesses.map((s, idx) => (
+                                                  <div key={idx} className="space-y-1">
+                                                      <div className="flex justify-between text-xs font-bold text-white"><span>{s.name}</span><span className="text-red-400">{s.percentage.toFixed(0)}%</span></div>
+                                                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-red-500 transition-all duration-1000" style={{width: `${s.percentage}%`}}></div></div>
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      )}
+                                  </div>
+
+                                  <div className="p-3 bg-indigo-900/20 border border-indigo-500/20 rounded-xl">
+                                      <div className="flex items-start gap-3 mb-2">
+                                          <Sparkles size={16} className="text-indigo-400 mt-0.5 shrink-0" />
+                                          <p className="text-xs text-indigo-200">
+                                              {mentorTip ? (
+                                                  <span className="animate-in fade-in">{mentorTip}</span>
+                                              ) : (
+                                                  <span>Solicite uma análise da IA sobre seus dados atuais para otimizar sua rotina.</span>
+                                              )}
+                                          </p>
+                                      </div>
+                                      {!mentorTip && (
+                                          <button 
+                                            onClick={handleGenerateTip}
+                                            disabled={mentorLoading}
+                                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                                          >
+                                              {mentorLoading ? <Loader2 className="animate-spin" size={14} /> : <Bot size={14} />}
+                                              Gerar Dica do Mentor
+                                          </button>
+                                      )}
+                                  </div>
+                              </>
+                          ) : (
+                              <div className="text-center py-8">
+                                  <BarChart3 size={32} className="text-slate-700 mx-auto mb-2"/>
+                                  <p className="text-slate-500 text-sm">Responda mais questões para calibrar o radar.</p>
                               </div>
-                              <div className="space-y-1">
-                                  <div className="flex justify-between text-xs font-bold text-white"><span>Pontos de Atenção</span><span className="text-yellow-400">Exatas</span></div>
-                                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full w-[45%] bg-yellow-500"></div></div>
-                              </div>
-                          </div>
-                          <div className="p-3 bg-indigo-900/20 border border-indigo-500/20 rounded-xl flex items-start gap-3">
-                              <Sparkles size={16} className="text-indigo-400 mt-0.5 shrink-0" />
-                              <p className="text-xs text-indigo-200">
-                                  <strong>Dica do Mentor:</strong> Foque em exercícios de Geometria Plana esta semana para equilibrar seu gráfico.
-                              </p>
-                          </div>
+                          )}
                       </div>
                   )}
               </div>

@@ -9,7 +9,8 @@ import {
   query, 
   orderByChild, 
   limitToLast,
-  onValue
+  onValue,
+  increment
 } from "firebase/database";
 import { database } from "./firebaseConfig";
 import { 
@@ -504,15 +505,25 @@ export const DatabaseService = {
       return {};
   },
 
-  markQuestionAsAnswered: async (uid: string, questionId: string, correct: boolean): Promise<void> => {
-      await update(ref(database, `users/${uid}/answeredQuestions/${questionId}`), { correct, timestamp: Date.now() });
+  // UPDATED: Now accepts Subject/Topic to update stats
+  markQuestionAsAnswered: async (uid: string, questionId: string, correct: boolean, subjectId?: string, topic?: string): Promise<void> => {
+      const updates: any = {};
+      
+      // 1. Mark basic log
+      updates[`users/${uid}/answeredQuestions/${questionId}`] = { correct, timestamp: Date.now() };
+      
+      // 2. Update Stats (Atomic Increment)
+      if (subjectId && topic) {
+          const statsPath = `users/${uid}/stats/${subjectId}/${topic}`;
+          updates[`${statsPath}/${correct ? 'correct' : 'wrong'}`] = increment(1);
+      }
+
+      await update(ref(database), updates);
   },
 
   incrementQuestionsAnswered: async (uid: string, count: number): Promise<void> => {
        const userRef = ref(database, `users/${uid}`);
-       const snap = await get(userRef);
-       const current = snap.val()?.questionsAnswered || 0;
-       await update(userRef, { questionsAnswered: current + count });
+       await update(userRef, { questionsAnswered: increment(count) });
   },
 
   getLeaderboard: async (period: 'total' | 'weekly' = 'total'): Promise<UserProfile[]> => {
@@ -691,6 +702,7 @@ export const DatabaseService = {
       await set(newRef, sanitizeData({ ...sim, id: newRef.key }));
   },
 
+  // UPDATED: Now saves batch stats to user profile
   saveSimulationResult: async (result: SimulationResult): Promise<void> => {
       const newRef = push(ref(database, `user_simulations/${result.userId}`));
       await set(newRef, sanitizeData(result));
@@ -698,9 +710,36 @@ export const DatabaseService = {
       const xpBase = XP_VALUES.SIMULATION_FINISH;
       const xpBonus = result.score * 2;
       const userRef = ref(database, `users/${result.userId}`);
-      const snap = await get(userRef);
-      const currentXp = snap.val()?.xp || 0;
-      await update(userRef, { xp: currentXp + xpBase + xpBonus });
+      
+      const updates: any = {};
+      updates[`users/${result.userId}/xp`] = increment(xpBase + xpBonus);
+
+      // Batch update topic stats
+      if (result.topicPerformance) {
+          Object.entries(result.topicPerformance).forEach(([topicName, stats]) => {
+              // Note: Simulation result only has TopicName, we need to infer subject or store it.
+              // For simplicity, we might iterate questions or assume a default 'mixed' subject if not available.
+              // Ideally, questions in simulation should carry subjectId.
+              // Assuming 'topicPerformance' logic in component knows the subject, OR we rely on a simplified 'simulations' key in stats.
+              // Let's store under 'simulations' pseudo-subject for now to avoid complexity of reverse looking up subject ID from Topic Name here.
+              // OR better: The component passed stats. If we want robustness, we assume topic names are unique enough or prefixed.
+              
+              // To properly sync with Dashboard radar, we really need the subject ID. 
+              // Since existing Logic in Simulation.tsx builds topicPerformance just by topic Name, let's stick to a generic "simulated_stats" or try to guess.
+              // Recommendation: Update SimulationResult type to include subjectId in keys or pass a map. 
+              // Fallback: We will just log under 'simulados' subject for radar visibility if we can't map.
+              
+              // However, since we want real Radar data, let's iterate the questions in Simulation.tsx component before calling this, 
+              // OR accept that we update 'topic' stats globally.
+              
+              // Let's assume topic names are unique for now or just log them.
+              const path = `users/${result.userId}/stats/simulados/${topicName}`;
+              updates[`${path}/correct`] = increment(stats.correct);
+              updates[`${path}/wrong`] = increment(stats.total - stats.correct);
+          });
+      }
+
+      await update(ref(database), updates);
   },
 
   // --- ADMIN & MISC ---
