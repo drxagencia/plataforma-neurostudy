@@ -50,13 +50,8 @@ const AdminPanel: React.FC = () => {
       return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  const getWelcomeLink = (lead: Lead) => {
-      const msg = `Olá ${lead.name}! ✨ Bem-vindo(a) à NeuroStudy AI!\n\nSeu acesso foi liberado com sucesso. ✅\n\n🔗 Link: https://neurostudy.com.br\n📧 E-mail: ${lead.contact}\n🔑 Senha: ${lead.password}\n\nBons estudos! 🚀`;
-      return `https://wa.me/55${lead.contact.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
-  };
-
   const getUserWelcomeLink = (u: UserProfile) => {
-      const msg = `Olá ${u.displayName}! ✨ Seu cadastro na NeuroStudy AI foi concluído com sucesso.\n\nAcesse agora: https://neurostudy.com.br\nEmail: ${u.email}\n\nSe precisar de ajuda, é só chamar! 🚀`;
+      const msg = `Olá ${u.displayName}! ✨ Seu cadastro na NeuroStudy AI foi concluído com sucesso.\n\nAcesse agora: https://neurostudy.com.br\n📧 Email: ${u.email}\n\nSe precisar de ajuda, é só chamar! 🚀`;
       return `https://wa.me/55${u.whatsapp?.replace(/\D/g, '') || ''}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -68,7 +63,7 @@ const AdminPanel: React.FC = () => {
           email: lead.contact, 
           password: lead.password || 'aluno123', 
           plan: lead.planId.toLowerCase().includes('adv') ? 'advanced' : 'basic', 
-          essayCredits: 0, // Inicia com 0 conforme solicitado
+          essayCredits: 0, 
           expiryDate: expiry.toISOString().split('T')[0] 
       });
       setShowAccessModal(true);
@@ -87,11 +82,11 @@ const AdminPanel: React.FC = () => {
           await DatabaseService.createUserProfile(uid, {
               ...accessForm,
               uid,
-              totalSpent: targetLead.amount, // LTV real (197 ou 94)
+              totalSpent: targetLead.amount, // LTV real definido no Checkout
               billingCycle: targetLead.billing,
               subscriptionExpiry: accessForm.expiryDate,
-              essayCredits: 0,
-              aiUnlimitedExpiry: undefined, // IA OFF por padrão
+              essayCredits: 0, // Novo aluno começa com 0
+              aiUnlimitedExpiry: undefined, // Novo aluno começa IA OFF
               firstTimeSetupDone: false
           });
           await DatabaseService.markLeadProcessed(targetLead.id);
@@ -131,7 +126,6 @@ const AdminPanel: React.FC = () => {
           <input className="w-full bg-slate-900 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:border-indigo-500 outline-none" placeholder="Pesquisar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
       </div>
 
-      {/* ABA LEADS: Somente leads não processados */}
       {activeTab === 'leads' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {leads.filter(l => l.name.toLowerCase().includes(searchTerm.toLowerCase())).map(l => (
@@ -171,11 +165,10 @@ const AdminPanel: React.FC = () => {
                       </button>
                   </div>
               ))}
-              {leads.length === 0 && <div className="col-span-full py-20 text-center text-slate-500 font-bold">Nenhum lead pendente. 🎉</div>}
+              {leads.length === 0 && <div className="col-span-full py-20 text-center text-slate-500 font-bold uppercase tracking-widest text-xs">Sem leads pendentes. 🎉</div>}
           </div>
       )}
 
-      {/* ABA USERS: Lista geral de usuários cadastrados */}
       {activeTab === 'users' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {users.filter(u => u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase())).map(u => {
@@ -216,11 +209,11 @@ const AdminPanel: React.FC = () => {
                                   <div className="space-y-1">
                                       <div className="flex justify-between text-[10px]">
                                           <span className="text-slate-400">IA Ilimitada:</span>
-                                          <span className={u.aiUnlimitedExpiry ? 'text-emerald-400 font-bold' : 'text-slate-600'}>{u.aiUnlimitedExpiry ? 'Ativo' : 'Não'}</span>
+                                          <span className={u.aiUnlimitedExpiry ? 'text-emerald-400 font-bold' : 'text-slate-600'}>{u.aiUnlimitedExpiry ? 'Sim' : 'Não'}</span>
                                       </div>
                                       <div className="flex justify-between text-[10px]">
                                           <span className="text-slate-400">Redações:</span>
-                                          <span className="text-indigo-400 font-bold">{u.essayCredits || 0} unid.</span>
+                                          <span className="text-indigo-400 font-bold">{u.essayCredits || 0} un.</span>
                                       </div>
                                   </div>
                               </div>
@@ -242,7 +235,26 @@ const AdminPanel: React.FC = () => {
           </div>
       )}
 
-      {/* MODAL: APROVAR LEAD */}
+      {/* FINANCE E SUPORTE (Mantidos funcionais conforme legado) */}
+      {activeTab === 'finance' && (
+          <div className="space-y-4">
+              {recharges.map(r => (
+                  <div key={r.id} className="glass-card p-4 rounded-xl flex justify-between items-center border border-white/5">
+                      <div><p className="font-bold text-white">R$ {r.amount.toFixed(2)} - {r.userDisplayName}</p><p className="text-[10px] text-indigo-400 font-bold uppercase">{r.planLabel || 'Recarga'}</p></div>
+                      {r.status === 'pending' ? (
+                          <div className="flex gap-2">
+                              <button onClick={() => DatabaseService.processRecharge(r.id, 'rejected').then(fetchData)} className="p-2 bg-red-900/50 text-red-400 rounded-lg transition-colors hover:bg-red-800"><XCircle size={18}/></button>
+                              <button onClick={() => DatabaseService.processRecharge(r.id, 'approved').then(fetchData)} className="p-2 bg-emerald-600 text-white rounded-lg transition-colors hover:bg-emerald-500"><CheckCircle size={18}/></button>
+                          </div>
+                      ) : (
+                          <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${r.status === 'approved' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}`}>{r.status}</span>
+                      )}
+                  </div>
+              ))}
+          </div>
+      )}
+
+      {/* MODAL: LIBERAR ACESSO (LEADS) */}
       {showAccessModal && (
           <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
               <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95">
@@ -251,32 +263,17 @@ const AdminPanel: React.FC = () => {
                       <button onClick={() => setShowAccessModal(false)} className="text-slate-500 hover:text-white"><X size={24}/></button>
                   </div>
                   <div className="space-y-4">
-                      <div>
-                          <label className="text-[10px] text-slate-500 font-bold uppercase ml-1">E-mail de Acesso</label>
-                          <input className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" value={accessForm.email} onChange={e => setAccessForm({...accessForm, email: e.target.value})} />
-                      </div>
-                      <div>
-                          <label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Senha</label>
-                          <input className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" value={accessForm.password} onChange={e => setAccessForm({...accessForm, password: e.target.value})} />
-                      </div>
+                      <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">E-mail</label><input className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" value={accessForm.email} onChange={e => setAccessForm({...accessForm, email: e.target.value})} /></div>
+                      <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Senha</label><input className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" value={accessForm.password} onChange={e => setAccessForm({...accessForm, password: e.target.value})} /></div>
                       <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Plano</label>
-                              <select className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" value={accessForm.plan} onChange={e => setAccessForm({...accessForm, plan: e.target.value as any})}>
-                                  <option value="basic">Basic</option>
-                                  <option value="advanced">Advanced</option>
-                              </select>
-                          </div>
-                          <div>
-                              <label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Expiração</label>
-                              <input type="date" className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" value={accessForm.expiryDate} onChange={e => setAccessForm({...accessForm, expiryDate: e.target.value})} />
-                          </div>
+                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Plano</label><select className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white outline-none" value={accessForm.plan} onChange={e => setAccessForm({...accessForm, plan: e.target.value as any})}><option value="basic">Basic</option><option value="advanced">Advanced</option></select></div>
+                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Expiração</label><input type="date" className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white outline-none" value={accessForm.expiryDate} onChange={e => setAccessForm({...accessForm, expiryDate: e.target.value})} /></div>
                       </div>
                       <div className="bg-indigo-900/20 p-4 rounded-xl border border-indigo-500/20 text-center">
-                          <p className="text-indigo-400 font-bold text-xs">Venda Detectada: <span className="text-white text-lg font-black">R$ {targetLead?.amount.toFixed(2)}</span></p>
+                          <p className="text-indigo-400 font-bold text-xs uppercase tracking-widest">LTV Detalhado: <span className="text-white text-lg font-black block">R$ {targetLead?.amount.toFixed(2)}</span></p>
                       </div>
-                      <button onClick={handleSubmitAccess} disabled={loading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-                          {loading ? <Loader2 className="animate-spin" /> : <UserCheck size={20}/>} Confirmar e Ativar Aluno
+                      <button onClick={handleSubmitAccess} disabled={loading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg rounded-xl shadow-lg flex items-center justify-center gap-2">
+                          {loading ? <Loader2 className="animate-spin" /> : <UserCheck size={20}/>} Criar Aluno Agora
                       </button>
                   </div>
               </div>
@@ -289,39 +286,39 @@ const AdminPanel: React.FC = () => {
               <div className="bg-slate-900 border border-indigo-500/20 p-8 rounded-3xl w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh]">
                   <div className="flex justify-between items-center mb-8">
                       <div>
-                          <h3 className="text-2xl font-black text-white">Gestão de Usuário</h3>
-                          <p className="text-slate-500 text-xs uppercase font-bold">UID: {editingUser.uid}</p>
+                          <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Gestão de Perfil</h3>
+                          <p className="text-slate-500 text-[10px] uppercase font-bold">UID: {editingUser.uid}</p>
                       </div>
                       <button onClick={() => setShowEditModal(false)} className="text-slate-500 hover:text-white bg-white/5 p-2 rounded-full"><X size={24}/></button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                       <div className="space-y-4">
-                          <h4 className="text-[10px] text-indigo-400 font-black uppercase tracking-widest border-b border-white/5 pb-2">Informações Base</h4>
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Nome Completo</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.displayName} onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} /></div>
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">E-mail de Acesso</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} /></div>
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">LTV (Gasto Total R$)</label><input type="number" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-emerald-400 font-black" value={editingUser.totalSpent} onChange={e => setEditingUser({...editingUser, totalSpent: parseFloat(e.target.value) || 0})} /></div>
+                          <h4 className="text-[10px] text-indigo-400 font-black uppercase tracking-widest border-b border-white/5 pb-2">Identidade e Financeiro</h4>
+                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Nome</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.displayName} onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} /></div>
+                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">E-mail</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} /></div>
+                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">LTV Manual (R$)</label><input type="number" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-emerald-400 font-black" value={editingUser.totalSpent} onChange={e => setEditingUser({...editingUser, totalSpent: parseFloat(e.target.value) || 0})} /></div>
                       </div>
 
                       <div className="space-y-4">
-                          <h4 className="text-[10px] text-indigo-400 font-black uppercase tracking-widest border-b border-white/5 pb-2">Planos e Acessos</h4>
+                          <h4 className="text-[10px] text-indigo-400 font-black uppercase tracking-widest border-b border-white/5 pb-2">Acessos e Planos</h4>
                           <div className="grid grid-cols-2 gap-3">
-                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Plano Base</label><select className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.plan} onChange={e => setEditingUser({...editingUser, plan: e.target.value as any})}><option value="basic">Basic</option><option value="advanced">Advanced</option></select></div>
-                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Expiração</label><input type="date" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.subscriptionExpiry} onChange={e => setEditingUser({...editingUser, subscriptionExpiry: e.target.value})} /></div>
+                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Plano</label><select className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white outline-none" value={editingUser.plan} onChange={e => setEditingUser({...editingUser, plan: e.target.value as any})}><option value="basic">Basic</option><option value="advanced">Advanced</option></select></div>
+                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Vencimento</label><input type="date" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white outline-none" value={editingUser.subscriptionExpiry} onChange={e => setEditingUser({...editingUser, subscriptionExpiry: e.target.value})} /></div>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
-                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Saldo IA (R$)</label><input type="number" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.balance} onChange={e => setEditingUser({...editingUser, balance: parseFloat(e.target.value) || 0})} /></div>
-                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Créditos Redação</label><input type="number" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.essayCredits} onChange={e => setEditingUser({...editingUser, essayCredits: parseInt(e.target.value) || 0})} /></div>
+                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Saldo IA (R$)</label><input type="number" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white outline-none" value={editingUser.balance} onChange={e => setEditingUser({...editingUser, balance: parseFloat(e.target.value) || 0})} /></div>
+                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Créditos Redação</label><input type="number" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white outline-none" value={editingUser.essayCredits} onChange={e => setEditingUser({...editingUser, essayCredits: parseInt(e.target.value) || 0})} /></div>
                           </div>
                           <div>
-                              <label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Expiração IA Ilimitada (Opcional)</label>
-                              <input type="date" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-emerald-400" value={editingUser.aiUnlimitedExpiry || ''} onChange={e => setEditingUser({...editingUser, aiUnlimitedExpiry: e.target.value || undefined})} />
+                              <label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Expiração IA Ilimitada</label>
+                              <input type="date" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-indigo-400 outline-none" value={editingUser.aiUnlimitedExpiry || ''} onChange={e => setEditingUser({...editingUser, aiUnlimitedExpiry: e.target.value || undefined})} />
                           </div>
                       </div>
                   </div>
 
                   <button onClick={handleSaveUserEdit} disabled={loading} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-lg rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all">
-                      {loading ? <Loader2 className="animate-spin" /> : <CheckCircle size={20}/>} Salvar Alterações no Perfil
+                      {loading ? <Loader2 className="animate-spin" /> : <CheckCircle size={20}/>} Salvar Alterações
                   </button>
               </div>
           </div>

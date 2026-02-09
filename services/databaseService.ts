@@ -92,6 +92,19 @@ export const DatabaseService = {
 
   createUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
        await set(ref(database, `users/${uid}`), sanitizeData({ ...data }));
+       
+       // Log de Transação inicial para o BI
+       const transRef = push(ref(database, `user_transactions/${uid}`));
+       await set(transRef, {
+           id: transRef.key,
+           userId: uid,
+           userName: data.displayName,
+           type: 'credit',
+           amount: data.totalSpent || 0,
+           description: `Assinatura: Plano ${data.plan?.toUpperCase()}`,
+           timestamp: Date.now(),
+           currencyType: 'BRL'
+       });
   },
 
   // --- FINANCE & LTV ---
@@ -180,7 +193,6 @@ export const DatabaseService = {
       const snap = await get(query(ref(database, 'users'), limitToLast(limitCount)));
       return snap.exists() ? Object.values(snap.val()) : [];
   },
-  // Added explicit return type to fix unknown type error in FinanceiroPanel
   getRechargeRequests: async (): Promise<RechargeRequest[]> => {
       const snap = await get(ref(database, 'recharge_requests'));
       return snap.exists() ? Object.values(snap.val()) : [];
