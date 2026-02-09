@@ -63,7 +63,7 @@ export const DatabaseService = {
               balance: 0,
               plan: defaultData.plan || 'basic',
               createdAt: Date.now(),
-              totalSpent: 0,
+              totalSpent: defaultData.totalSpent || 0,
               firstTimeSetupDone: false
           };
           await set(userRef, sanitizeData(newUser));
@@ -91,7 +91,8 @@ export const DatabaseService = {
   },
 
   createUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
-       await set(ref(database, `users/${uid}`), sanitizeData({ ...data, totalSpent: data.totalSpent || 0 }));
+       // Garante que o totalSpent seja apenas o enviado, sem incrementos extras aqui
+       await set(ref(database, `users/${uid}`), sanitizeData({ ...data }));
   },
 
   // --- FINANCE & LTV ---
@@ -106,7 +107,7 @@ export const DatabaseService = {
       if (status === 'approved') {
           const userRef = ref(database, `users/${req.userId}`);
           const updates: any = {
-              totalSpent: increment(req.amount) // SOMA AO LTV
+              totalSpent: increment(req.amount)
           };
 
           if (req.planLabel && req.planLabel.includes('UPGRADE')) {
@@ -152,9 +153,9 @@ export const DatabaseService = {
       await set(r, sanitizeData(req));
   },
 
-  markLeadProcessed: async (leadId: string, amount: number, userId: string): Promise<void> => {
-      await update(ref(database, `leads/${leadId}`), { processed: true, status: 'approved_access' });
-      await update(ref(database, `users/${userId}`), { totalSpent: increment(amount) }); // SOMA AO LTV
+  markLeadProcessed: async (leadId: string): Promise<void> => {
+      // Remove o lead da lista pois ele já virou usuário
+      await remove(ref(database, `leads/${leadId}`));
   },
 
   // --- GETTERS ---
@@ -206,7 +207,6 @@ export const DatabaseService = {
       return list;
   },
 
-  // Fix: Added missing getQuestionsFromSubtopics method
   getQuestionsFromSubtopics: async (cat: string, sub: string, top: string, subTopics: string[]) => {
       const results: Question[] = [];
       for (const st of subTopics) {
@@ -232,7 +232,6 @@ export const DatabaseService = {
       return snap.exists() ? snap.val() as SupportTicket : null;
   },
 
-  // Fix: Added missing createSupportTicket method
   createSupportTicket: async (uid: string, userName: string, userEmail: string, issueDescription: string) => {
       const ticket: SupportTicket = {
           id: uid,
@@ -247,7 +246,6 @@ export const DatabaseService = {
       await set(ref(database, `support_tickets/${uid}`), sanitizeData(ticket));
   },
 
-  // Fix: Added missing resolveSupportTicket method
   resolveSupportTicket: async (uid: string) => {
       await remove(ref(database, `support_tickets/${uid}`));
   },
@@ -262,7 +260,6 @@ export const DatabaseService = {
       }
   },
 
-  // Fix: Added missing clearSupportNotification method
   clearSupportNotification: async (uid: string) => {
       await update(ref(database, `users/${uid}`), { hasSupportNotification: false });
   },
@@ -281,7 +278,6 @@ export const DatabaseService = {
       return snap.exists() ? snap.val() : {};
   },
 
-  // Fix: Added missing incrementQuestionsAnswered method
   incrementQuestionsAnswered: async (uid: string, amount: number) => {
       await update(ref(database, `users/${uid}`), { questionsAnswered: increment(amount) });
   },
@@ -298,14 +294,12 @@ export const DatabaseService = {
       return users.sort((a, b) => (p === 'weekly' ? (b.weeklyXp || 0) - (a.weeklyXp || 0) : (b.xp || 0) - (a.xp || 0))).slice(0, 50);
   },
 
-  // Fix: Added missing getPosts method
   getPosts: async (): Promise<CommunityPost[]> => {
       const snap = await get(ref(database, 'community_posts'));
       if (!snap.exists()) return [];
       return Object.values(snap.val()).reverse() as CommunityPost[];
   },
 
-  // Fix: Added missing createPost method
   createPost: async (post: Partial<CommunityPost>, uid: string) => {
       const userRef = ref(database, `users/${uid}`);
       const userSnap = await get(userRef);
@@ -324,7 +318,6 @@ export const DatabaseService = {
       await DatabaseService.processXpAction(uid, 'AI_CHAT_MESSAGE');
   },
 
-  // Fix: Added missing toggleLike method
   toggleLike: async (postId: string, uid: string) => {
       const postRef = ref(database, `community_posts/${postId}`);
       const snap = await get(postRef);
@@ -344,7 +337,6 @@ export const DatabaseService = {
       }
   },
 
-  // Fix: Added missing replyPost method
   replyPost: async (postId: string, reply: { author: string; content: string }) => {
       const postRef = ref(database, `community_posts/${postId}`);
       const snap = await get(postRef);

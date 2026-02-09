@@ -39,6 +39,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Monitora o estado de autenticação e decide se mostra o onboarding
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
@@ -53,17 +54,26 @@ const App: React.FC = () => {
           });
           setUser({ ...mappedUser, ...dbUser });
           
-          // MOSTRA ONBOARDING APENAS SE NÃO ESTIVER NA LP
+          // CRÍTICO: Só ativa o estado de onboarding se NÃO estiver na Landing Page
+          // E se o setup inicial ainda não foi concluído.
           if (!dbUser.firstTimeSetupDone && !showLanding) {
               setShowOnboarding(true);
+          } else {
+              setShowOnboarding(false);
           }
         } else {
           setUser(null);
+          setShowOnboarding(false);
         }
-      } catch (error) { setUser(null); } finally { setLoadingAuth(false); }
+      } catch (error) { 
+          setUser(null); 
+          setShowOnboarding(false);
+      } finally { 
+          setLoadingAuth(false); 
+      }
     });
     return () => unsubscribe();
-  }, [showLanding]);
+  }, [showLanding]); // Re-executa se o usuário sair da LP para o Dashboard
 
   const handleOnboardingSubmit = async () => {
       if (whatsappInput.length < 10 || !user) return;
@@ -72,15 +82,32 @@ const App: React.FC = () => {
           await DatabaseService.updateOnboarding(user.uid, whatsappInput);
           setUser(prev => prev ? { ...prev, whatsapp: whatsappInput, firstTimeSetupDone: true } : null);
           setShowOnboarding(false);
-      } catch (e) { alert("Erro ao salvar dados."); } finally { setOnboardingLoading(false); }
+      } catch (e) { 
+          alert("Erro ao salvar dados."); 
+      } finally { 
+          setOnboardingLoading(false); 
+      }
   };
 
-  if (showLanding) return <LandingPage onStartGame={() => setShowLanding(false)} />;
-  if (loadingAuth) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;
+  // Se estiver na Landing Page, renderiza ela e interrompe qualquer outro fluxo (inclusive modal)
+  if (showLanding) {
+      return <LandingPage onStartGame={() => setShowLanding(false)} />;
+  }
+
+  if (loadingAuth) {
+      return (
+          <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+              <Loader2 className="animate-spin text-indigo-500" />
+          </div>
+      );
+  }
+
   if (!user) return <Auth onLogin={() => setLoadingAuth(true)} />;
 
   return (
     <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
+      
+      {/* MODAL DE CAPTURA DE WHATSAPP (Aparece apenas na área logada) */}
       {showOnboarding && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/95 backdrop-blur-xl p-4">
               <div className="bg-slate-900 border border-indigo-500/30 p-8 rounded-3xl max-w-md w-full shadow-2xl animate-in zoom-in-95 text-center">
@@ -88,21 +115,46 @@ const App: React.FC = () => {
                       <Smartphone size={40} />
                   </div>
                   <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Quase lá!</h2>
-                  <p className="text-slate-400 mb-8 leading-relaxed">Confirme seu WhatsApp para receber avisos importantes e suporte direto.</p>
+                  <p className="text-slate-400 mb-8 leading-relaxed">
+                      Para sua segurança e melhor suporte, confirme seu WhatsApp. Usaremos apenas para avisos urgentes.
+                  </p>
+                  
                   <div className="space-y-4">
                       <div className="text-left">
                           <label className="text-xs font-bold text-zinc-500 uppercase ml-1">WhatsApp (DDD + Número)</label>
-                          <input className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-4 text-white focus:border-indigo-500 outline-none mt-1" placeholder="Ex: 11999999999" type="tel" value={whatsappInput} onChange={e => setWhatsappInput(e.target.value.replace(/\D/g, ''))} />
+                          <input 
+                            className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-4 text-white focus:border-indigo-500 outline-none mt-1" 
+                            placeholder="Ex: 11999999999" 
+                            type="tel" 
+                            value={whatsappInput} 
+                            onChange={e => setWhatsappInput(e.target.value.replace(/\D/g, ''))} 
+                          />
                       </div>
-                      <button onClick={handleOnboardingSubmit} disabled={whatsappInput.length < 10 || onboardingLoading} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black text-lg rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
-                          {onboardingLoading ? <Loader2 className="animate-spin" /> : <CheckCircle size={20} />} Finalizar Cadastro
+                      
+                      <button 
+                        onClick={handleOnboardingSubmit} 
+                        disabled={whatsappInput.length < 10 || onboardingLoading} 
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black text-lg rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                      >
+                          {onboardingLoading ? <Loader2 className="animate-spin" /> : <CheckCircle size={20} />} 
+                          Finalizar Cadastro
                       </button>
                   </div>
               </div>
           </div>
       )}
+
       <FullScreenPrompt /> 
-      <Navigation currentView={currentView} onNavigate={setCurrentView} onLogout={() => auth.signOut()} isMobile={isMobile} isAdmin={user.isAdmin} hasSupportNotification={user.hasSupportNotification} />
+      
+      <Navigation 
+        currentView={currentView} 
+        onNavigate={setCurrentView} 
+        onLogout={() => auth.signOut()} 
+        isMobile={isMobile} 
+        isAdmin={user.isAdmin} 
+        hasSupportNotification={user.hasSupportNotification} 
+      />
+
       <main className={`flex-1 relative overflow-y-auto transition-all duration-300 z-10 ${isMobile ? 'pb-24 p-4' : 'ml-64 p-8'}`} style={{ height: '100vh' }}>
         <div className="max-w-7xl mx-auto h-full">
             {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} />}
