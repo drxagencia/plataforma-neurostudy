@@ -257,6 +257,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           
           const finalTotal = c1Score + c2Score + c3Score + c4Score + c5Score;
 
+          // Fixed: Removed non-existent 'errors' property to match EssayCorrection interface
           const result: EssayCorrection = {
               theme,
               imageUrl: null, 
@@ -271,7 +272,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                   c5: parsed.c5
               },
               feedback: parsed.general_feedback || parsed.feedback || "Análise concluída.",
-              errors: parsed.weaknesses || parsed.errors || [],
               strengths: parsed.strengths || [],
               weaknesses: parsed.weaknesses || [],
               structuralTips: parsed.structural_tips || ""
@@ -707,7 +707,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                       <div className="mt-8 flex justify-center gap-4 text-[10px] text-slate-500">
                           <span className="flex items-center gap-1"><ShieldCheck size={12}/> Pagamento Seguro</span>
                           <span className="flex items-center gap-1"><CheckCircle size={12}/> Renovação Automática</span>
-                          <span className="flex items-center gap-1"><Gift size={12}/> Liberação Imediata</span>
+                          <span className="flex items-center gap-1"><CheckCircle size={12}/> Liberação Imediata</span>
                       </div>
                   </div>
               )}

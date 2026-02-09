@@ -18,7 +18,6 @@ export interface User {
   isAdmin?: boolean;
 }
 
-// Stats Structure for Radar - Decoupled from UserProfile
 export interface TopicStats {
     correct: number;
     wrong: number;
@@ -32,9 +31,11 @@ export interface UserProfile extends User {
   plan: UserPlan;
   billingCycle?: BillingCycle;
   subscriptionExpiry?: string;
+  aiUnlimitedExpiry?: string; // Expiração da IA Ilimitada
+  essayPlanExpiry?: string;    // Expiração do plano de Redação
   xp?: number;
-  weeklyXp?: number; // New: Weekly XP
-  lastXpWeek?: number; // New: Week ID for reset logic
+  weeklyXp?: number;
+  lastXpWeek?: number;
   balance: number;
   essayCredits?: number;
   hoursStudied?: number;
@@ -43,7 +44,10 @@ export interface UserProfile extends User {
   dailyLikesGiven?: number;
   lastPostedAt?: number;
   theme?: 'dark' | 'light';
-  hasSupportNotification?: boolean; // New: Notification flag
+  hasSupportNotification?: boolean;
+  whatsapp?: string;           // Número do WhatsApp
+  firstTimeSetupDone?: boolean; // Flag de Onboarding
+  totalSpent?: number;         // LTV: Total gasto na plataforma
 }
 
 export interface SupportMessage {
@@ -53,12 +57,12 @@ export interface SupportMessage {
 }
 
 export interface SupportTicket {
-  id: string; // usually userId
+  id: string;
   userId: string;
-  userName: string; // Nome completo informado
+  userName: string;
   userEmail: string;
   issueDescription: string;
-  status: 'open' | 'answered'; // open = waiting admin, answered = waiting user
+  status: 'open' | 'answered';
   messages: SupportMessage[];
   lastUpdated: number;
 }
@@ -66,8 +70,8 @@ export interface SupportTicket {
 export interface Subject {
   id: string;
   name: string;
-  iconName: string; // Lucide icon name
-  color: string; // Tailwind class
+  iconName: string;
+  color: string;
   category: 'regular' | 'military';
 }
 
@@ -76,27 +80,15 @@ export interface LessonMaterial {
   url: string;
 }
 
-export interface LessonTag {
-  text: string;
-  color: string;
-}
-
-export interface ExerciseFilters {
-  category: string;
-  subject: string;
-  topic: string;
-  subtopics?: string[];
-}
-
 export interface Lesson {
   id?: string;
   title: string;
   type: 'video' | 'exercise_block';
-  videoUrl?: string; // YouTube ID or URL
+  videoUrl?: string;
   duration?: string;
   materials?: LessonMaterial[];
-  tag?: LessonTag;
-  exerciseFilters?: ExerciseFilters;
+  tag?: { text: string; color: string };
+  exerciseFilters?: { category: string; subject: string; topic: string; subtopics?: string[] };
 }
 
 export interface Question {
@@ -110,7 +102,6 @@ export interface Question {
   subjectId: string;
   topic: string;
   subtopic?: string;
-  tag?: LessonTag;
 }
 
 export interface Announcement {
@@ -119,12 +110,6 @@ export interface Announcement {
   description: string;
   image: string;
   ctaText: string;
-}
-
-export interface CommunityReply {
-  author: string;
-  content: string;
-  timestamp: number;
 }
 
 export interface CommunityPost {
@@ -136,7 +121,7 @@ export interface CommunityPost {
   timestamp: number;
   likes: number;
   likedBy?: Record<string, boolean>;
-  replies?: CommunityReply[];
+  replies?: { author: string; content: string; timestamp: number }[];
 }
 
 export interface Simulation {
@@ -148,7 +133,6 @@ export interface Simulation {
   status: 'open' | 'closed' | 'coming_soon';
   subjects?: string[];
   questionIds?: string[];
-  questionCount?: number;
 }
 
 export interface SimulationResult {
@@ -162,39 +146,18 @@ export interface SimulationResult {
   topicPerformance?: Record<string, { correct: number, total: number }>;
 }
 
-export interface CompetencyDetails {
-    score: number;
-    analysis?: string;
-    positivePoints?: string[];
-    negativePoints?: string[];
-}
-
 export interface EssayCorrection {
   id?: string;
   theme: string;
-  imageUrl?: string; // NOTE: In DB list, this will be null/id. In UI detail, it's the blob.
+  imageUrl?: string;
   date: number;
   scoreTotal: number;
-  competencies: {
-    c1: number;
-    c2: number;
-    c3: number;
-    c4: number;
-    c5: number;
-  };
-  detailedCompetencies?: {
-    c1: CompetencyDetails;
-    c2: CompetencyDetails;
-    c3: CompetencyDetails;
-    c4: CompetencyDetails;
-    c5: CompetencyDetails;
-  };
+  competencies: { c1: number; c2: number; c3: number; c4: number; c5: number };
+  detailedCompetencies?: any;
   feedback: string;
-  errors?: string[]; // Legacy fallback
   strengths?: string[];
   weaknesses?: string[];
   structuralTips?: string;
-  competencyFeedback?: Record<string, string>; // Legacy fallback
 }
 
 export interface Lead {
@@ -209,8 +172,8 @@ export interface Lead {
   timestamp: string;
   status: 'pending' | 'paid' | 'approved_access' | 'pending_pix';
   processed?: boolean;
-  password?: string; // New: Password for account creation
-  payerName?: string; // New: Explicit payer name
+  password?: string;
+  payerName?: string;
 }
 
 export interface RechargeRequest {
@@ -219,8 +182,8 @@ export interface RechargeRequest {
   userDisplayName: string;
   amount: number;
   currencyType: 'BRL' | 'CREDIT';
-  quantityCredits?: number; // if CREDIT
-  type: 'CREDIT' | 'BALANCE'; // Derived from currencyType usually
+  quantityCredits?: number;
+  type: 'CREDIT' | 'BALANCE';
   status: 'pending' | 'approved' | 'rejected';
   timestamp: number;
   planLabel?: string;
@@ -232,41 +195,16 @@ export interface Transaction {
   amount: number;
   description: string;
   timestamp: number;
-  tokensUsed?: number;
   currencyType?: 'BRL' | 'CREDIT';
-}
-
-export interface PlanFeatures {
-    canUseChat: boolean;
-    canUseExplanation: boolean; // For question bank AI
-    canUseEssay: boolean;
-    canUseSimulations: boolean;
-    canUseCommunity: boolean;
-    canUseMilitary: boolean;
-}
-
-export interface PlanConfig {
-    permissions: {
-        basic: PlanFeatures;
-        advanced: PlanFeatures;
-    };
-    prices: {
-        basic: number;
-        advanced: number;
-    };
-}
-
-export interface AiConfig {
-  // Legacy, kept for compatibility, now mostly superseded by PlanConfig
-  intermediateLimits: {
-    canUseChat: boolean;
-    canUseExplanation: boolean;
-  };
 }
 
 export interface TrafficConfig {
     vslScript: string;
     checkoutLinkMonthly: string;
     checkoutLinkYearly: string;
-    pixelId?: string;
+}
+
+export interface PlanConfig {
+    permissions: any;
+    prices: { basic: number; advanced: number };
 }
