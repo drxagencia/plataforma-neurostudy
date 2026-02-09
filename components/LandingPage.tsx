@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye, Sparkles, Crosshair } from 'lucide-react';
+import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye, Sparkles, Crosshair, Loader2 } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { TrafficConfig, Lead } from '../types';
@@ -73,7 +73,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [deadEnemies, setDeadEnemies] = useState<number[]>([]);
 
   // Pricing / Checkout Logic
-  // DEFAULT YEARLY AS REQUESTED
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [showPixModal, setShowPixModal] = useState(false);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
@@ -81,6 +80,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [selectedPlan, setSelectedPlan] = useState<'basic' | 'advanced'>('advanced');
   const [purchasedCount, setPurchasedCount] = useState(842);
   const [config, setConfig] = useState<TrafficConfig>({ vslScript: '', checkoutLinkMonthly: '', checkoutLinkYearly: '' });
+
+  // PIX Form Data & Anti-Fraud Logic
+  const [checkoutForm, setCheckoutForm] = useState({
+      fullName: '',
+      email: '',
+      password: '',
+      payerName: ''
+  });
+  const [pixCooldown, setPixCooldown] = useState(0);
+  const [hasClickedOnce, setHasClickedOnce] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   useEffect(() => {
     DatabaseService.getTrafficSettings().then(setConfig);
@@ -90,13 +101,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
     return () => clearInterval(interval);
   }, []);
 
+  // Cooldown Timer Effect
+  useEffect(() => {
+      let timer: any;
+      if (pixCooldown > 0) {
+          timer = setInterval(() => {
+              setPixCooldown(prev => prev - 1);
+          }, 1000);
+      }
+      return () => clearInterval(timer);
+  }, [pixCooldown]);
+
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
       ref.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleRevealOffer = () => {
       setShowPricingSection(true);
-      // Small timeout to allow render before scroll
       setTimeout(() => {
           scrollToSection(pricingRef);
       }, 100);
@@ -105,8 +126,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const handleKillEnemy = (index: number) => {
       if (deadEnemies.includes(index)) return;
       setDeadEnemies(prev => [...prev, index]);
-      
-      // Vibrate on mobile
       if (navigator.vibrate) navigator.vibrate(50);
   };
 
@@ -114,7 +133,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const handleCheckout = (plan: 'basic' | 'advanced', method: 'pix' | 'card') => {
       let price = 0;
       if (plan === 'basic') {
-          // UPDATE: Basic Yearly is now 94.00
           price = billingCycle === 'monthly' ? 9.90 : 94.00;
       } else {
           price = billingCycle === 'monthly' ? 19.90 : 197.00;
@@ -122,16 +140,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
       if (method === 'card') {
           let link = "https://kirvano.com";
-          // Use specific Plan links from constants if available
           if (plan === 'basic') link = KIRVANO_LINKS.plan_basic;
           else if (plan === 'advanced') link = KIRVANO_LINKS.plan_advanced;
-          
           window.open(link, '_blank');
       } else {
           try {
               const payload = PixService.generatePayload(price);
               setPixPayload(payload);
               setPixAmount(price);
+              // Reset PIX form states
+              setCheckoutForm({ fullName: '', email: '', password: '', payerName: '' });
+              setHasClickedOnce(false);
+              setPixCooldown(0);
+              setSubmitError(null);
+              setSubmitSuccess(false);
+              
               setShowPixModal(true);
           } catch (e) {
               alert("Erro ao gerar PIX");
@@ -139,10 +162,60 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       }
   };
 
-  // Helper to display price based on cycle
+  const handleConfirmPix = async () => {
+      // 1. Validation
+      if (!checkoutForm.fullName.trim() || !checkoutForm.email.trim() || !checkoutForm.password.trim() || !checkoutForm.payerName.trim()) {
+          setSubmitError("Preencha todos os dados e o nome do pagador.");
+          return;
+      }
+
+      // 2. Anti-Fraud Logic (First Click)
+      if (!hasClickedOnce) {
+          setHasClickedOnce(true);
+          setPixCooldown(15);
+          setSubmitError("Aguardando confirmação bancária... O processamento pode levar até 15 segundos.");
+          return;
+      }
+
+      // 3. Cooldown Check
+      if (pixCooldown > 0) {
+          setSubmitError(`Por favor, aguarde a verificação do banco: ${pixCooldown}s`);
+          return;
+      }
+
+      // 4. Submit Lead
+      setSubmitError(null);
+      try {
+          await DatabaseService.createLead({
+              name: checkoutForm.fullName,
+              contact: checkoutForm.email,
+              planId: selectedPlan === 'basic' ? 'Basic' : 'Advanced',
+              amount: pixAmount,
+              billing: billingCycle,
+              paymentMethod: 'pix',
+              pixIdentifier: checkoutForm.payerName, // Nome do pagador no campo de ID para visualização rápida
+              status: 'pending_pix',
+              password: checkoutForm.password, // Password for account creation
+              payerName: checkoutForm.payerName,
+              timestamp: new Date().toISOString()
+          });
+
+          setSubmitSuccess(true);
+          // Don't auto-close immediately, let them see success
+          setTimeout(() => {
+              setShowPixModal(false);
+              // Reset states
+              setSubmitSuccess(false);
+              setHasClickedOnce(false);
+          }, 4000);
+
+      } catch (e) {
+          setSubmitError("Erro ao enviar confirmação. Tente novamente.");
+      }
+  };
+
   const getPriceDisplay = (plan: 'basic' | 'advanced') => {
       if (billingCycle === 'monthly') {
-          // Monthly Display
           const val = plan === 'basic' ? '9,90' : '19,90';
           return (
               <div className="mb-6 opacity-80">
@@ -151,11 +224,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               </div>
           );
       } else {
-          // Yearly Display (Shown as Monthly Equivalent)
-          // UPDATE: Basic Yearly is now 94.00
           const total = plan === 'basic' ? 94.00 : 197.00;
           const monthlyEq = (total / 12).toFixed(2).replace('.', ',');
-          
           return (
               <div className="mb-6">
                   <div className="flex items-baseline gap-1">
@@ -173,13 +243,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   return (
     <div className="min-h-screen w-full bg-black text-white font-sans overflow-y-auto overflow-x-hidden relative selection:bg-white selection:text-black scroll-smooth">
       
-      {/* 90FPS CSS Optimizations */}
+      {/* CSS Optimizations */}
       <style>{`
         :root { --star-color: #ffffff !important; }
         .nebula-glow { opacity: 0.15 !important; background-image: none !important; will-change: transform, opacity; } 
         .star-layer { opacity: 1 !important; will-change: transform; }
         
-        /* Shooting Animation */
         @keyframes muzzleFlash {
             0% { background-color: rgba(255, 255, 255, 0.8); }
             100% { background-color: transparent; }
@@ -202,7 +271,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
         }
       `}</style>
 
-      {/* Background Fixado (Visível em toda a rolagem - z-0) */}
+      {/* Background Fixado */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-black">
           <div className="star-layer stars-1"></div>
           <div className="star-layer stars-2"></div>
@@ -211,7 +280,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
       <div className="relative z-10">
 
-          {/* === TELA 1: HERO === */}
+          {/* === HERO === */}
           <section ref={heroRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-transparent">
               <div className="absolute top-8 flex flex-col items-center animate-in fade-in duration-1000">
                  <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/20 mb-4 shadow-[0_0_30px_rgba(255,255,255,0.1)] animate-pulse-slow">
@@ -247,7 +316,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               </div>
           </section>
 
-          {/* === TELA 2: INIMIGOS (SHOOTER MODE) === */}
+          {/* === INIMIGOS (SHOOTER MODE) === */}
           <section ref={enemiesRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/20 backdrop-blur-sm cursor-[url('https://cdn.custom-cursor.com/db/cursor/32/Crosshair.png'),_crosshair]">
               <div className="max-w-6xl mx-auto w-full">
                   <div className="text-center mb-16">
@@ -466,7 +535,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                       </div>
                   </div>
                   
-                  {/* Removed "Já tenho conta" section as requested */}
               </div>
               ) : (
                   <div className="h-64 flex flex-col items-center justify-center">
@@ -477,29 +545,107 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
       </div>
 
-      {/* --- MODAL PIX --- */}
+      {/* --- MODAL PIX COM CADASTRO E ANTI-FRAUDE --- */}
       {showPixModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in p-4">
-              <div className="bg-zinc-900 border border-white/20 p-8 rounded-3xl max-w-md w-full text-center relative shadow-2xl">
-                  <button onClick={() => setShowPixModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={20}/></button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl animate-in fade-in p-4 overflow-y-auto">
+              <div className="bg-zinc-900 border border-white/10 p-6 md:p-8 rounded-3xl max-w-2xl w-full text-center relative shadow-2xl my-auto">
+                  <button onClick={() => setShowPixModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white bg-white/5 p-2 rounded-full"><X size={20}/></button>
                   
-                  <h3 className="text-2xl font-bold text-white mb-2">Pagamento via PIX</h3>
-                  <p className="text-zinc-400 text-sm mb-6">Escaneie para liberar seu acesso imediatamente.</p>
-                  
-                  <div className="bg-white p-4 rounded-2xl inline-block mb-6 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
-                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-48 h-48 mix-blend-multiply" />
-                  </div>
-                  
-                  <div className="flex gap-2 mb-6">
-                      <input readOnly value={pixPayload || ''} className="flex-1 bg-black border border-zinc-700 rounded-xl px-4 text-xs text-zinc-400 truncate" />
-                      <button onClick={() => navigator.clipboard.writeText(pixPayload || '')} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white"><Copy size={18}/></button>
-                  </div>
+                  {submitSuccess ? (
+                      <div className="py-12 animate-in zoom-in-50">
+                          <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(16,185,129,0.3)]">
+                              <Check size={48} className="text-white"/>
+                          </div>
+                          <h3 className="text-3xl font-bold text-white mb-2">Recebido!</h3>
+                          <p className="text-zinc-400">Seus dados foram enviados. Aguarde a aprovação do seu acesso no email.</p>
+                      </div>
+                  ) : (
+                      <div className="flex flex-col md:flex-row gap-8 text-left">
+                          
+                          {/* Left: Form */}
+                          <div className="flex-1 space-y-4">
+                              <div className="mb-4">
+                                  <h3 className="text-xl font-bold text-white">Finalizar Inscrição</h3>
+                                  <p className="text-zinc-400 text-sm">Crie seu acesso antes de confirmar.</p>
+                              </div>
 
-                  <p className="text-emerald-400 font-bold text-2xl mb-6">R$ {pixAmount.toFixed(2)}</p>
-                  
-                  <button onClick={onStartGame} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2">
-                      <Check size={20} /> Já realizei o pagamento
-                  </button>
+                              <div>
+                                  <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Nome Completo</label>
+                                  <input 
+                                    className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-white outline-none"
+                                    placeholder="Seu nome"
+                                    value={checkoutForm.fullName}
+                                    onChange={e => setCheckoutForm({...checkoutForm, fullName: e.target.value})}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Email de Acesso</label>
+                                  <input 
+                                    className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-white outline-none"
+                                    placeholder="seu@email.com"
+                                    value={checkoutForm.email}
+                                    onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Senha Desejada</label>
+                                  <input 
+                                    type="password"
+                                    className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-white outline-none"
+                                    placeholder="••••••••"
+                                    value={checkoutForm.password}
+                                    onChange={e => setCheckoutForm({...checkoutForm, password: e.target.value})}
+                                  />
+                              </div>
+                              
+                              <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-xl">
+                                  <label className="text-xs font-bold text-emerald-400 uppercase ml-1 flex items-center gap-2"><CreditCard size={12}/> Comprovante</label>
+                                  <p className="text-[10px] text-zinc-400 mb-2">Para liberar seu acesso, precisamos confirmar quem fez o pagamento.</p>
+                                  <input 
+                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none"
+                                    placeholder="Nome de quem fez o PIX (Pagador)"
+                                    value={checkoutForm.payerName}
+                                    onChange={e => setCheckoutForm({...checkoutForm, payerName: e.target.value})}
+                                  />
+                              </div>
+                          </div>
+
+                          {/* Right: QR Code & Action */}
+                          <div className="flex-1 flex flex-col items-center justify-center bg-zinc-800/30 rounded-2xl p-6 border border-white/5">
+                              <p className="text-emerald-400 font-bold text-2xl mb-4">R$ {pixAmount.toFixed(2)}</p>
+                              
+                              <div className="bg-white p-3 rounded-2xl inline-block mb-4 shadow-lg">
+                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-40 h-40 mix-blend-multiply" />
+                              </div>
+                              
+                              <div className="flex gap-2 w-full mb-6">
+                                  <input readOnly value={pixPayload || ''} className="flex-1 bg-black border border-zinc-700 rounded-xl px-3 text-[10px] text-zinc-400 truncate font-mono" />
+                                  <button onClick={() => navigator.clipboard.writeText(pixPayload || '')} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white"><Copy size={16}/></button>
+                              </div>
+
+                              {submitError && (
+                                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-200 text-xs font-bold flex items-center gap-2 animate-pulse">
+                                      <AlertTriangle size={16} /> {submitError}
+                                  </div>
+                              )}
+                              
+                              <button 
+                                onClick={handleConfirmPix}
+                                disabled={pixCooldown > 0}
+                                className={`w-full py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all ${pixCooldown > 0 ? 'bg-zinc-700 text-zinc-400 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                              >
+                                  {pixCooldown > 0 ? (
+                                      <><Loader2 className="animate-spin" size={18} /> Verificando ({pixCooldown}s)</>
+                                  ) : (
+                                      <><CheckCircle size={20} /> Já realizei o pagamento</>
+                                  )}
+                              </button>
+                              <p className="text-[10px] text-zinc-500 mt-3 text-center">
+                                  Atenção: Clicar sem pagar pode bloquear seu CPF no sistema.
+                              </p>
+                          </div>
+                      </div>
+                  )}
               </div>
           </div>
       )}

@@ -209,6 +209,8 @@ export interface Lead {
   timestamp: string;
   status: 'pending' | 'paid' | 'approved_access' | 'pending_pix';
   processed?: boolean;
+  password?: string; // New: Password for account creation
+  payerName?: string; // New: Explicit payer name
 }
 
 export interface RechargeRequest {
