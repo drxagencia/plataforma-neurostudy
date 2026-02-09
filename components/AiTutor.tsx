@@ -1,6 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit, Infinity, CreditCard, Crown, Rocket, Zap, ArrowRight, Circle, Diamond, Map } from 'lucide-react';
+// Fix: Added missing 'Lock' import from lucide-react to resolve JSX component error on line 485
+import { Send, Bot, User as UserIcon, Loader2, Sparkles, Eraser, Wallet, History, Plus, AlertTriangle, X, Copy, Check, QrCode, CheckCircle, AlertCircle, BrainCircuit, Infinity, CreditCard, Crown, Rocket, Zap, ArrowRight, Circle, Diamond, Map, Lock } from 'lucide-react';
 import { AiService } from '../services/aiService';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
