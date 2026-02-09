@@ -1,5 +1,5 @@
 
-export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes' | 'suporte';
+export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes' | 'suporte' | 'financeiro';
 
 export type UserPlan = 'basic' | 'advanced' | 'admin';
 export type BillingCycle = 'monthly' | 'yearly';
@@ -191,6 +191,8 @@ export interface RechargeRequest {
 
 export interface Transaction {
   id: string;
+  userId?: string;
+  userName?: string;
   type: 'credit' | 'debit';
   amount: number;
   description: string;

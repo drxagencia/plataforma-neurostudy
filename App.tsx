@@ -9,6 +9,7 @@ import Community from './components/Community';
 import Simulations from './components/Simulations';
 import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
+import FinanceiroPanel from './components/FinanceiroPanel'; // NEW
 import Competitivo from './components/Competitivo';
 import AiTutor from './components/AiTutor';
 import Redacao from './components/Redacao';
@@ -168,6 +169,7 @@ const App: React.FC = () => {
             {currentView === 'ajustes' && <Settings user={user} onUpdateUser={u => setUser(u)} />}
             {currentView === 'suporte' && <Support user={user} />}
             {currentView === 'competitivo' && <Competitivo />}
+            {currentView === 'financeiro' && (user.isAdmin ? <FinanceiroPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />)}
             {currentView === 'admin' && (user.isAdmin ? <AdminPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />)}
         </div>
       </main>

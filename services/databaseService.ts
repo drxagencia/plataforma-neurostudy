@@ -91,7 +91,6 @@ export const DatabaseService = {
   },
 
   createUserProfile: async (uid: string, data: Partial<UserProfile>): Promise<void> => {
-       // Garante que o totalSpent seja apenas o enviado, sem incrementos extras aqui
        await set(ref(database, `users/${uid}`), sanitizeData({ ...data }));
   },
 
@@ -127,6 +126,8 @@ export const DatabaseService = {
           const transRef = push(ref(database, `user_transactions/${req.userId}`));
           await set(transRef, {
               id: transRef.key,
+              userId: req.userId,
+              userName: req.userDisplayName,
               type: 'credit',
               amount: req.amount,
               description: req.planLabel || `Recarga ${req.currencyType === 'CREDIT' ? 'Créditos' : 'Saldo'}`,
@@ -154,8 +155,20 @@ export const DatabaseService = {
   },
 
   markLeadProcessed: async (leadId: string): Promise<void> => {
-      // Remove o lead da lista pois ele já virou usuário
       await remove(ref(database, `leads/${leadId}`));
+  },
+
+  getAllGlobalTransactions: async (): Promise<Transaction[]> => {
+      const snap = await get(ref(database, 'user_transactions'));
+      if (!snap.exists()) return [];
+      const all: Transaction[] = [];
+      const data = snap.val();
+      Object.keys(data).forEach(userId => {
+          Object.values(data[userId]).forEach((t: any) => {
+              all.push({ ...t, userId });
+          });
+      });
+      return all;
   },
 
   // --- GETTERS ---
@@ -167,7 +180,8 @@ export const DatabaseService = {
       const snap = await get(query(ref(database, 'users'), limitToLast(limitCount)));
       return snap.exists() ? Object.values(snap.val()) : [];
   },
-  getRechargeRequests: async () => {
+  // Added explicit return type to fix unknown type error in FinanceiroPanel
+  getRechargeRequests: async (): Promise<RechargeRequest[]> => {
       const snap = await get(ref(database, 'recharge_requests'));
       return snap.exists() ? Object.values(snap.val()) : [];
   },

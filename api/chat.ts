@@ -23,7 +23,8 @@ if (apps.length > 0) {
 }
 
 const db = getDatabase(app);
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+// Fix: Use process.env.API_KEY directly as required by the GenAI SDK guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');

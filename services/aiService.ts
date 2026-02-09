@@ -4,13 +4,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ref, push, set, get, update } from "firebase/database";
 import { ChatMessage } from "../types";
 
-// Helper: Get API Key safely
-const getApiKey = () => {
-    return process.env.API_KEY || "";
-};
-
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+// Fix: Initialize Gemini API directly with process.env.API_KEY as per guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Pricing Configuration (BRL per Token)
 const BASE_COST_PER_TOKEN = 0.00002; 

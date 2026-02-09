@@ -15,7 +15,8 @@ import {
   BrainCircuit,
   PenTool,
   Skull,
-  LifeBuoy
+  LifeBuoy,
+  DollarSign
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -38,6 +39,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate, onLogo
     { id: 'questoes', label: 'Questões', icon: <FileQuestion size={20} /> },
     { id: 'comunidade', label: 'Comunidade', icon: <Users size={20} /> },
     { id: 'competitivo', label: 'Competitivo', icon: <Trophy size={20} /> },
+    { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={20} />, adminOnly: true },
     { id: 'admin', label: 'Admin', icon: <ShieldAlert size={20} />, adminOnly: true },
     { id: 'ajustes', label: 'Ajustes', icon: <Settings size={20} /> },
     { id: 'suporte', label: 'Suporte', icon: <LifeBuoy size={20} />, hasNotif: hasSupportNotification },
