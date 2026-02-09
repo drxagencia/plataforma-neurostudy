@@ -31,8 +31,8 @@ export interface UserProfile extends User {
   plan: UserPlan;
   billingCycle?: BillingCycle;
   subscriptionExpiry?: string;
-  aiUnlimitedExpiry?: string; // Expiração da IA Ilimitada
-  essayPlanExpiry?: string;    // Expiração do plano de Redação
+  aiUnlimitedExpiry?: string; 
+  essayPlanExpiry?: string;    
   xp?: number;
   weeklyXp?: number;
   lastXpWeek?: number;
@@ -45,9 +45,9 @@ export interface UserProfile extends User {
   lastPostedAt?: number;
   theme?: 'dark' | 'light';
   hasSupportNotification?: boolean;
-  whatsapp?: string;           // Número do WhatsApp
-  firstTimeSetupDone?: boolean; // Flag de Onboarding
-  totalSpent?: number;         // LTV: Total gasto na plataforma
+  whatsapp?: string;           
+  firstTimeSetupDone?: boolean; 
+  totalSpent?: number;         
 }
 
 export interface SupportMessage {
