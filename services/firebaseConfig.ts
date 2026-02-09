@@ -1,5 +1,6 @@
 
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import type { FirebaseApp } from 'firebase/app';
 import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 
@@ -14,7 +15,7 @@ const firebaseConfig = {
   measurementId: "G-CFYSRSFF0V"
 };
 
-// Use direct imports for app initialization and checking existing apps
+// Use standard v9 modular SDK imports
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 // Initialize a SECONDARY app instance for Admin User Creation using correct FirebaseApp type

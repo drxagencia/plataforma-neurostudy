@@ -50,6 +50,14 @@ export interface UserProfile extends User {
   totalSpent?: number;         
 }
 
+export interface OperationalCost {
+    id: string;
+    name: string;
+    date: string; // ISO format
+    amount: number;
+    timestamp: number;
+}
+
 export interface SupportMessage {
   role: 'user' | 'ai' | 'admin';
   content: string;
@@ -102,6 +110,8 @@ export interface Question {
   subjectId: string;
   topic: string;
   subtopic?: string;
+  // Added tag property to Question interface
+  tag?: { text: string; color: string };
 }
 
 export interface Announcement {

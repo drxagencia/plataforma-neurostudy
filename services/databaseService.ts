@@ -3,7 +3,7 @@ import {
   ref, get, set, update, push, remove, query, limitToLast, increment, orderByChild
 } from "firebase/database";
 import { database } from "./firebaseConfig";
-import { UserProfile, Lead, RechargeRequest, Transaction, Subject, Lesson, CommunityPost, Simulation, SimulationResult, EssayCorrection, SupportTicket, UserStatsMap } from "../types";
+import { UserProfile, Lead, RechargeRequest, Transaction, Subject, Lesson, CommunityPost, Simulation, SimulationResult, EssayCorrection, SupportTicket, UserStatsMap, OperationalCost, TrafficConfig } from "../types";
 import { SUBJECTS, XP_VALUES } from "../constants";
 
 export const DatabaseService = {
@@ -24,7 +24,8 @@ export const DatabaseService = {
       questionsAnswered: 0,
       loginStreak: 1,
       theme: 'dark',
-      firstTimeSetupDone: false
+      firstTimeSetupDone: false,
+      totalSpent: 0
     };
     await set(userRef, profile);
     return profile as UserProfile;
@@ -45,6 +46,12 @@ export const DatabaseService = {
 
   getUsersPaginated: async (limit: number): Promise<UserProfile[]> => {
     const snap = await get(query(ref(database, 'users'), limitToLast(limit)));
+    if (!snap.exists()) return [];
+    return Object.values(snap.val()) as UserProfile[];
+  },
+
+  getAllUsers: async (): Promise<UserProfile[]> => {
+    const snap = await get(ref(database, 'users'));
     if (!snap.exists()) return [];
     return Object.values(snap.val()) as UserProfile[];
   },
@@ -195,12 +202,6 @@ export const DatabaseService = {
 
   saveSimulationResult: async (result: SimulationResult): Promise<void> => {
     await push(ref(database, 'simulation_results'), result);
-    // Update performance stats
-    if (result.topicPerformance) {
-      for (const [topic, stats] of Object.entries(result.topicPerformance)) {
-        // We don't have subjectId here easily, assume a global topic performance or skip for brevity
-      }
-    }
   },
 
   // --- ADMIN & FINANCE ---
@@ -268,6 +269,10 @@ export const DatabaseService = {
       } else if (req.currencyType === 'CREDIT') {
         await update(userRef, { essayCredits: increment(req.quantityCredits || 0) });
       }
+      
+      // Update LTV (totalSpent)
+      await update(userRef, { totalSpent: increment(req.amount) });
+
       // Log transaction
       const transRef = push(ref(database, `user_transactions/${req.userId}`));
       await set(transRef, {
@@ -298,6 +303,27 @@ export const DatabaseService = {
           Object.values(data[uid]).forEach((t: any) => all.push(t));
       });
       return all.sort((a,b) => b.timestamp - a.timestamp);
+  },
+
+  // --- OPERATIONAL COSTS ---
+  saveOperationalCost: async (cost: Omit<OperationalCost, 'id' | 'timestamp'>): Promise<void> => {
+      const costsRef = ref(database, 'operational_costs');
+      const newCostRef = push(costsRef);
+      await set(newCostRef, {
+          ...cost,
+          id: newCostRef.key,
+          timestamp: Date.now()
+      });
+  },
+
+  getOperationalCosts: async (): Promise<OperationalCost[]> => {
+      const snap = await get(ref(database, 'operational_costs'));
+      if (!snap.exists()) return [];
+      return Object.values(snap.val()) as OperationalCost[];
+  },
+
+  deleteOperationalCost: async (id: string): Promise<void> => {
+      await remove(ref(database, `operational_costs/${id}`));
   },
 
   // --- ESSAY CORRECTIONS ---

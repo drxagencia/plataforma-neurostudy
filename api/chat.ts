@@ -1,5 +1,5 @@
 
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase, ref, get, update } from "firebase/database";
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -10,10 +10,11 @@ const firebaseConfig = {
   projectId: "neurostudy-d8a00",
 };
 
+// Ensure Firebase is initialized correctly for the environment
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Initialize Gemini API
+// Initialize Gemini API with API_KEY from environment
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export default async function handler(req: any, res: any) {
@@ -62,6 +63,7 @@ export default async function handler(req: any, res: any) {
       });
 
       await update(userRef, { essayCredits: credits - 1 });
+      // Guideline: access text via response.text getter
       return res.status(200).json({ text: response.text });
     }
 
@@ -87,6 +89,7 @@ export default async function handler(req: any, res: any) {
     const cost = 0.01;
     await update(userRef, { balance: Math.max(0, (user.balance || 0) - cost) });
     
+    // Guideline: access text via response.text getter
     return res.status(200).json({ text: response.text });
 
   } catch (error: any) {
