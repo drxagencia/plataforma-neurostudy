@@ -1,5 +1,5 @@
 
-import * as firebaseApp from "firebase/app";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 
@@ -14,17 +14,17 @@ const firebaseConfig = {
   measurementId: "G-CFYSRSFF0V"
 };
 
-// Use named initializeApp. Check if app already initialized to avoid hot-reload errors.
-const app = firebaseApp.getApps().length > 0 ? firebaseApp.getApp() : firebaseApp.initializeApp(firebaseConfig);
+// Use direct imports for app initialization and checking existing apps
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize a SECONDARY app instance for Admin User Creation.
-let secondaryApp: firebaseApp.FirebaseApp;
+// Initialize a SECONDARY app instance for Admin User Creation using correct FirebaseApp type
+let secondaryApp: FirebaseApp;
 try {
-    secondaryApp = firebaseApp.getApp("SecondaryApp");
+    secondaryApp = getApp("SecondaryApp");
 } catch (e) {
-    secondaryApp = firebaseApp.initializeApp(firebaseConfig, "SecondaryApp");
+    secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 }
 
 export const auth = getAuth(app);
-export const secondaryAuth = getAuth(secondaryApp); // Export secondary auth
+export const secondaryAuth = getAuth(secondaryApp); 
 export const database = getDatabase(app);
