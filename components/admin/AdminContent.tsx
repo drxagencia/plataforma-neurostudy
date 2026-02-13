@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Subject, Lesson, Simulation, Question, LessonMaterial } from '../../types';
 import { DatabaseService } from '../../services/databaseService';
 import { 
-  PlayCircle, FileQuestion, GraduationCap, LayoutGrid, Layers, PlusCircle, Edit, Trash2, BookOpen, Plus, Save, Image as ImageIcon, Sparkles, ArrowLeft, MoreVertical, FileText, List, X
+  PlayCircle, FileQuestion, GraduationCap, LayoutGrid, Layers, PlusCircle, Edit, Trash2, BookOpen, Plus, Save, Image as ImageIcon, Sparkles, ArrowLeft, MoreVertical, FileText, List, X, Clock, AlertCircle
 } from 'lucide-react';
 
 type ContentSubTab = 'lms' | 'bank' | 'sims';
@@ -21,7 +21,7 @@ const AdminContent: React.FC = () => {
   const [topicsList, setTopicsList] = useState<string[]>([]);
   const [currentLessons, setCurrentLessons] = useState<Lesson[]>([]);
 
-  // Modal State
+  // Lesson Modal State
   const [showLessonModal, setShowLessonModal] = useState(false);
   const [lessonForm, setLessonForm] = useState<Partial<Lesson>>({ type: 'video', title: '', materials: [] });
   const [formMaterialUrl, setFormMaterialUrl] = useState('');
@@ -34,8 +34,11 @@ const AdminContent: React.FC = () => {
   });
   const [qLoc, setQLoc] = useState({ subject: '', topic: '', subtopic: '' });
 
-  // Sims
+  // Sims State & Modal
   const [simulations, setSimulations] = useState<Simulation[]>([]);
+  const [showSimModal, setShowSimModal] = useState(false);
+  const [simForm, setSimForm] = useState<Partial<Simulation>>({});
+  const [simQIds, setSimQIds] = useState(''); // Para gerenciar os IDs como texto separado por vírgula
 
   useEffect(() => {
       fetchData();
@@ -111,14 +114,12 @@ const AdminContent: React.FC = () => {
       setLoading(true);
       const id = lessonForm.id || `l_${Date.now()}`;
       
-      // Sanitização para blocos de exercicios
       const finalData: Lesson = {
           ...lessonForm as Lesson,
           id
       };
 
       if (finalData.type === 'exercise_block') {
-          // Garante que o bloco aponte para a matéria/tópico atual por padrão, se não definido
           if (!finalData.exerciseFilters) {
               finalData.exerciseFilters = {
                   category: selectedSub.category,
@@ -129,8 +130,6 @@ const AdminContent: React.FC = () => {
       }
 
       await DatabaseService.saveLesson(selectedSub.id, selectedTopic, id, finalData);
-      
-      // Refresh list
       await handleOpenTopic(selectedTopic);
       setShowLessonModal(false);
       setLoading(false);
@@ -159,7 +158,49 @@ const AdminContent: React.FC = () => {
       alert("Questão salva!");
   };
 
-  // --- SIMULATION HANDLERS ---
+  // --- SIMULATION HANDLERS (UPDATED) ---
+  const openNewSimModal = () => {
+      setSimForm({
+          title: '',
+          description: '',
+          durationMinutes: 90,
+          type: 'training',
+          status: 'coming_soon',
+          questionIds: []
+      });
+      setSimQIds('');
+      setShowSimModal(true);
+  };
+
+  const openEditSimModal = (sim: Simulation) => {
+      setSimForm(sim);
+      setSimQIds(sim.questionIds?.join(', ') || '');
+      setShowSimModal(true);
+  };
+
+  const handleSaveSim = async () => {
+      if (!simForm.title || !simForm.durationMinutes) {
+          alert("Título e duração são obrigatórios");
+          return;
+      }
+      setLoading(true);
+      
+      const id = simForm.id || `sim_${Date.now()}`;
+      // Parse IDs from text area
+      const parsedIds = simQIds.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+      const finalSim: Simulation = {
+          ...simForm as Simulation,
+          id,
+          questionIds: parsedIds
+      };
+
+      await DatabaseService.saveSimulation(id, finalSim);
+      await fetchData(); // Refresh list
+      setShowSimModal(false);
+      setLoading(false);
+  };
+
   const handleDeleteSim = async (id: string) => {
       if (!confirm("Excluir simulado?")) return;
       setLoading(true);
@@ -196,8 +237,6 @@ const AdminContent: React.FC = () => {
             {/* === GERENCIADOR LMS === */}
             {contentSubTab === 'lms' && (
                 <div className="animate-in fade-in duration-300">
-                    
-                    {/* Nível 1: Seleção de Matéria */}
                     {!selectedSub && (
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                             {subjects.map(s => (
@@ -215,7 +254,6 @@ const AdminContent: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Nível 2: Seleção de Tópico (Dentro da Matéria) */}
                     {selectedSub && !selectedTopic && (
                         <div className="space-y-6">
                             <button onClick={() => setSelectedSub(null)} className="flex items-center gap-2 text-slate-400 hover:text-white font-bold text-sm">
@@ -223,7 +261,6 @@ const AdminContent: React.FC = () => {
                             </button>
                             <div className="flex justify-between items-center">
                                 <h3 className="text-2xl font-bold text-white flex items-center gap-2"><LayoutGrid size={24} className="text-indigo-400" /> {selectedSub.name} <span className="text-slate-500 text-lg">/ Playlists</span></h3>
-                                {/* Opção para criar tópico novo seria apenas criar aula com tópico novo no modal, simplificado aqui */}
                             </div>
                             
                             {topicsList.length > 0 ? (
@@ -245,7 +282,6 @@ const AdminContent: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Nível 3: Lista de Aulas (Dentro do Tópico) */}
                     {selectedSub && selectedTopic && (
                         <div className="space-y-6">
                             <div className="flex justify-between items-center bg-slate-950/40 p-4 rounded-2xl border border-white/5">
@@ -279,7 +315,6 @@ const AdminContent: React.FC = () => {
                                             </h4>
                                             <div className="flex gap-4 mt-1 text-[10px] text-slate-500">
                                                 <span>{l.type === 'video' ? `Duração: ${l.duration}` : 'Bloco de Prática'}</span>
-                                                {l.materials && l.materials.length > 0 && <span className="flex items-center gap-1"><FileText size={10}/> {l.materials.length} Materiais</span>}
                                             </div>
                                         </div>
                                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -320,7 +355,7 @@ const AdminContent: React.FC = () => {
                 </div>
             )}
 
-            {/* === SIMULADOS === */}
+            {/* === SIMULADOS (FIXED & FUNCTIONAL) === */}
             {contentSubTab === 'sims' && (
                 <div className="animate-in fade-in duration-300 grid grid-cols-1 md:grid-cols-2 gap-6">
                      {simulations.map(sim => (
@@ -328,14 +363,15 @@ const AdminContent: React.FC = () => {
                              <div>
                                  <h4 className="font-black text-white text-lg italic">{sim.title}</h4>
                                  <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest">{sim.durationMinutes} min • {sim.questionIds?.length || 0} questões</p>
+                                 <span className={`text-[10px] uppercase font-bold mt-2 inline-block px-2 py-0.5 rounded ${sim.status === 'open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{sim.status}</span>
                              </div>
                              <div className="flex gap-2">
-                                 <button className="p-3 bg-slate-800 hover:bg-indigo-600 rounded-2xl text-slate-400 hover:text-white transition-all"><Edit size={18}/></button>
+                                 <button onClick={() => openEditSimModal(sim)} className="p-3 bg-slate-800 hover:bg-indigo-600 rounded-2xl text-slate-400 hover:text-white transition-all"><Edit size={18}/></button>
                                  <button onClick={() => handleDeleteSim(sim.id)} className="p-3 bg-slate-800 hover:bg-red-600 rounded-2xl text-slate-400 hover:text-white transition-all"><Trash2 size={18}/></button>
                              </div>
                          </div>
                      ))}
-                     <button className="border-2 border-dashed border-white/10 rounded-[2rem] p-10 flex flex-col items-center justify-center gap-4 text-slate-500 hover:bg-white/5 hover:border-indigo-500/40 transition-all group">
+                     <button onClick={openNewSimModal} className="border-2 border-dashed border-white/10 rounded-[2rem] p-10 flex flex-col items-center justify-center gap-4 text-slate-500 hover:bg-white/5 hover:border-indigo-500/40 transition-all group">
                          <Plus size={40} className="group-hover:scale-110 transition-transform" />
                          <span className="font-black uppercase tracking-[0.2em] text-xs">Novo Simulado</span>
                      </button>
@@ -459,7 +495,7 @@ const AdminContent: React.FC = () => {
             </div>
         )}
 
-        {/* MODAL: CRIAR QUESTÃO (Mantido igual, simplificado visualmente no código para focar na mudança principal) */}
+        {/* MODAL: CRIAR QUESTÃO */}
         {showQuestionModal && (
             <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 overflow-y-auto">
                 <div className="bg-slate-900 border border-white/10 p-10 rounded-[3rem] w-full max-w-5xl shadow-2xl animate-in zoom-in-95 my-auto">
@@ -515,6 +551,73 @@ const AdminContent: React.FC = () => {
                         </button>
                         <button onClick={() => setShowQuestionModal(false)} className="px-10 py-5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-black rounded-3xl transition-all">
                             DESCARTAR
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL: CRIAR/EDITAR SIMULADO (NOVO) */}
+        {showSimModal && (
+            <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 overflow-y-auto">
+                <div className="bg-slate-900 border border-white/10 p-8 rounded-[2.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 my-auto">
+                    <div className="flex justify-between items-start mb-6">
+                        <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">
+                            {simForm.id ? 'Editar Simulado' : 'Novo Simulado'}
+                        </h3>
+                        <button onClick={() => setShowSimModal(false)} className="text-slate-500 hover:text-white"><X size={24}/></button>
+                    </div>
+                    
+                    <div className="space-y-5">
+                        <div>
+                            <label className="text-[10px] text-slate-500 font-black uppercase ml-1">Título do Simulado</label>
+                            <input className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white font-bold outline-none focus:border-purple-500" value={simForm.title} onChange={e => setSimForm({...simForm, title: e.target.value})} placeholder="Ex: Simulado Nacional ENEM #1" />
+                        </div>
+                        
+                        <div>
+                            <label className="text-[10px] text-slate-500 font-black uppercase ml-1">Descrição</label>
+                            <textarea className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white text-sm outline-none focus:border-purple-500 h-24" value={simForm.description} onChange={e => setSimForm({...simForm, description: e.target.value})} placeholder="Detalhes sobre a prova..." />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-black uppercase ml-1">Duração (Minutos)</label>
+                                <div className="relative">
+                                    <Clock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"/>
+                                    <input type="number" className="w-full bg-black border border-zinc-800 rounded-xl p-4 pl-12 text-white outline-none focus:border-purple-500" value={simForm.durationMinutes} onChange={e => setSimForm({...simForm, durationMinutes: parseInt(e.target.value)})} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-slate-500 font-black uppercase ml-1">Status</label>
+                                <select className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white outline-none focus:border-purple-500" value={simForm.status} onChange={e => setSimForm({...simForm, status: e.target.value as any})}>
+                                    <option value="open">Aberto (Disponível)</option>
+                                    <option value="closed">Fechado</option>
+                                    <option value="coming_soon">Em Breve</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] text-slate-500 font-black uppercase ml-1">Tipo</label>
+                            <select className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white outline-none focus:border-purple-500" value={simForm.type} onChange={e => setSimForm({...simForm, type: e.target.value as any})}>
+                                <option value="training">Treino (Livre)</option>
+                                <option value="official">Oficial (Ranking)</option>
+                            </select>
+                        </div>
+
+                        <div className="bg-purple-900/10 border border-purple-500/20 p-4 rounded-2xl">
+                            <label className="text-[10px] text-purple-400 font-black uppercase ml-1 flex items-center gap-2"><List size={12}/> IDs das Questões</label>
+                            <p className="text-[10px] text-slate-500 mb-2">Cole os IDs das questões que compõem este simulado, separados por vírgula.</p>
+                            <textarea 
+                                className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white text-xs font-mono outline-none focus:border-purple-500 h-32" 
+                                value={simQIds} 
+                                onChange={e => setSimQIds(e.target.value)} 
+                                placeholder="q_171..., q_172..., q_173..." 
+                            />
+                        </div>
+
+                        <button onClick={handleSaveSim} className="w-full py-5 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-2xl flex items-center justify-center gap-2 mt-4 shadow-xl transition-all hover:scale-[1.02]">
+                            <Save size={20}/> SALVAR SIMULADO
                         </button>
                     </div>
                 </div>
