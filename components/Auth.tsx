@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, BrainCircuit } from 'lucide-react';
 import { AuthService } from '../services/authService';
@@ -55,7 +56,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full glass-input rounded-xl py-3.5 pl-12 pr-4 focus:outline-none transition-all placeholder:text-slate-600"
+                className="w-full bg-slate-900/60 border border-white/10 text-white rounded-xl py-3.5 pl-12 pr-4 focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600"
                 placeholder="seu@email.com"
                 required
               />
@@ -70,7 +71,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full glass-input rounded-xl py-3.5 pl-12 pr-12 focus:outline-none transition-all placeholder:text-slate-600"
+                className="w-full bg-slate-900/60 border border-white/10 text-white rounded-xl py-3.5 pl-12 pr-12 focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600"
                 placeholder="••••••••"
                 required
               />
@@ -110,7 +111,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
         <div className="mt-8 text-center">
           <p className="text-slate-500 text-sm">
-            Não tem acesso? <a href="#" className="text-indigo-400 hover:text-indigo-300 font-bold hover:underline">Falar com Suporte</a>
+            Não tem acesso? <a href="https://wa.me/558494446745" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 font-bold hover:underline">Falar com Suporte</a>
           </p>
         </div>
       </div>

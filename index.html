@@ -61,6 +61,15 @@
         background-image: radial-gradient(circle at 50% 0%, #0f172a, transparent 80%);
       }
       .glass-card { background: var(--glass-bg); backdrop-filter: blur(8px); border: 1px solid var(--glass-border); }
+      .glass-input { 
+        background: rgba(0, 0, 0, 0.3) !important; 
+        border: 1px solid rgba(255, 255, 255, 0.1) !important; 
+        color: #ffffff !important; 
+      }
+      .glass-input:focus {
+        border-color: #6366f1 !important;
+        background: rgba(0, 0, 0, 0.4) !important;
+      }
       #root { position: relative; z-index: 1; min-height: 100vh; }
     </style>
   <script type="importmap">

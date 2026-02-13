@@ -1,11 +1,14 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { DatabaseService } from '../services/databaseService';
+// Added missing auth import
+import { auth } from '../services/firebaseConfig';
+// Added missing AiService import
+import { AiService } from '../services/aiService';
 import { Subject, Lesson, View, UserProfile } from '../types';
 import * as Icons from 'lucide-react';
-import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, ExternalLink, Clock, MonitorPlay, GraduationCap, CheckCircle, BrainCircuit, X, MessageCircle, Target, ArrowRight, Zap, Network, BarChart, FileType, Sparkles } from 'lucide-react';
-import { AiService } from '../services/aiService';
-import { auth } from '../services/firebaseConfig';
+// Fix: Removed 'ExternalLink' from explicit named imports to avoid conflict with the local declaration on line 354
+import { Loader2, BookX, ArrowLeft, PlayCircle, Video, Layers, ChevronRight, Play, FileText, Clock, MonitorPlay, GraduationCap, CheckCircle, BrainCircuit, X, MessageCircle, Target, ArrowRight, Zap, Network, BarChart, FileType, Sparkles } from 'lucide-react';
 
 // --- OPTIMIZED VIDEO PLAYER COMPONENT ---
 const VideoPlayer = React.memo(({ videoId, title }: { videoId: string, title: string }) => {
@@ -584,6 +587,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
   );
 };
 
+// Fix: Redefined local ExternalLink component to use the Icons namespace to avoid collision with direct import
 const ExternalLink = ({ size, className }: { size?: number, className?: string }) => (
     <Icons.ExternalLink size={size} className={className} />
 );
