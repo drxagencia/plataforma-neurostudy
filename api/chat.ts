@@ -10,12 +10,10 @@ const firebaseConfig = {
   projectId: "neurostudy-d8a00",
 };
 
-// Singleton Firebase initialization
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 export default async function handler(req: any, res: any) {
-  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -40,18 +38,16 @@ export default async function handler(req: any, res: any) {
     const user = userSnap.val();
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
-    // Multiplicador Proporcional (50x do custo base de 0.002)
+    // CÁLCULO DE CONSUMO COM MULTIPLICADOR 50X
     const baseCost = 0.002;
     const isAdvanced = user.plan === 'advanced';
-    const multiplier = isAdvanced ? 25 : 50; // Advanced paga metade por msg
-    const calculatedCost = baseCost * multiplier;
+    const multiplier = isAdvanced ? 25 : 50; 
+    const calculatedCost = baseCost * multiplier; // R$ 0.10 para Basic, R$ 0.05 para Advanced
 
-    // --- MODO CORREÇÃO DE REDAÇÃO ---
     if (mode === 'essay-correction') {
       const credits = user.essayCredits || 0;
       if (credits <= 0) return res.status(402).json({ error: 'Sem créditos de redação.' });
-      if (!image) return res.status(400).json({ error: 'Imagem obrigatória.' });
-
+      
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -65,7 +61,7 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ text: response.choices[0].message.content });
     }
 
-    // --- MODO CHAT / EXPLICAÇÃO ---
+    // Validação de saldo com o valor CALCULADO
     if (user.balance < calculatedCost) {
         return res.status(402).json({ error: 'Saldo insuficiente na NeuroAI.' });
     }
@@ -78,14 +74,16 @@ export default async function handler(req: any, res: any) {
     const completion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages, temperature: 0.7 });
     const aiText = completion.choices[0].message.content;
 
-    // Débito e Log de Transação Real
+    // Débito do valor CALCULADO
     await update(userRef, { balance: Math.max(0, (user.balance || 0) - calculatedCost) });
+    
+    // Log da transação com o valor que o usuário vê (multiplicado)
     const transRef = push(ref(db, `user_transactions/${uid}`));
     await set(transRef, {
         id: transRef.key,
         userId: uid,
         type: 'debit',
-        amount: calculatedCost,
+        amount: calculatedCost, // Valor real debitado (ex: 0.10)
         description: mode === 'explain' ? 'Explicação de Questão IA' : 'Chat NeuroAI Mentor',
         timestamp: Date.now()
     });
@@ -94,7 +92,6 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ text: aiText });
 
   } catch (error: any) {
-    if (error?.status === 401) return res.status(401).json({ error: "Chave de API Inválida." });
     return res.status(500).json({ error: "Falha na IA.", details: error.message });
   }
 }

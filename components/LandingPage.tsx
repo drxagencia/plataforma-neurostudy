@@ -1,6 +1,6 @@
-
 import React, { useEffect, useState, useRef } from 'react';
-import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye, Sparkles, Crosshair, Loader2 } from 'lucide-react';
+/* Fix: Added missing PenTool import to fix "Cannot find name 'PenTool'" */
+import { Rocket, Star, Zap, Shield, CheckCircle, Skull, Play, Lock, AlertTriangle, ChevronDown, Trophy, Timer, Swords, BrainCircuit, ArrowRight, MousePointerClick, CreditCard, QrCode, X, Check, Copy, User, Mail, Smartphone, Eye, Sparkles, Crosshair, Loader2, PenTool } from 'lucide-react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { TrafficConfig, Lead } from '../types';
@@ -10,7 +10,6 @@ interface LandingPageProps {
   onStartGame: () => void;
 }
 
-// --- FAKE PROGRESS BAR COMPONENT ---
 const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onFinish: () => void }) => {
     const [progress, setProgress] = useState(75);
 
@@ -56,23 +55,15 @@ const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onF
 };
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
-  // Refs para rolagem suave
   const heroRef = useRef<HTMLDivElement>(null);
   const enemiesRef = useRef<HTMLDivElement>(null);
   const vslRef = useRef<HTMLDivElement>(null);
   const pricingRef = useRef<HTMLDivElement>(null);
 
-  // VSL Logic
   const [showEarlyOffer, setShowEarlyOffer] = useState(false);
   const [showFinalOffer, setShowFinalOffer] = useState(false);
-  
-  // Visibility Logic (Anti-Pixel confusion)
   const [showPricingSection, setShowPricingSection] = useState(false);
-
-  // Enemy Shooting Logic
   const [deadEnemies, setDeadEnemies] = useState<number[]>([]);
-
-  // Pricing / Checkout Logic
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [showPixModal, setShowPixModal] = useState(false);
   const [pixPayload, setPixPayload] = useState<string | null>(null);
@@ -81,13 +72,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [purchasedCount, setPurchasedCount] = useState(842);
   const [config, setConfig] = useState<TrafficConfig>({ vslScript: '', checkoutLinkMonthly: '', checkoutLinkYearly: '' });
 
-  // PIX Form Data & Anti-Fraud Logic
-  const [checkoutForm, setCheckoutForm] = useState({
-      fullName: '',
-      email: '',
-      password: '',
-      payerName: ''
-  });
+  const [checkoutForm, setCheckoutForm] = useState({ fullName: '', email: '', password: '', payerName: '' });
   const [pixCooldown, setPixCooldown] = useState(0);
   const [hasClickedOnce, setHasClickedOnce] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -101,13 +86,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Cooldown Timer Effect
   useEffect(() => {
       let timer: any;
       if (pixCooldown > 0) {
-          timer = setInterval(() => {
-              setPixCooldown(prev => prev - 1);
-          }, 1000);
+          timer = setInterval(() => { setPixCooldown(prev => prev - 1); }, 1000);
       }
       return () => clearInterval(timer);
   }, [pixCooldown]);
@@ -118,9 +100,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
   const handleRevealOffer = () => {
       setShowPricingSection(true);
-      setTimeout(() => {
-          scrollToSection(pricingRef);
-      }, 100);
+      setTimeout(() => { scrollToSection(pricingRef); }, 100);
   };
 
   const handleKillEnemy = (index: number) => {
@@ -129,61 +109,49 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       if (navigator.vibrate) navigator.vibrate(50);
   };
 
-  // --- ACTIONS ---
+  // --- LOGICA DE CHECKOUT ATUALIZADA ---
   const handleCheckout = (plan: 'basic' | 'advanced', method: 'pix' | 'card') => {
-      let price = 0;
-      if (plan === 'basic') {
-          price = billingCycle === 'monthly' ? 9.90 : 94.00;
-      } else {
-          price = billingCycle === 'monthly' ? 19.90 : 197.00;
+      // REGRA: Planos Mensais SEMPRE Kirvano
+      if (billingCycle === 'monthly') {
+          const link = plan === 'basic' ? KIRVANO_LINKS.plan_basic : KIRVANO_LINKS.plan_advanced;
+          window.open(link, '_blank');
+          return;
       }
 
+      // REGRA: Planos Anuais
       if (method === 'card') {
-          let link = "https://kirvano.com";
-          if (plan === 'basic') link = KIRVANO_LINKS.plan_basic;
-          else if (plan === 'advanced') link = KIRVANO_LINKS.plan_advanced;
+          const link = plan === 'basic' ? KIRVANO_LINKS.plan_basic : KIRVANO_LINKS.plan_advanced;
           window.open(link, '_blank');
       } else {
+          // PIX Anual gera QR Code interno
+          const price = plan === 'basic' ? 94.00 : 197.00;
           try {
               const payload = PixService.generatePayload(price);
               setPixPayload(payload);
               setPixAmount(price);
-              // Reset PIX form states
               setCheckoutForm({ fullName: '', email: '', password: '', payerName: '' });
               setHasClickedOnce(false);
               setPixCooldown(0);
               setSubmitError(null);
               setSubmitSuccess(false);
-              
               setShowPixModal(true);
-          } catch (e) {
-              alert("Erro ao gerar PIX");
-          }
+          } catch (e) { alert("Erro ao gerar PIX"); }
       }
   };
 
   const handleConfirmPix = async () => {
-      // 1. Validation
       if (!checkoutForm.fullName.trim() || !checkoutForm.email.trim() || !checkoutForm.password.trim() || !checkoutForm.payerName.trim()) {
-          setSubmitError("Preencha todos os dados e o nome do pagador.");
+          setSubmitError("Preencha todos os dados.");
           return;
       }
-
-      // 2. Anti-Fraud Logic (First Click)
       if (!hasClickedOnce) {
           setHasClickedOnce(true);
           setPixCooldown(15);
-          setSubmitError("Aguardando confirmação bancária... O processamento pode levar até 15 segundos.");
+          setSubmitError("Confirmando transação com o Banco Central... (15s)");
           return;
       }
+      if (pixCooldown > 0) return;
 
-      // 3. Cooldown Check
-      if (pixCooldown > 0) {
-          setSubmitError(`Por favor, aguarde a verificação do banco: ${pixCooldown}s`);
-          return;
-      }
-
-      // 4. Submit Lead
       setSubmitError(null);
       try {
           await DatabaseService.createLead({
@@ -193,25 +161,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
               amount: pixAmount,
               billing: billingCycle,
               paymentMethod: 'pix',
-              pixIdentifier: checkoutForm.payerName, // Nome do pagador no campo de ID para visualização rápida
+              pixIdentifier: checkoutForm.payerName,
               status: 'pending_pix',
-              password: checkoutForm.password, // Password for account creation
+              password: checkoutForm.password,
               payerName: checkoutForm.payerName,
               timestamp: new Date().toISOString()
           });
-
           setSubmitSuccess(true);
-          // Don't auto-close immediately, let them see success
-          setTimeout(() => {
-              setShowPixModal(false);
-              // Reset states
-              setSubmitSuccess(false);
-              setHasClickedOnce(false);
-          }, 4000);
-
-      } catch (e) {
-          setSubmitError("Erro ao enviar confirmação. Tente novamente.");
-      }
+          setTimeout(() => { setShowPixModal(false); setSubmitSuccess(false); setHasClickedOnce(false); }, 4000);
+      } catch (e) { setSubmitError("Erro ao enviar confirmação."); }
   };
 
   const getPriceDisplay = (plan: 'basic' | 'advanced') => {
@@ -242,414 +200,148 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
   return (
     <div className="min-h-screen w-full bg-black text-white font-sans overflow-y-auto overflow-x-hidden relative selection:bg-white selection:text-black scroll-smooth">
-      
-      {/* CSS Optimizations */}
       <style>{`
-        :root { --star-color: #ffffff !important; }
-        .nebula-glow { opacity: 0.15 !important; background-image: none !important; will-change: transform, opacity; } 
-        .star-layer { opacity: 1 !important; will-change: transform; }
-        
-        @keyframes muzzleFlash {
-            0% { background-color: rgba(255, 255, 255, 0.8); }
-            100% { background-color: transparent; }
-        }
-        @keyframes enemyDeath {
-            0% { transform: scale(1) translate(0, 0); filter: brightness(2) sepia(1) hue-rotate(-50deg) saturate(5); }
-            20% { transform: scale(0.95) translate(5px, -5px); }
-            40% { transform: scale(0.9) translate(-5px, 5px); }
-            100% { transform: scale(0.8) translateY(20px); opacity: 0; filter: grayscale(1); }
-        }
-        .animate-shot {
-            animation: enemyDeath 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-        }
-        .muzzle-overlay {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            animation: muzzleFlash 0.1s linear forwards;
-            z-index: 50;
-        }
+        @keyframes muzzleFlash { 0% { background-color: rgba(255, 255, 255, 0.8); } 100% { background-color: transparent; } }
+        @keyframes enemyDeath { 0% { transform: scale(1); filter: brightness(2); } 100% { transform: scale(0.8) translateY(20px); opacity: 0; } }
+        .animate-shot { animation: enemyDeath 0.4s forwards; }
+        .muzzle-overlay { position: absolute; inset: 0; pointer-events: none; animation: muzzleFlash 0.1s forwards; z-index: 50; }
+        .star-layer { opacity: 0.5; }
       `}</style>
 
-      {/* Background Fixado */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-black">
           <div className="star-layer stars-1"></div>
           <div className="star-layer stars-2"></div>
-          <div className="star-layer stars-3"></div>
       </div>
 
       <div className="relative z-10">
-
-          {/* === HERO === */}
-          <section ref={heroRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-transparent">
-              <div className="absolute top-8 flex flex-col items-center animate-in fade-in duration-1000">
-                 <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/20 mb-4 shadow-[0_0_30px_rgba(255,255,255,0.1)] animate-pulse-slow">
-                     <BrainCircuit size={40} className="text-white" />
-                 </div>
-                 <h3 className="text-zinc-400 font-bold tracking-[0.3em] text-xs uppercase mt-2">NeuroStudy OS</h3>
-              </div>
-
-              <div className="text-center space-y-8 max-w-4xl z-10 mt-24">
-                  <h1 className="text-6xl md:text-9xl font-black tracking-tighter text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.3)] animate-in zoom-in-50 duration-1000 uppercase leading-none">
-                      Você está<br/>pronto?
+          <section ref={heroRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20">
+              <div className="text-center space-y-8 max-w-4xl z-10">
+                  <h1 className="text-6xl md:text-9xl font-black tracking-tighter text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.3)] uppercase leading-none">
+                      APROVAÇÃO<br/>HACKEADA
                   </h1>
                   <p className="text-xl md:text-2xl text-zinc-400 max-w-2xl mx-auto leading-relaxed font-light">
-                      Você está prestes a entrar no <strong className="text-white">único sistema</strong> capaz de hackear sua aprovação no ENEM em tempo recorde.
+                      O sistema de elite que transforma estudantes comuns em <strong className="text-white">monstros do ENEM</strong>.
                   </p>
-                  
                   <div className="pt-8">
-                      <button 
-                        onClick={() => scrollToSection(enemiesRef)}
-                        className="group relative px-12 py-5 bg-transparent overflow-hidden rounded-none border border-white/30 transition-all duration-300 hover:border-white hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]"
-                      >
-                          <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 skew-x-12 scale-150 origin-left" />
-                          <div className="relative flex items-center gap-4 text-2xl font-black text-white tracking-[0.2em] uppercase group-hover:tracking-[0.3em] transition-all duration-300">
-                              <Play size={24} className="fill-white group-hover:text-white transition-colors" />
-                              PRESS START
+                      <button onClick={() => scrollToSection(enemiesRef)} className="group relative px-12 py-5 bg-transparent border border-white/30 transition-all hover:border-white hover:shadow-[0_0_40px_rgba(255,255,255,0.3)]">
+                          <div className="relative flex items-center gap-4 text-2xl font-black text-white tracking-[0.2em] uppercase">
+                              <Play size={24} className="fill-white" /> PRESS START
                           </div>
                       </button>
                   </div>
               </div>
-              
-              <div className="absolute bottom-10 animate-bounce text-zinc-600">
-                  <ChevronDown size={32} />
-              </div>
           </section>
 
-          {/* === INIMIGOS (SHOOTER MODE) === */}
-          <section ref={enemiesRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/20 backdrop-blur-sm cursor-[url('https://cdn.custom-cursor.com/db/cursor/32/Crosshair.png'),_crosshair]">
+          <section ref={enemiesRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/20 backdrop-blur-sm cursor-crosshair">
               <div className="max-w-6xl mx-auto w-full">
                   <div className="text-center mb-16">
-                      <span className="text-white font-mono font-bold tracking-widest uppercase text-sm mb-4 block animate-pulse border border-white/20 inline-block px-4 py-1 rounded">System Alert: Threats Detected</span>
-                      <h2 className="text-4xl md:text-6xl font-black text-white mb-4">ESCOLHA SEUS INIMIGOS</h2>
-                      <p className="text-zinc-400 flex items-center justify-center gap-2">
-                          <Crosshair size={16} /> Clique para eliminar os "Monstros" que drenam seu XP.
-                      </p>
+                      <h2 className="text-4xl md:text-6xl font-black text-white mb-4 uppercase">Limpe o Caminho</h2>
+                      <p className="text-zinc-500">Clique nos problemas para eliminá-los do seu futuro.</p>
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-                      {[
-                          { title: "Procrastinação", lvl: "LVL 99 BOSS", icon: <Timer size={40} />, desc: "Rouba 4h do seu dia rolando feed.", color: "text-white" },
-                          { title: "Ansiedade", lvl: "Elite Mob", icon: <AlertTriangle size={40} />, desc: "Causa debuff de 'Branco' na hora da prova.", color: "text-zinc-300" },
-                          { title: "Desorganização", lvl: "Common Mob", icon: <Swords size={40} />, desc: "Impede você de saber o que estudar hoje.", color: "text-zinc-400" }
-                      ].map((enemy, idx) => {
-                          const isDead = deadEnemies.includes(idx);
-                          return (
-                          <div 
-                            key={idx} 
-                            onClick={() => handleKillEnemy(idx)}
-                            className={`group relative bg-black/60 border border-white/10 p-8 rounded-2xl transition-all duration-300 select-none overflow-hidden ${isDead ? 'animate-shot pointer-events-none' : 'hover:bg-white/5 hover:border-white/40 cursor-[url(https://cdn.custom-cursor.com/db/cursor/32/Crosshair.png),_crosshair]'}`}
-                          >
-                              {isDead && (
-                                  <>
-                                    <div className="muzzle-overlay" />
-                                    <div className="absolute inset-0 flex items-center justify-center z-20">
-                                        <span className="text-red-500 font-black text-4xl -rotate-12 border-4 border-red-500 px-4 py-2 rounded-lg opacity-80">ELIMINADO</span>
-                                    </div>
-                                  </>
-                              )}
-
-                              <div className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-1 rounded bg-white/10 text-white border border-white/20`}>
-                                  {enemy.lvl}
-                              </div>
-                              <div className={`mb-6 text-white group-hover:scale-110 transition-transform duration-300`}>
-                                  {enemy.icon}
-                              </div>
-                              <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-zinc-200 transition-colors">{enemy.title}</h3>
-                              <p className="text-zinc-500 text-sm group-hover:text-zinc-400">{enemy.desc}</p>
-                              <div className="mt-6 w-12 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                  <div className={`h-full bg-white w-[90%] shadow-[0_0_10px_white]`}></div>
-                              </div>
+                      {['Procrastinação', 'Ansiedade', 'Confusão'].map((e, i) => (
+                          <div key={i} onClick={() => handleKillEnemy(i)} className={`group bg-black/60 border border-white/10 p-10 rounded-3xl transition-all ${deadEnemies.includes(i) ? 'animate-shot pointer-events-none' : 'hover:border-white/40'}`}>
+                              <h3 className="text-2xl font-bold text-white mb-2">{e}</h3>
+                              <div className="w-12 h-1 bg-zinc-800 mt-4"><div className="h-full bg-white w-[80%]"></div></div>
                           </div>
-                      )})}
+                      ))}
                   </div>
-
-                  <div className="text-center">
-                      <button 
-                        onClick={() => scrollToSection(vslRef)}
-                        className="px-10 py-4 bg-white text-black font-black text-xl rounded-xl shadow-[0_0_40px_rgba(255,255,255,0.2)] hover:scale-105 transition-all flex items-center gap-3 mx-auto uppercase tracking-wide hover:bg-zinc-200"
-                      >
-                          <Swords size={24} />
-                          Enfrentar Agora
-                      </button>
-                  </div>
+                  <button onClick={() => scrollToSection(vslRef)} className="px-10 py-5 bg-white text-black font-black text-xl rounded-2xl flex items-center gap-3 mx-auto hover:scale-105 transition-all">ASSISTIR ARMA SECRETA</button>
               </div>
           </section>
 
-          {/* === TELA 3: VSL === */}
-          <section ref={vslRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/30 backdrop-blur-md">
+          <section ref={vslRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20">
               <div className="max-w-5xl w-full">
-                  <div className="bg-black/80 rounded-3xl border border-white/20 shadow-[0_0_100px_rgba(255,255,255,0.05)] backdrop-blur-xl relative overflow-hidden">
-                      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-zinc-900/50">
-                          <div className="flex gap-1.5">
-                              <div className="w-3 h-3 rounded-full bg-zinc-600" />
-                              <div className="w-3 h-3 rounded-full bg-zinc-600" />
-                              <div className="w-3 h-3 rounded-full bg-zinc-600" />
-                          </div>
-                          <div className="flex-1 text-center text-xs font-mono text-zinc-500">SECRET_WEAPON_FILE.mp4</div>
+                  <div className="bg-zinc-900/80 rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                      <div className="aspect-video bg-black relative">
+                          <video src="/video.mp4" className="w-full h-full object-cover" controls poster="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=2000" />
                       </div>
-
-                      <div className="relative aspect-video bg-black rounded-none overflow-hidden group">
-                          <video 
-                            src="/video.mp4" 
-                            className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" 
-                            controls 
-                            controlsList="nodownload"
-                            poster="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=2000&auto=format&fit=crop"
-                          >
-                              Seu navegador não suporta vídeos.
-                          </video>
-                      </div>
-
-                      <div className="bg-black p-4 border-t border-white/10">
-                          <FakeProgressBar 
-                            onHalfTime={() => setShowEarlyOffer(true)} 
-                            onFinish={() => setShowFinalOffer(true)} 
-                          />
+                      <div className="p-6 bg-black">
+                          <FakeProgressBar onHalfTime={() => setShowEarlyOffer(true)} onFinish={() => setShowFinalOffer(true)} />
                       </div>
                   </div>
-
-                  <div className="mt-10 text-center h-24 relative flex flex-col items-center justify-center">
-                      {showFinalOffer ? (
-                          <div className="animate-in zoom-in-50 duration-500 w-full">
-                              <button 
-                                onClick={handleRevealOffer}
-                                className="w-full md:w-auto px-12 py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-2xl rounded-xl shadow-[0_0_60px_rgba(16,185,129,0.4)] hover:scale-105 transition-all animate-pulse-slow flex items-center justify-center gap-3 mx-auto uppercase tracking-widest border border-emerald-400/50"
-                              >
-                                  <Rocket size={28} className="fill-white" />
-                                  LIBERAR ACESSO AGORA
-                              </button>
-                              <p className="text-xs text-zinc-500 mt-3 font-mono">O vídeo acabou. Sua oportunidade começou.</p>
-                          </div>
-                      ) : showEarlyOffer && (
-                          <button 
-                            onClick={handleRevealOffer}
-                            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-6 py-3 rounded-lg text-sm font-bold animate-in fade-in transition-all flex items-center gap-2 border border-white/10 hover:border-white/30"
-                          >
-                              <Eye size={16} /> Espiar Oferta
-                          </button>
+                  <div className="mt-10 text-center">
+                      {(showFinalOffer || showEarlyOffer) && (
+                          <button onClick={handleRevealOffer} className="px-12 py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-2xl rounded-2xl shadow-2xl animate-bounce-slow">REVELAR OFERTA</button>
                       )}
                   </div>
               </div>
           </section>
 
-          {/* === TELA 4: CHECKOUT / PREÇOS === */}
-          <section ref={pricingRef} className="min-h-screen w-full flex flex-col items-center justify-center relative px-6 py-20 bg-black/40 backdrop-blur-lg">
-              {showPricingSection ? (
-              <div className="max-w-6xl w-full relative animate-in slide-in-from-bottom-8 duration-700">
-                  
-                  <div className="text-center mb-12">
-                      <div className="inline-block mb-4">
-                          <span className="bg-white/5 text-white border border-white/20 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 backdrop-blur-md">
-                              <Sparkles size={14} /> Turma 2025 Confirmada
-                          </span>
-                      </div>
-                      <h2 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight">INVESTIMENTO NA SUA APROVAÇÃO</h2>
-                      <p className="text-zinc-400 max-w-xl mx-auto text-lg">Escolha como você quer jogar esse jogo: no modo difícil (sozinho) ou com as melhores armas.</p>
-                      
-                      <div className="flex items-center justify-center gap-4 mt-10">
-                          <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-zinc-500'}`}>Mensal</span>
-                          <button 
-                            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-                            className="w-16 h-8 bg-zinc-900 rounded-full relative p-1 transition-colors border border-white/20 cursor-pointer"
-                          >
-                              <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform ${billingCycle === 'yearly' ? 'translate-x-8' : 'translate-x-0'}`} />
-                          </button>
-                          <span className={`text-sm font-bold ${billingCycle === 'yearly' ? 'text-white' : 'text-zinc-500'}`}>
-                              Anual <span className="text-emerald-400 text-[10px] ml-1 uppercase border border-emerald-500/30 px-1 rounded bg-emerald-500/10">(2 meses grátis)</span>
-                          </span>
-                      </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-center">
-                      
-                      {/* PLANO BÁSICO - Escuro e Discreto */}
-                      <div 
-                        onClick={() => setSelectedPlan('basic')}
-                        className={`bg-black/40 border p-8 rounded-3xl relative transition-all cursor-pointer group backdrop-blur-md ${selectedPlan === 'basic' ? 'border-zinc-500 opacity-100 scale-95' : 'border-white/5 hover:border-zinc-700 opacity-60 hover:opacity-80 scale-95'}`}
-                      >
-                          <div className="flex justify-between items-start">
-                              <div>
-                                  <h3 className="text-xl font-bold text-zinc-400">Modo Sobrevivência</h3>
-                                  <p className="text-zinc-600 text-xs mb-6">Apenas o conteúdo bruto.</p>
-                              </div>
-                          </div>
-                          
-                          {getPriceDisplay('basic')}
-
-                          <ul className="space-y-4 mb-8 text-zinc-400 text-sm">
-                              <li className="flex gap-2"><CheckCircle size={16} className="text-zinc-600" /> Acesso às Aulas Gravadas</li>
-                              <li className="flex gap-2"><CheckCircle size={16} className="text-zinc-600" /> Banco de Questões</li>
-                              <li className="flex gap-2 text-zinc-700 line-through decoration-zinc-700"><X size={16} /> Sem NeuroTutor IA</li>
-                              <li className="flex gap-2 text-zinc-700 line-through decoration-zinc-700"><X size={16} /> Sem Redação IA</li>
-                              <li className="flex gap-2 text-zinc-700 line-through decoration-zinc-700"><X size={16} /> Sem Simulados Exclusivos</li>
-                          </ul>
-
-                          {selectedPlan === 'basic' && (
-                              <div className="grid grid-cols-2 gap-3 animate-in fade-in">
-                                  <button onClick={() => handleCheckout('basic', 'pix')} className="bg-zinc-800 hover:bg-zinc-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm border border-white/5"><QrCode size={16}/> PIX</button>
-                                  <button onClick={() => handleCheckout('basic', 'card')} className="bg-zinc-800 hover:bg-zinc-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-sm border border-white/5"><CreditCard size={16}/> Cartão</button>
-                              </div>
-                          )}
-                      </div>
-
-                      {/* PLANO AVANÇADO - Branco/Preto Alto Contraste */}
-                      <div 
-                        onClick={() => setSelectedPlan('advanced')}
-                        className={`bg-black/80 border p-8 rounded-3xl relative transition-all cursor-pointer transform hover:-translate-y-2 shadow-2xl backdrop-blur-xl ${selectedPlan === 'advanced' ? 'border-white shadow-[0_0_50px_rgba(255,255,255,0.1)] ring-1 ring-white/50 scale-105 z-10' : 'border-zinc-700 opacity-90'}`}
-                      >
-                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg flex items-center gap-2 whitespace-nowrap border border-zinc-200">
-                              <Star size={12} className="fill-black" /> Recomendado por 94%
-                          </div>
-
-                          <h3 className="text-2xl font-black text-white flex items-center gap-2 mt-2">
-                              <Trophy size={24} className="text-white fill-white/20" /> MODO APROVAÇÃO
-                          </h3>
-                          <p className="text-zinc-300 text-xs mb-6 font-bold uppercase tracking-wide">Ecossistema Completo</p>
-                          
-                          {getPriceDisplay('advanced')}
-
-                          <ul className="space-y-3 mb-8 text-white text-sm font-medium">
-                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-white fill-white/20" /> Tudo do Básico</li>
-                              <li className="flex gap-2 items-center"><BrainCircuit size={18} className="text-white fill-white/20" /> NeuroTutor IA (Tire dúvidas 24h)</li>
-                              <li className="flex gap-2 items-center"><CheckCircle size={18} className="text-white fill-white/20" /> Correção de Redação Instantânea</li>
-                              {/* NEW ITEMS */}
-                              <li className="flex gap-2 items-center"><Trophy size={18} className="text-white fill-white/20" /> Sistema de Gamificação com XP</li>
-                              <li className="flex gap-2 items-center"><Swords size={18} className="text-white fill-white/20" /> Ranking Competitivo com Alunos</li>
-                              
-                              <li className="flex gap-2 items-center"><Shield size={18} className="text-white fill-white/20" /> Acesso à Comunidade VIP</li>
-                          </ul>
-
-                          {selectedPlan === 'advanced' && (
-                              <div className="grid grid-cols-2 gap-3 animate-in fade-in">
-                                  <button onClick={() => handleCheckout('advanced', 'pix')} className="bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"><QrCode size={18}/> PIX</button>
-                                  <button onClick={() => handleCheckout('advanced', 'card')} className="bg-white hover:bg-zinc-200 text-black py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg"><CreditCard size={18}/> Cartão</button>
-                              </div>
-                          )}
-                          
-                          <div className="mt-4 text-center">
-                              <p className="text-[10px] text-zinc-500 flex items-center justify-center gap-1">
-                                  <Shield size={10} /> Garantia incondicional de 7 dias.
-                              </p>
+          <section ref={pricingRef} className="min-h-screen w-full flex flex-col items-center justify-center px-6 py-20">
+              {showPricingSection && (
+                  <div className="max-w-4xl w-full animate-in slide-in-from-bottom-8">
+                      <div className="text-center mb-16">
+                          <h2 className="text-5xl font-black mb-4">ESCOLHA SEU PLANO</h2>
+                          <div className="flex items-center justify-center gap-4 mt-8">
+                              <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-zinc-600'}`}>Mensal</span>
+                              <button onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')} className="w-14 h-7 bg-zinc-800 rounded-full relative p-1"><div className={`w-5 h-5 bg-white rounded-full transition-all ${billingCycle === 'yearly' ? 'translate-x-7' : ''}`} /></button>
+                              <span className={`text-sm font-bold ${billingCycle === 'yearly' ? 'text-white' : 'text-zinc-600'}`}>Anual (-20%)</span>
                           </div>
                       </div>
-                  </div>
-                  
-              </div>
-              ) : (
-                  <div className="h-64 flex flex-col items-center justify-center">
-                      <p className="text-zinc-500 animate-pulse text-sm">Assista ao vídeo para desbloquear as ofertas...</p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          {['basic', 'advanced'].map(p => (
+                              <div key={p} onClick={() => setSelectedPlan(p as any)} className={`p-10 rounded-[3rem] border-2 cursor-pointer transition-all ${selectedPlan === p ? 'border-white bg-zinc-900 scale-105' : 'border-zinc-800 opacity-50'}`}>
+                                  <h3 className="text-2xl font-black uppercase italic mb-4">{p === 'basic' ? 'Soldado' : 'Elite'}</h3>
+                                  {getPriceDisplay(p as any)}
+                                  <ul className="space-y-3 mb-10 text-sm text-zinc-400">
+                                      <li className="flex gap-2"><Check size={16} className="text-emerald-500"/> Aulas Completas</li>
+                                      <li className="flex gap-2"><Check size={16} className="text-emerald-500"/> Banco de Questões</li>
+                                      {p === 'advanced' && (
+                                          <>
+                                            <li className="flex gap-2 text-white font-bold"><BrainCircuit size={16} className="text-indigo-400"/> NeuroTutor IA Ilimitado</li>
+                                            <li className="flex gap-2 text-white font-bold"><PenTool size={16} className="text-indigo-400"/> Correção de Redação</li>
+                                          </>
+                                      )}
+                                  </ul>
+                                  {selectedPlan === p && (
+                                      <div className="grid grid-cols-1 gap-3">
+                                          <button onClick={() => handleCheckout(p as any, 'pix')} className="bg-emerald-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-500 transition-all">Pagar via PIX</button>
+                                          <button onClick={() => handleCheckout(p as any, 'card')} className="bg-white text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-zinc-200 transition-all">Pagar via Cartão</button>
+                                      </div>
+                                  )}
+                              </div>
+                          ))}
+                      </div>
                   </div>
               )}
           </section>
-
       </div>
 
-      {/* --- MODAL PIX COM CADASTRO E ANTI-FRAUDE --- */}
+      {/* MODAL PIX ANUAL */}
       {showPixModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl animate-in fade-in p-4 overflow-y-auto">
-              <div className="bg-zinc-900 border border-white/10 p-6 md:p-8 rounded-3xl max-w-2xl w-full text-center relative shadow-2xl my-auto">
-                  <button onClick={() => setShowPixModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white bg-white/5 p-2 rounded-full"><X size={20}/></button>
-                  
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/98 p-4">
+              <div className="bg-zinc-900 border border-white/10 p-8 rounded-[3rem] max-w-2xl w-full flex flex-col md:flex-row gap-8 relative shadow-3xl">
+                  <button onClick={() => setShowPixModal(false)} className="absolute top-6 right-6 text-zinc-500 hover:text-white"><X /></button>
                   {submitSuccess ? (
-                      <div className="py-12 animate-in zoom-in-50">
-                          <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(16,185,129,0.3)]">
-                              <Check size={48} className="text-white"/>
-                          </div>
-                          <h3 className="text-3xl font-bold text-white mb-2">Recebido!</h3>
-                          <p className="text-zinc-400">Seus dados foram enviados. Aguarde a aprovação do seu acesso no email.</p>
-                      </div>
+                      <div className="w-full py-10 text-center animate-in zoom-in-50"><div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6"><Check size={40}/></div><h3 className="text-3xl font-black">SOLICITADO!</h3><p className="text-zinc-500">Aguarde a liberação por e-mail.</p></div>
                   ) : (
-                      <div className="flex flex-col md:flex-row gap-8 text-left">
-                          
-                          {/* Left: Form */}
-                          <div className="flex-1 space-y-4">
-                              <div className="mb-4">
-                                  <h3 className="text-xl font-bold text-white">Finalizar Inscrição</h3>
-                                  <p className="text-zinc-400 text-sm">Crie seu acesso antes de confirmar.</p>
-                              </div>
-
-                              <div>
-                                  <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Nome Completo</label>
-                                  <input 
-                                    className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-white outline-none"
-                                    placeholder="Seu nome"
-                                    value={checkoutForm.fullName}
-                                    onChange={e => setCheckoutForm({...checkoutForm, fullName: e.target.value})}
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Email de Acesso</label>
-                                  <input 
-                                    className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-white outline-none"
-                                    placeholder="seu@email.com"
-                                    value={checkoutForm.email}
-                                    onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})}
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Senha Desejada</label>
-                                  <input 
-                                    type="password"
-                                    className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-white outline-none"
-                                    placeholder="••••••••"
-                                    value={checkoutForm.password}
-                                    onChange={e => setCheckoutForm({...checkoutForm, password: e.target.value})}
-                                  />
-                              </div>
-                              
-                              <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-xl">
-                                  <label className="text-xs font-bold text-emerald-400 uppercase ml-1 flex items-center gap-2"><CreditCard size={12}/> Comprovante</label>
-                                  <p className="text-[10px] text-zinc-400 mb-2">Para liberar seu acesso, precisamos confirmar quem fez o pagamento.</p>
-                                  <input 
-                                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 outline-none"
-                                    placeholder="Nome de quem fez o PIX (Pagador)"
-                                    value={checkoutForm.payerName}
-                                    onChange={e => setCheckoutForm({...checkoutForm, payerName: e.target.value})}
-                                  />
-                              </div>
-                          </div>
-
-                          {/* Right: QR Code & Action */}
-                          <div className="flex-1 flex flex-col items-center justify-center bg-zinc-800/30 rounded-2xl p-6 border border-white/5">
-                              <p className="text-emerald-400 font-bold text-2xl mb-4">R$ {pixAmount.toFixed(2)}</p>
-                              
-                              <div className="bg-white p-3 rounded-2xl inline-block mb-4 shadow-lg">
-                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-40 h-40 mix-blend-multiply" />
-                              </div>
-                              
-                              <div className="flex gap-2 w-full mb-6">
-                                  <input readOnly value={pixPayload || ''} className="flex-1 bg-black border border-zinc-700 rounded-xl px-3 text-[10px] text-zinc-400 truncate font-mono" />
-                                  <button onClick={() => navigator.clipboard.writeText(pixPayload || '')} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white"><Copy size={16}/></button>
-                              </div>
-
-                              {submitError && (
-                                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-200 text-xs font-bold flex items-center gap-2 animate-pulse">
-                                      <AlertTriangle size={16} /> {submitError}
-                                  </div>
-                              )}
-                              
-                              <button 
-                                onClick={handleConfirmPix}
-                                disabled={pixCooldown > 0}
-                                className={`w-full py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all ${pixCooldown > 0 ? 'bg-zinc-700 text-zinc-400 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
-                              >
-                                  {pixCooldown > 0 ? (
-                                      <><Loader2 className="animate-spin" size={18} /> Verificando ({pixCooldown}s)</>
-                                  ) : (
-                                      <><CheckCircle size={20} /> Já realizei o pagamento</>
-                                  )}
-                              </button>
-                              <p className="text-[10px] text-zinc-500 mt-3 text-center">
-                                  Atenção: Clicar sem pagar pode bloquear seu CPF no sistema.
-                              </p>
-                          </div>
-                      </div>
+                      <>
+                        <div className="flex-1 space-y-4">
+                            <h3 className="text-2xl font-black uppercase italic italic tracking-tighter">Inscrição de Elite</h3>
+                            <input className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-sm" placeholder="Nome Completo" value={checkoutForm.fullName} onChange={e => setCheckoutForm({...checkoutForm, fullName: e.target.value})} />
+                            <input className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-sm" placeholder="E-mail" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} />
+                            <input className="w-full bg-black border border-zinc-800 rounded-2xl p-4 text-sm" placeholder="Defina uma Senha" type="password" value={checkoutForm.password} onChange={e => setCheckoutForm({...checkoutForm, password: e.target.value})} />
+                            <div className="p-4 bg-emerald-900/10 border border-emerald-500/20 rounded-2xl">
+                                <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Nome do Pagador (Conferência)</label>
+                                <input className="w-full bg-zinc-900 border-none rounded-xl p-3 text-xs mt-2" placeholder="Nome no Comprovante" value={checkoutForm.payerName} onChange={e => setCheckoutForm({...checkoutForm, payerName: e.target.value})} />
+                            </div>
+                        </div>
+                        <div className="flex-1 flex flex-col items-center justify-center bg-zinc-800/30 rounded-3xl p-6 border border-white/5">
+                            <p className="text-emerald-400 font-black text-3xl mb-6 italic">R$ {pixAmount.toFixed(2)}</p>
+                            <div className="bg-white p-3 rounded-2xl mb-6 shadow-xl"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(pixPayload || '')}`} className="w-32 h-32 mix-blend-multiply" /></div>
+                            <button onClick={() => navigator.clipboard.writeText(pixPayload || '')} className="text-zinc-500 text-[10px] uppercase font-black hover:text-white mb-6 flex items-center gap-2"><Copy size={12}/> Copiar Código</button>
+                            {submitError && <p className="text-red-400 text-[10px] font-bold mb-4 animate-pulse uppercase">{submitError}</p>}
+                            <button onClick={handleConfirmPix} className="w-full py-5 bg-emerald-600 rounded-2xl font-black text-xs shadow-xl hover:bg-emerald-500 transition-all flex items-center justify-center gap-2">
+                                {pixCooldown > 0 ? <Loader2 className="animate-spin" /> : <CheckCircle size={18}/>} JÁ FIZ O PAGAMENTO
+                            </button>
+                        </div>
+                      </>
                   )}
               </div>
           </div>
       )}
-
     </div>
   );
 };
