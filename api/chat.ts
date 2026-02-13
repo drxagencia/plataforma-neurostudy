@@ -10,32 +10,51 @@ const firebaseConfig = {
   projectId: "neurostudy-d8a00",
 };
 
-// Inicialização do Firebase
+// Inicialização do Firebase (Singleton para Serverless)
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Inicialização da OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.API_KEY,
-});
-
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+  // CORS Headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  // Verificar Chave de API
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.error("ERRO CRÍTICO: Variável de ambiente API_KEY não configurada no Vercel.");
+    return res.status(500).json({ error: "Configuração de servidor incompleta (API_KEY missing)." });
+  }
+
+  const openai = new OpenAI({ apiKey });
 
   try {
     const { message, history, mode, uid, image, systemOverride } = req.body;
+    
     if (!uid) return res.status(401).json({ error: 'User ID required' });
 
     const userRef = ref(db, `users/${uid}`);
     const userSnap = await get(userRef);
     const user = userSnap.val();
 
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado no banco de dados.' });
 
-    // --- LÓGICA DE CORREÇÃO DE REDAÇÃO ---
+    // --- LÓGICA DE CORREÇÃO DE REDAÇÃO (VISION) ---
     if (mode === 'essay-correction') {
       const credits = user.essayCredits || 0;
-      if (credits <= 0) return res.status(402).json({ error: 'Sem créditos de redação.' });
+      if (credits <= 0) return res.status(402).json({ error: 'Sem créditos de redação disponíveis.' });
+
+      if (!image) return res.status(400).json({ error: 'Imagem da redação é obrigatória para este modo.' });
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -51,20 +70,18 @@ export default async function handler(req: any, res: any) {
               {
                 type: "image_url",
                 image_url: {
-                  url: image, // A imagem já vem como base64 data URL do frontend
+                  url: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`,
                 },
               },
             ],
           },
         ],
         response_format: { type: "json_object" },
+        max_tokens: 2000,
       });
 
       const resultText = response.choices[0].message.content || "{}";
-      
-      // Registrar custo operacional da API (Estimativa para GPT-4o-mini)
-      const apiCost = 0.15; // R$ 0.15 por correção visão
-      await DatabaseService_LogApiCost(uid, "Correção Redação IA", apiCost);
+      await DatabaseService_LogApiCost(uid, "Correção Redação IA", 0.15);
 
       return res.status(200).json({ text: resultText });
     }
@@ -72,11 +89,10 @@ export default async function handler(req: any, res: any) {
     // --- LÓGICA DE CHAT / EXPLICAÇÃO ---
     const systemInstruction = systemOverride || "Você é a NeuroAI, uma tutora de elite focada em aprovação no ENEM e vestibulares militares. Seja didática, use Markdown e emojis.";
     
-    // Preparar mensagens para a OpenAI
     const messages: any[] = [{ role: "system", content: systemInstruction }];
     
     if (history && history.length > 0) {
-      history.forEach((h: any) => {
+      history.slice(-10).forEach((h: any) => { // Pegar apenas as últimas 10 para economizar tokens
         messages.push({
           role: h.role === 'ai' ? 'assistant' : 'user',
           content: h.content
@@ -90,22 +106,21 @@ export default async function handler(req: any, res: any) {
       model: "gpt-4o-mini",
       messages,
       temperature: 0.7,
+      max_tokens: 1500,
     });
 
     const aiText = completion.choices[0].message.content;
 
-    // Cálculo de débito do usuário (Regras do app: R$ 0.01 por msg no Pro, R$ 0.02 no Basic)
+    // Débito do usuário
     const isBasic = user.plan === 'basic';
     const cost = isBasic ? 0.02 : 0.01;
     
     if (user.balance < cost) {
-        return res.status(402).json({ error: 'Saldo insuficiente para a IA.' });
+        return res.status(402).json({ error: 'Saldo insuficiente para processar a dúvida com IA.' });
     }
 
-    // Atualizar saldo do usuário
+    // Atualizar saldo e logar
     await update(userRef, { balance: Math.max(0, (user.balance || 0) - cost) });
-
-    // Registrar transação de débito
     const transRef = push(ref(db, `user_transactions/${uid}`));
     await set(transRef, {
         id: transRef.key,
@@ -116,19 +131,19 @@ export default async function handler(req: any, res: any) {
         timestamp: Date.now()
     });
 
-    // Registrar Custo Operacional Real da API para o Admin (Estimativa gpt-4o-mini)
-    const realApiCost = 0.002; // R$ 0.002 por mensagem média
-    await DatabaseService_LogApiCost(uid, "Uso API Chat", realApiCost);
+    await DatabaseService_LogApiCost(uid, "Uso API Chat", 0.002);
     
     return res.status(200).json({ text: aiText });
 
   } catch (error: any) {
-    console.error("OpenAI Error:", error);
-    return res.status(500).json({ error: error.message || "Erro interno no servidor de IA." });
+    console.error("ERRO OPENAI:", error?.response?.data || error.message);
+    return res.status(500).json({ 
+      error: "Falha na comunicação com a inteligência artificial.",
+      details: error.message 
+    });
   }
 }
 
-// Helper interno para logar custos de API no financeiro global
 async function DatabaseService_LogApiCost(uid: string, desc: string, amount: number) {
     try {
         const costRef = push(ref(db, 'operational_costs'));
