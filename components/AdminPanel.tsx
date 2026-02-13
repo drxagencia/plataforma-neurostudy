@@ -1,347 +1,272 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Lead, RechargeRequest, UserPlan, Subject, Lesson, Simulation } from '../types';
+import { UserProfile, Lead, RechargeRequest, UserPlan, Subject, Lesson, Simulation, Question } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Search, CheckCircle, XCircle, Loader2, Eye, EyeOff, X, Smartphone, Calendar, CreditCard, DollarSign, Edit, Send, UserCheck, BookOpen, Layers, PlayCircle, Plus, Trash2, ChevronRight, Save } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Loader2, Eye, EyeOff, X, Smartphone, Calendar, CreditCard, DollarSign, Edit, Send, UserCheck, BookOpen, Layers, PlayCircle, Plus, Trash2, ChevronRight, Save, FileQuestion, GraduationCap, ArrowLeft, Image as ImageIcon, Sparkles } from 'lucide-react';
+
+type ContentSection = 'lms' | 'questions' | 'simulations';
 
 const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'leads' | 'users' | 'finance' | 'content'>('leads');
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [recharges, setRecharges] = useState<RechargeRequest[]>([]);
+  const [contentSection, setContentSection] = useState<ContentSection>('lms');
   const [loading, setLoading] = useState(false);
-  const [showPassMap, setShowPassMap] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Modais
-  const [showAccessModal, setShowAccessModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  
-  // Form de Criação (Leads)
-  const [targetLead, setTargetLead] = useState<Lead | null>(null); 
-  const [accessForm, setAccessForm] = useState({ displayName: '', email: '', password: '', plan: 'basic' as UserPlan, essayCredits: 0, expiryDate: '' });
-  
-  // Form de Edição (Users)
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
 
-  // --- LMS STATE ---
+  // LMS State
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const [lessonsByTopic, setLessonsByTopic] = useState<Record<string, Lesson[]>>({});
-  const [simulations, setSimulations] = useState<Simulation[]>([]);
+  const [selectedSub, setSelectedSub] = useState<Subject | null>(null);
+  const [lessonsMap, setLessonsMap] = useState<Record<string, Lesson[]>>({});
   const [showLessonModal, setShowLessonModal] = useState(false);
-  const [lessonForm, setLessonForm] = useState<Partial<Lesson>>({ type: 'video', title: '', videoUrl: '', duration: '' });
+  const [lessonForm, setLessonForm] = useState<Partial<Lesson>>({ type: 'video', title: '' });
   const [targetTopic, setTargetTopic] = useState('');
+
+  // Questions State
+  const [allTopics, setAllTopics] = useState<Record<string, string[]>>({});
+  const [showQuestionModal, setShowQuestionModal] = useState(false);
+  // Fix: category is now a known property of Question interface
+  const [questionForm, setQuestionForm] = useState<Partial<Question>>({
+      text: '', options: ['', '', '', '', ''], correctAnswer: 0, difficulty: 'easy', category: 'regular'
+  });
+  const [qTarget, setQTarget] = useState({ subject: '', topic: '', subtopic: '' });
+
+  // Simulation State
+  const [simulations, setSimulations] = useState<Simulation[]>([]);
 
   useEffect(() => { fetchData(); }, [activeTab]);
 
   const fetchData = async () => {
       setLoading(true);
       try {
-        if (activeTab === 'users') {
-            const u = await DatabaseService.getUsersPaginated(500);
-            setUsers(u.filter(x => x.uid && x.uid !== 'placeholder').reverse());
-        }
-        if (activeTab === 'leads') {
-            const l = await DatabaseService.getLeads();
-            setLeads(l.filter(x => !x.processed).reverse());
-        }
-        if (activeTab === 'finance') {
-            const r = await DatabaseService.getRechargeRequests();
-            setRecharges(r.reverse());
-        }
         if (activeTab === 'content') {
-            const s = await DatabaseService.getSubjects();
-            const sims = await DatabaseService.getSimulations();
-            setSubjects(s);
+            const [subs, tops, sims] = await Promise.all([
+                DatabaseService.getSubjects(),
+                DatabaseService.getTopics(),
+                DatabaseService.getSimulations()
+            ]);
+            setSubjects(subs);
+            setAllTopics(tops);
             setSimulations(sims);
         }
-      } catch (e) {
-          console.error("Fetch Error:", e);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  // --- CONTENT HANDLERS ---
-  const handleSelectSubject = async (s: Subject) => {
-      setSelectedSubject(s);
-      const data = await DatabaseService.getLessonsByTopic(s.id);
-      setLessonsByTopic(data);
-  };
-
-  const handleSaveLesson = async () => {
-      if (!selectedSubject || !targetTopic || !lessonForm.title) return;
+  // --- LMS HANDLERS ---
+  const handleOpenSubject = async (s: Subject) => {
+      setSelectedSub(s);
       setLoading(true);
-      const id = lessonForm.id || `l_${Date.now()}`;
-      await DatabaseService.saveLesson(selectedSubject.id, targetTopic, id, { ...lessonForm, id } as Lesson);
-      
-      const updated = await DatabaseService.getLessonsByTopic(selectedSubject.id);
-      setLessonsByTopic(updated);
-      setShowLessonModal(false);
-      setLessonForm({ type: 'video', title: '', videoUrl: '', duration: '' });
+      const data = await DatabaseService.getLessonsByTopic(s.id);
+      setLessonsMap(data);
       setLoading(false);
   };
 
-  const handleDeleteLesson = async (topic: string, lessonId: string) => {
-      if (!selectedSubject || !confirm("Excluir aula?")) return;
-      await DatabaseService.deleteLesson(selectedSubject.id, topic, lessonId);
-      const updated = await DatabaseService.getLessonsByTopic(selectedSubject.id);
-      setLessonsByTopic(updated);
+  const handleSaveLesson = async () => {
+      if (!selectedSub || !targetTopic || !lessonForm.title) return;
+      const id = lessonForm.id || `l_${Date.now()}`;
+      await DatabaseService.saveLesson(selectedSub.id, targetTopic, id, { ...lessonForm, id } as Lesson);
+      handleOpenSubject(selectedSub);
+      setShowLessonModal(false);
   };
 
-  const calculateDaysRemaining = (expiryStr?: string) => {
-      if (!expiryStr) return 0;
-      const diff = new Date(expiryStr).getTime() - new Date().getTime();
-      return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
-
-  const getUserWelcomeLink = (u: UserProfile) => {
-      const msg = `Olá ${u.displayName}! ✨ Seu cadastro na NeuroStudy AI foi concluído com sucesso.\n\nAcesse agora: https://neurostudy.com.br\n📧 Email: ${u.email}\n\nSe precisar de ajuda, é só chamar! 🚀`;
-      return `https://wa.me/55${u.whatsapp?.replace(/\D/g, '') || ''}?text=${encodeURIComponent(msg)}`;
-  };
-
-  const handleOpenAccessModal = (lead: Lead) => {
-      const expiry = new Date(); expiry.setDate(expiry.getDate() + 30);
-      setTargetLead(lead);
-      setAccessForm({ 
-          displayName: lead.name, 
-          email: lead.contact, 
-          password: lead.password || 'aluno123', 
-          plan: lead.planId.toLowerCase().includes('adv') ? 'advanced' : 'basic', 
-          essayCredits: 0, 
-          expiryDate: expiry.toISOString().split('T')[0] 
-      });
-      setShowAccessModal(true);
-  };
-
-  const handleOpenEditModal = (u: UserProfile) => {
-      setEditingUser(u);
-      setShowEditModal(true);
-  };
-
-  const handleSubmitAccess = async () => {
-      if (!targetLead) return;
-      setLoading(true);
-      try {
-          const uid = await AuthService.registerStudent(accessForm.email, accessForm.password, accessForm.displayName);
-          await DatabaseService.createUserProfile(uid, {
-              ...accessForm,
-              uid,
-              totalSpent: targetLead.amount,
-              billingCycle: targetLead.billing,
-              subscriptionExpiry: accessForm.expiryDate,
-              essayCredits: 0,
-              aiUnlimitedExpiry: undefined,
-              firstTimeSetupDone: false
-          });
-          await DatabaseService.markLeadProcessed(targetLead.id);
-          setShowAccessModal(false);
-          fetchData();
-      } catch (e: any) { alert(e.message); } finally { setLoading(false); }
-  };
-
-  const handleSaveUserEdit = async () => {
-      if (!editingUser) return;
-      setLoading(true);
-      try {
-          await DatabaseService.saveUserProfile(editingUser.uid, editingUser);
-          setShowEditModal(false);
-          fetchData();
-      } catch (e: any) { alert(e.message); } finally { setLoading(false); }
+  // --- QUESTIONS HANDLERS ---
+  const handleSaveQuestion = async () => {
+      if (!qTarget.subject || !qTarget.topic || !qTarget.subtopic) {
+          alert("Preencha todos os campos de localização da questão.");
+          return;
+      }
+      const qid = questionForm.id || `q_${Date.now()}`;
+      const data = { ...questionForm, id: qid, subjectId: qTarget.subject, topic: qTarget.topic, subtopic: qTarget.subtopic } as Question;
+      // Fix: category is now a property of Question, making it accessible on Partial<Question>
+      await DatabaseService.saveQuestion(questionForm.category || 'regular', qTarget.subject, qTarget.topic, qTarget.subtopic, qid, data);
+      alert("Questão salva com sucesso!");
+      setShowQuestionModal(false);
   };
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in">
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-end gap-4">
           <div>
-              <h2 className="text-3xl font-bold text-white mb-2 tracking-tight font-display">Controle de Operação</h2>
-              <p className="text-slate-400">Gestão avançada de faturamento e acesso.</p>
+              <h2 className="text-3xl font-black text-white italic tracking-tighter">CENTRAL DE COMANDO</h2>
+              <p className="text-slate-400 text-sm">Gestão operacional da NeuroStudy AI.</p>
           </div>
-          <div className="flex gap-2 bg-slate-900 p-1 rounded-xl border border-white/10">
+          <div className="flex bg-slate-900 p-1 rounded-xl border border-white/10">
               {['leads', 'users', 'finance', 'content'].map(tab => (
-                  <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-all ${activeTab === tab ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
-                      {tab === 'content' ? 'Conteúdo' : tab}
+                  <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === tab ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>
+                      {tab}
                   </button>
               ))}
           </div>
       </div>
 
-      {activeTab !== 'content' && (
-          <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input className="w-full bg-slate-900 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:border-indigo-500 outline-none" placeholder="Pesquisar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-          </div>
-      )}
-
-      {/* --- ABA CONTEÚDO (LMS) --- */}
+      {/* --- ABA CONTEÚDO (REDESENHADA) --- */}
       {activeTab === 'content' && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in slide-in-from-right duration-500">
-              {/* Sidebar: Matérias */}
-              <div className="lg:col-span-1 space-y-4">
-                  <div className="glass-card p-4 rounded-2xl">
-                      <h3 className="text-white font-bold mb-4 flex items-center gap-2"><BookOpen size={18}/> Disciplinas</h3>
-                      <div className="space-y-2">
-                          {subjects.map(s => (
-                              <button 
-                                key={s.id} 
-                                onClick={() => handleSelectSubject(s)}
-                                className={`w-full p-3 rounded-xl flex items-center justify-between transition-all text-sm font-bold ${selectedSubject?.id === s.id ? 'bg-indigo-600 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
-                              >
-                                  {s.name}
-                                  <ChevronRight size={14} />
-                              </button>
-                          ))}
-                      </div>
-                  </div>
-                  
-                  <div className="glass-card p-4 rounded-2xl bg-indigo-900/10 border-indigo-500/20">
-                      <h3 className="text-white font-bold mb-2 flex items-center gap-2"><Layers size={18}/> Simulados</h3>
-                      <p className="text-[10px] text-slate-500 mb-4 uppercase font-bold">Total: {simulations.length}</p>
-                      <div className="space-y-2">
-                          {simulations.map(sim => (
-                              <div key={sim.id} className="p-2 bg-black/40 rounded-lg text-xs flex items-center justify-between border border-white/5">
-                                  <span className="text-slate-300 truncate pr-2">{sim.title}</span>
-                                  <button onClick={() => DatabaseService.deleteSimulation(sim.id).then(fetchData)} className="text-red-500 hover:bg-red-500/20 p-1 rounded"><Trash2 size={12}/></button>
-                              </div>
-                          ))}
-                      </div>
-                  </div>
+          <div className="space-y-6">
+              {/* Seletor de Sub-Aba de Conteúdo */}
+              <div className="grid grid-cols-3 gap-4">
+                  {[
+                      { id: 'lms', label: 'Grade de Aulas', icon: PlayCircle, color: 'text-indigo-400' },
+                      { id: 'questions', label: 'Banco de Questões', icon: FileQuestion, color: 'text-emerald-400' },
+                      { id: 'simulations', label: 'Simulados', icon: GraduationCap, color: 'text-purple-400' }
+                  ].map(sec => (
+                      <button 
+                        key={sec.id} 
+                        onClick={() => setContentSection(sec.id as any)}
+                        className={`p-6 rounded-2xl border transition-all text-left flex items-center gap-4 ${contentSection === sec.id ? 'bg-indigo-600/10 border-indigo-500/50 shadow-lg' : 'bg-slate-900/50 border-white/5 hover:border-white/20'}`}
+                      >
+                          <sec.icon className={sec.color} size={32} />
+                          <div>
+                              <p className={`text-sm font-black uppercase tracking-widest ${contentSection === sec.id ? 'text-white' : 'text-slate-500'}`}>{sec.label}</p>
+                              <p className="text-[10px] text-slate-400">Gerenciar recursos</p>
+                          </div>
+                      </button>
+                  ))}
               </div>
 
-              {/* Main: Topics & Lessons */}
-              <div className="lg:col-span-3">
-                  {selectedSubject ? (
-                      <div className="space-y-6">
-                          <div className="flex justify-between items-center bg-slate-900 p-6 rounded-2xl border border-white/10">
-                              <div>
-                                  <h3 className="text-2xl font-bold text-white">{selectedSubject.name}</h3>
-                                  <p className="text-slate-400 text-sm">Gerencie os tópicos e aulas desta disciplina.</p>
+              <div className="glass-card rounded-3xl p-8 border-white/10 relative overflow-hidden min-h-[600px]">
+                  {/* === GESTÃO DE AULAS (LMS) === */}
+                  {contentSection === 'lms' && (
+                      <div className="animate-in slide-in-from-right duration-500">
+                          {selectedSub ? (
+                              <div className="space-y-6">
+                                  <button onClick={() => setSelectedSub(null)} className="flex items-center gap-2 text-indigo-400 font-bold text-sm hover:text-indigo-300">
+                                      <ArrowLeft size={16}/> Voltar para Matérias
+                                  </button>
+                                  <div className="flex justify-between items-center bg-slate-950/50 p-6 rounded-2xl border border-white/5">
+                                      <div>
+                                          <h3 className="text-2xl font-bold text-white">{selectedSub.name}</h3>
+                                          <p className="text-slate-500 text-xs mt-1">Clique nos tópicos para editar as aulas ou blocos de exercícios.</p>
+                                      </div>
+                                      <button onClick={() => { setTargetTopic(''); setLessonForm({type:'video'}); setShowLessonModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-500 shadow-lg transition-all">
+                                          <Plus size={18}/> Adicionar Aula
+                                      </button>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 gap-4">
+                                      {Object.keys(lessonsMap).length > 0 ? Object.keys(lessonsMap).map(topic => (
+                                          <div key={topic} className="bg-white/5 rounded-2xl p-6 border border-white/5 group hover:border-indigo-500/20 transition-all">
+                                              <div className="flex justify-between items-center mb-4">
+                                                  <h4 className="text-lg font-bold text-slate-300 flex items-center gap-2">
+                                                      <Layers size={18} className="text-indigo-400"/> {topic}
+                                                  </h4>
+                                              </div>
+                                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                  {lessonsMap[topic].map((l, i) => (
+                                                      <div key={i} className="p-4 bg-black/40 rounded-xl border border-white/5 flex items-center justify-between group/item">
+                                                          <div className="flex items-center gap-3">
+                                                              {l.type === 'video' ? <PlayCircle size={16} className="text-blue-400"/> : <FileQuestion size={16} className="text-emerald-400"/>}
+                                                              <span className="text-xs font-medium text-slate-300 truncate max-w-[120px]">{l.title}</span>
+                                                          </div>
+                                                          <div className="flex gap-2 opacity-0 group-item-hover:opacity-100 transition-opacity">
+                                                              <button onClick={() => { setTargetTopic(topic); setLessonForm(l); setShowLessonModal(true); }} className="p-1.5 hover:bg-white/10 rounded text-slate-500 hover:text-white"><Edit size={14}/></button>
+                                                              <button onClick={() => confirm("Excluir aula?") && DatabaseService.deleteLesson(selectedSub.id, topic, l.id!).then(() => handleOpenSubject(selectedSub))} className="p-1.5 hover:bg-red-500/20 rounded text-slate-500 hover:text-red-500"><Trash2 size={14}/></button>
+                                                          </div>
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          </div>
+                                      )) : (
+                                          <div className="py-20 text-center text-slate-600">
+                                              <Sparkles size={48} className="mx-auto mb-4 opacity-20"/>
+                                              <p className="font-bold">Nenhum tópico cadastrado nesta matéria.</p>
+                                          </div>
+                                      )}
+                                  </div>
                               </div>
-                              <button onClick={() => { setTargetTopic('Geral'); setLessonForm({ type: 'video' }); setShowLessonModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm flex items-center gap-2">
-                                  <Plus size={16}/> Nova Aula
+                          ) : (
+                              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                  {subjects.map(s => (
+                                      <button 
+                                        key={s.id} 
+                                        onClick={() => handleOpenSubject(s)}
+                                        className="p-6 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center gap-3 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all group"
+                                      >
+                                          <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                                              <BookOpen size={24}/>
+                                          </div>
+                                          <span className="text-xs font-bold text-slate-300 uppercase text-center">{s.name}</span>
+                                      </button>
+                                  ))}
+                              </div>
+                          )}
+                      </div>
+                  )}
+
+                  {/* === GESTÃO DE QUESTÕES (BANCO) === */}
+                  {contentSection === 'questions' && (
+                      <div className="animate-in fade-in space-y-6">
+                          <div className="flex justify-between items-center">
+                              <h3 className="text-2xl font-bold text-white">Editor de Questões</h3>
+                              <button onClick={() => { 
+                                  // Fix: category is now a known property of Question interface
+                                  setQuestionForm({ text: '', options: ['', '', '', '', ''], correctAnswer: 0, difficulty: 'easy', category: 'regular' });
+                                  setShowQuestionModal(true); 
+                              }} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-500 shadow-emerald-900/20">
+                                  <Plus size={20}/> Nova Questão no Banco
                               </button>
                           </div>
-
-                          <div className="space-y-4">
-                              {Object.entries(lessonsByTopic).map(([topic, lessons]) => (
-                                  <div key={topic} className="glass-card p-6 rounded-2xl border border-white/5">
-                                      <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
-                                          <h4 className="text-lg font-bold text-indigo-400">{topic}</h4>
-                                          <span className="text-[10px] text-slate-600 uppercase font-black">{lessons.length} Itens</span>
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          {lessons.map(lesson => (
-                                              <div key={lesson.id} className="p-4 bg-black/40 rounded-xl border border-white/5 flex items-center justify-between group hover:border-indigo-500/30 transition-all">
-                                                  <div className="flex items-center gap-3">
-                                                      <div className={`p-2 rounded-lg ${lesson.type === 'video' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                                                          {lesson.type === 'video' ? <PlayCircle size={18}/> : <Layers size={18}/>}
-                                                      </div>
-                                                      <div>
-                                                          <p className="text-sm font-bold text-white leading-tight">{lesson.title}</p>
-                                                          <p className="text-[10px] text-slate-500 uppercase">{lesson.duration || 'Block'}</p>
-                                                      </div>
-                                                  </div>
-                                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                      <button onClick={() => { setTargetTopic(topic); setLessonForm(lesson); setShowLessonModal(true); }} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white"><Edit size={14}/></button>
-                                                      <button onClick={() => handleDeleteLesson(topic, lesson.id!)} className="p-2 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>
-                                                  </div>
-                                              </div>
-                                          ))}
-                                      </div>
-                                  </div>
-                              ))}
+                          
+                          <div className="p-10 border-2 border-dashed border-white/5 rounded-3xl text-center text-slate-600">
+                              <FileQuestion size={64} className="mx-auto mb-4 opacity-10"/>
+                              <p className="max-w-xs mx-auto">Use o botão acima para cadastrar novas questões. Elas ficarão disponíveis instantaneamente no banco filtrável.</p>
                           </div>
                       </div>
-                  ) : (
-                      <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-3xl text-slate-600">
-                          <BookOpen size={48} className="mb-4 opacity-20" />
-                          <p className="font-bold uppercase tracking-widest text-xs">Selecione uma matéria para editar</p>
+                  )}
+
+                  {/* === SIMULADOS === */}
+                  {contentSection === 'simulations' && (
+                      <div className="animate-in fade-in space-y-6">
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                               {simulations.map(sim => (
+                                   <div key={sim.id} className="p-6 bg-white/5 border border-white/5 rounded-2xl flex justify-between items-center group hover:border-purple-500/30 transition-all">
+                                       <div>
+                                           <h4 className="font-bold text-white text-lg">{sim.title}</h4>
+                                           <p className="text-xs text-slate-500">{sim.durationMinutes} min • {sim.questionIds?.length || 0} questões</p>
+                                       </div>
+                                       <div className="flex gap-2">
+                                           <button className="p-3 bg-slate-800 rounded-xl text-slate-400 hover:text-white"><Edit size={18}/></button>
+                                           <button onClick={() => confirm("Excluir?") && DatabaseService.deleteSimulation(sim.id).then(fetchData)} className="p-3 bg-slate-800 rounded-xl text-slate-400 hover:text-red-500"><Trash2 size={18}/></button>
+                                       </div>
+                                   </div>
+                               ))}
+                               <button className="border-2 border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center gap-2 text-slate-500 hover:bg-white/5 transition-all">
+                                   <Plus size={32}/>
+                                   <span className="font-bold uppercase tracking-widest text-xs">Novo Simulado</span>
+                               </button>
+                           </div>
                       </div>
                   )}
               </div>
           </div>
       )}
 
-      {/* --- LEADS, USERS, FINANCE (MANTIDOS) --- */}
-      {activeTab === 'leads' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {leads.filter(l => l.name.toLowerCase().includes(searchTerm.toLowerCase())).map(l => (
-                  <div key={l.id} className="glass-card p-6 rounded-2xl border border-emerald-500/40 shadow-lg shadow-emerald-500/5 transition-all">
-                      <div className="bg-emerald-500/20 border border-emerald-500/30 p-3 rounded-xl mb-4 text-center">
-                          <p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest mb-1">Nome no PIX (Comprovante)</p>
-                          <p className="text-white font-black text-lg truncate px-2">{l.payerName || 'Não Informado'}</p>
-                      </div>
-                      
-                      <div className="space-y-3 mb-6">
-                          <div><p className="text-[10px] text-slate-500 uppercase font-bold">Aluno</p><p className="text-white font-bold">{l.name}</p></div>
-                          <div><p className="text-[10px] text-slate-500 uppercase font-bold">E-mail</p><p className="text-xs text-indigo-400 font-mono truncate">{l.contact}</p></div>
-                          
-                          <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5">
-                              <div className="flex-1">
-                                  <p className="text-[9px] text-slate-500 uppercase font-bold">Senha Escolhida</p>
-                                  <span className="text-xs font-mono text-slate-300">{showPassMap[l.id] ? l.password : '••••••••'}</span>
-                              </div>
-                              <button onClick={() => setShowPassMap(p => ({...p, [l.id]: !p[l.id]}))} className="text-slate-500 hover:text-white">
-                                  {showPassMap[l.id] ? <EyeOff size={16}/> : <Eye size={16}/>}
-                              </button>
-                          </div>
-                      </div>
-
-                      <button onClick={() => handleOpenAccessModal(l)} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all hover:scale-[1.02]">
-                          <UserCheck size={18}/> Aprovar e Criar Usuário
-                      </button>
-                  </div>
-              ))}
-          </div>
-      )}
-
-      {activeTab === 'users' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {users.filter(u => u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase())).map(u => (
-                  <div key={u.uid} className="glass-card p-6 rounded-2xl border border-white/5 flex flex-col gap-6 relative overflow-hidden group">
-                      <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-4">
-                              <img src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} className="w-14 h-14 rounded-full border-2 border-indigo-500/20 object-cover" />
-                              <div>
-                                  <h4 className="font-bold text-white text-lg">{u.displayName}</h4>
-                                  <p className="text-xs text-slate-500">{u.email}</p>
-                              </div>
-                          </div>
-                          <div className="text-right">
-                              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Gasto Total (LTV)</p>
-                              <p className="text-2xl font-black text-emerald-400">R$ {(u.totalSpent || 0).toFixed(2)}</p>
-                          </div>
-                      </div>
-                      <div className="pt-4 border-t border-white/5 flex gap-2">
-                          <button onClick={() => handleOpenEditModal(u)} className="flex-1 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all border border-white/10 flex items-center justify-center gap-2">
-                              <Edit size={16}/> Editar Usuário
-                          </button>
-                      </div>
-                  </div>
-              ))}
-          </div>
-      )}
-
-      {/* MODAL: SALVAR AULA (CONTENT) */}
+      {/* --- MODAL: SALVAR AULA --- */}
       {showLessonModal && (
           <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
               <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95">
-                  <h3 className="text-2xl font-black text-white mb-6 uppercase">Gerenciar Aula</h3>
+                  <h3 className="text-2xl font-black text-white mb-6 uppercase italic">Gerenciar Aula</h3>
                   <div className="space-y-4">
-                      <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Tópico</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={targetTopic} onChange={e => setTargetTopic(e.target.value)} placeholder="Ex: Álgebra" /></div>
-                      <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Título da Aula</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={lessonForm.title} onChange={e => setLessonForm({...lessonForm, title: e.target.value})} /></div>
+                      <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Tópico (Agrupador)</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={targetTopic} onChange={e => setTargetTopic(e.target.value)} placeholder="Ex: Álgebra" /></div>
+                      <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Título</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={lessonForm.title} onChange={e => setLessonForm({...lessonForm, title: e.target.value})} /></div>
                       <div className="grid grid-cols-2 gap-4">
                           <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Tipo</label><select className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={lessonForm.type} onChange={e => setLessonForm({...lessonForm, type: e.target.value as any})}><option value="video">Vídeo</option><option value="exercise_block">Bloco de Questões</option></select></div>
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Duração/Tag</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={lessonForm.duration} onChange={e => setLessonForm({...lessonForm, duration: e.target.value})} placeholder="15:00" /></div>
+                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Duração/Carga</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={lessonForm.duration} onChange={e => setLessonForm({...lessonForm, duration: e.target.value})} placeholder="15:00" /></div>
                       </div>
                       {lessonForm.type === 'video' && (
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">URL do Vídeo (YouTube)</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={lessonForm.videoUrl} onChange={e => setLessonForm({...lessonForm, videoUrl: e.target.value})} /></div>
+                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">URL YouTube</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={lessonForm.videoUrl} onChange={e => setLessonForm({...lessonForm, videoUrl: e.target.value})} /></div>
+                      )}
+                      {lessonForm.type === 'exercise_block' && (
+                          <div className="p-4 bg-emerald-900/10 border border-emerald-500/20 rounded-xl">
+                              <p className="text-[10px] text-emerald-400 font-bold uppercase mb-2">Filtro de Questões Associado</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                  <input className="bg-black/40 border border-white/5 p-2 rounded text-[10px] text-white" placeholder="Assunto" value={lessonForm.exerciseFilters?.topic} onChange={e => setLessonForm({...lessonForm, exerciseFilters: {...(lessonForm.exerciseFilters as any), topic: e.target.value, category: 'regular', subject: selectedSub?.id}})} />
+                              </div>
+                          </div>
                       )}
                       
                       <button onClick={handleSaveLesson} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl flex items-center justify-center gap-2 mt-4 transition-all">
-                          <Save size={18}/> Salvar Aula
+                          <Save size={18}/> Salvar Item
                       </button>
                       <button onClick={() => setShowLessonModal(false)} className="w-full text-slate-500 text-xs font-bold uppercase hover:text-white mt-2">Cancelar</button>
                   </div>
@@ -349,61 +274,50 @@ const AdminPanel: React.FC = () => {
           </div>
       )}
 
-      {/* MODAL: LIBERAR ACESSO (LEADS) */}
-      {showAccessModal && (
-          <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-              <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95">
-                  <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-2xl font-black text-white">Liberar Acesso Aluno</h3>
-                      <button onClick={() => setShowAccessModal(false)} className="text-slate-500 hover:text-white"><X size={24}/></button>
-                  </div>
-                  <div className="space-y-4">
-                      <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">E-mail</label><input className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" value={accessForm.email} onChange={e => setAccessForm({...accessForm, email: e.target.value})} /></div>
-                      <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Senha</label><input className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white focus:border-indigo-500 outline-none" value={accessForm.password} onChange={e => setAccessForm({...accessForm, password: e.target.value})} /></div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Plano</label><select className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white outline-none" value={accessForm.plan} onChange={e => setAccessForm({...accessForm, plan: e.target.value as any})}><option value="basic">Basic</option><option value="advanced">Advanced</option></select></div>
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Expiração</label><input type="date" className="w-full bg-black border border-zinc-700 rounded-xl p-3 text-white outline-none" value={accessForm.expiryDate} onChange={e => setAccessForm({...accessForm, expiryDate: e.target.value})} /></div>
-                      </div>
-                      <button onClick={handleSubmitAccess} disabled={loading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg rounded-xl shadow-lg flex items-center justify-center gap-2">
-                          {loading ? <Loader2 className="animate-spin" /> : <UserCheck size={20}/>} Criar Aluno Agora
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
+      {/* --- MODAL: CRIAR QUESTÃO --- */}
+      {showQuestionModal && (
+          <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 overflow-y-auto">
+              <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl w-full max-w-4xl shadow-2xl animate-in zoom-in-95 my-auto">
+                  <h3 className="text-2xl font-black text-white mb-6 uppercase flex items-center gap-3">
+                      <ImageIcon className="text-indigo-400"/> Editor de Questão
+                  </h3>
 
-      {/* MODAL: EDITAR USUÁRIO */}
-      {showEditModal && editingUser && (
-          <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
-              <div className="bg-slate-900 border border-indigo-500/20 p-8 rounded-3xl w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh]">
-                  <div className="flex justify-between items-center mb-8">
-                      <div>
-                          <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Gestão de Perfil</h3>
-                          <p className="text-slate-500 text-[10px] uppercase font-bold">UID: {editingUser.uid}</p>
-                      </div>
-                      <button onClick={() => setShowEditModal(false)} className="text-slate-500 hover:text-white bg-white/5 p-2 rounded-full"><X size={24}/></button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                      {/* Localização */}
                       <div className="space-y-4">
-                          <h4 className="text-[10px] text-indigo-400 font-black uppercase tracking-widest border-b border-white/5 pb-2">Identidade e Financeiro</h4>
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Nome</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.displayName} onChange={e => setEditingUser({...editingUser, displayName: e.target.value})} /></div>
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">E-mail</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white" value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} /></div>
-                          <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">LTV Manual (R$)</label><input type="number" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-emerald-400 font-black" value={editingUser.totalSpent} onChange={e => setEditingUser({...editingUser, totalSpent: parseFloat(e.target.value) || 0})} /></div>
-                      </div>
-
-                      <div className="space-y-4">
-                          <h4 className="text-[10px] text-indigo-400 font-black uppercase tracking-widest border-b border-white/5 pb-2">Acessos e Planos</h4>
+                          <h4 className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest border-b border-white/5 pb-2">Onde salvar?</h4>
                           <div className="grid grid-cols-2 gap-3">
-                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Plano</label><select className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white outline-none" value={editingUser.plan} onChange={e => setEditingUser({...editingUser, plan: e.target.value as any})}><option value="basic">Basic</option><option value="advanced">Advanced</option></select></div>
-                              <div><label className="text-[10px] text-slate-500 font-bold uppercase ml-1">Vencimento</label><input type="date" className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white outline-none" value={editingUser.subscriptionExpiry} onChange={e => setEditingUser({...editingUser, subscriptionExpiry: e.target.value})} /></div>
+                              <div><label className="text-[10px] text-slate-500 font-bold">Matéria (ID)</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white text-xs" value={qTarget.subject} onChange={e => setQTarget({...qTarget, subject: e.target.value})} placeholder="fisica" /></div>
+                              <div><label className="text-[10px] text-slate-500 font-bold">Assunto</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white text-xs" value={qTarget.topic} onChange={e => setQTarget({...qTarget, topic: e.target.value})} placeholder="Cinemática" /></div>
+                              <div><label className="text-[10px] text-slate-500 font-bold">Sub-tópico</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white text-xs" value={qTarget.subtopic} onChange={e => setQTarget({...qTarget, subtopic: e.target.value})} placeholder="MRU" /></div>
+                              <div><label className="text-[10px] text-slate-500 font-bold">Dificuldade</label><select className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white text-xs" value={questionForm.difficulty} onChange={e => setQuestionForm({...questionForm, difficulty: e.target.value as any})}><option value="easy">Fácil</option><option value="medium">Média</option><option value="hard">Difícil</option></select></div>
+                          </div>
+                          <div><label className="text-[10px] text-slate-500 font-bold">URL da Imagem (Opcional)</label><input className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white text-xs" value={questionForm.imageUrl} onChange={e => setQuestionForm({...questionForm, imageUrl: e.target.value})} placeholder="https://..." /></div>
+                      </div>
+
+                      {/* Conteúdo */}
+                      <div className="space-y-4">
+                          <h4 className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest border-b border-white/5 pb-2">Enunciado e Respostas</h4>
+                          <div><textarea className="w-full bg-black border border-zinc-800 rounded-xl p-3 text-white text-xs h-32" value={questionForm.text} onChange={e => setQuestionForm({...questionForm, text: e.target.value})} placeholder="Escreva o enunciado aqui..." /></div>
+                          <div className="space-y-2">
+                              {questionForm.options?.map((opt, i) => (
+                                  <div key={i} className="flex gap-2">
+                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs cursor-pointer ${questionForm.correctAnswer === i ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'}`} onClick={() => setQuestionForm({...questionForm, correctAnswer: i})}>{String.fromCharCode(65+i)}</div>
+                                      <input className="flex-1 bg-black border border-zinc-800 rounded-lg px-3 py-1 text-[10px] text-white" value={opt} onChange={e => {
+                                          const newOpts = [...(questionForm.options || [])];
+                                          newOpts[i] = e.target.value;
+                                          setQuestionForm({...questionForm, options: newOpts});
+                                      }} />
+                                  </div>
+                              ))}
                           </div>
                       </div>
                   </div>
 
-                  <button onClick={handleSaveUserEdit} disabled={loading} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-lg rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all">
-                      {loading ? <Loader2 className="animate-spin" /> : <CheckCircle size={20}/>} Salvar Alterações
+                  <button onClick={handleSaveQuestion} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-indigo-900/20">
+                      <Save size={20}/> SALVAR QUESTÃO NO BANCO
                   </button>
+                  <button onClick={() => setShowQuestionModal(false)} className="w-full text-slate-500 text-xs font-bold uppercase hover:text-white mt-4">Cancelar e Descartar</button>
               </div>
           </div>
       )}

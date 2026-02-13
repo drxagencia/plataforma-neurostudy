@@ -1,4 +1,5 @@
 
+
 export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes' | 'suporte' | 'financeiro';
 
 export type UserPlan = 'basic' | 'advanced' | 'admin';
@@ -110,6 +111,8 @@ export interface Question {
   subjectId: string;
   topic: string;
   subtopic?: string;
+  // Fix: added category to Question interface
+  category?: 'regular' | 'military';
   // Added tag property to Question interface
   tag?: { text: string; color: string };
 }

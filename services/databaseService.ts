@@ -1,4 +1,5 @@
 
+
 import { 
   ref, get, set, update, push, remove, query, limitToLast, increment, orderByChild
 } from "firebase/database";
@@ -106,7 +107,14 @@ export const DatabaseService = {
 
   getLessonsByTopic: async (subjectId: string): Promise<Record<string, Lesson[]>> => {
     const snap = await get(ref(database, `lessons/${subjectId}`));
-    return snap.exists() ? snap.val() : {};
+    if (!snap.exists()) return {};
+    const data = snap.val();
+    const processed: Record<string, Lesson[]> = {};
+    Object.keys(data).forEach(topic => {
+      const lessons = data[topic];
+      processed[topic] = Object.values(lessons);
+    });
+    return processed;
   },
 
   saveLesson: async (subjectId: string, topic: string, lessonId: string, data: Lesson): Promise<void> => {
@@ -134,7 +142,6 @@ export const DatabaseService = {
     const processed: Record<string, string[]> = {};
     Object.keys(data).forEach(subId => {
         const topicsVal = data[subId];
-        // Flatten topics from object keys if stored as { "TopicName": true }
         processed[subId] = Array.isArray(topicsVal) ? topicsVal : Object.keys(topicsVal);
     });
     return processed;
@@ -144,31 +151,27 @@ export const DatabaseService = {
     await set(ref(database, `topics/${subjectId}`), topics);
   },
 
-  getAnsweredQuestions: async (uid: string): Promise<Record<string, { correct: boolean }>> => {
-    const snap = await get(ref(database, `users/${uid}/answered_questions`));
-    return snap.exists() ? snap.val() : {};
-  },
-
   getAvailableSubtopics: async (category: string, subject: string, topic: string): Promise<string[]> => {
-    // Correct path as per database seed: subtopics/subject/topic
     const snap = await get(ref(database, `subtopics/${subject}/${topic}`));
     return snap.exists() ? Object.keys(snap.val()) : [];
   },
 
-  getQuestions: async (category: string, subject: string, topic: string, subtopic?: string): Promise<any[]> => {
-    const path = `questions/${category}/${subject}/${topic}${subtopic ? `/${subtopic}` : ''}`;
+  // Fix: updated return type to Promise<Question[]>
+  getQuestions: async (category: string, subject: string, topic: string, subtopic?: string): Promise<Question[]> => {
+    const basePath = `questions/${category}/${subject}/${topic}`;
+    const path = subtopic ? `${basePath}/${subtopic}` : basePath;
     const snap = await get(ref(database, path));
+    
     if (!snap.exists()) return [];
     
     const data = snap.val();
     
-    // Se selecionou sub-tópico, o dado já é uma lista ou objeto de questões
+    // Se selecionou sub-tópico específico, retorna o array/objeto direto
     if (subtopic) {
         return Array.isArray(data) ? data : Object.values(data);
     }
 
-    // Se NÃO selecionou sub-tópico, 'data' é um objeto onde as chaves são os nomes dos sub-tópicos
-    // Precisamos percorrer cada sub-tópico e pegar as questões de dentro
+    // Se NÃO selecionou sub-tópico, precisamos achatar a estrutura
     let allQuestions: any[] = [];
     Object.keys(data).forEach(subKey => {
         const subData = data[subKey];
@@ -179,13 +182,25 @@ export const DatabaseService = {
     return allQuestions;
   },
 
-  getQuestionsFromSubtopics: async (category: string, subject: string, topic: string, subtopics: string[]): Promise<any[]> => {
-    const all: any[] = [];
+  // Fix: added missing getQuestionsFromSubtopics method to solve QuestionBank.tsx error
+  getQuestionsFromSubtopics: async (category: string, subject: string, topic: string, subtopics: string[]): Promise<Question[]> => {
+    let allQuestions: Question[] = [];
     for (const sub of subtopics) {
       const q = await DatabaseService.getQuestions(category, subject, topic, sub);
-      all.push(...q);
+      allQuestions = [...allQuestions, ...q];
     }
-    return all;
+    return allQuestions;
+  },
+
+  saveQuestion: async (category: string, subject: string, topic: string, subtopic: string, qid: string, data: Question): Promise<void> => {
+      await set(ref(database, `questions/${category}/${subject}/${topic}/${subtopic}/${qid}`), data);
+      // Salva no flat index para simulados
+      await set(ref(database, `questions_flat/${qid}`), data);
+  },
+
+  deleteQuestion: async (category: string, subject: string, topic: string, subtopic: string, qid: string): Promise<void> => {
+      await remove(ref(database, `questions/${category}/${subject}/${topic}/${subtopic}/${qid}`));
+      await remove(ref(database, `questions_flat/${qid}`));
   },
 
   markQuestionAsAnswered: async (uid: string, qid: string, correct: boolean, subjectId: string, topic: string): Promise<void> => {
@@ -195,6 +210,11 @@ export const DatabaseService = {
       correct: increment(correct ? 1 : 0),
       wrong: increment(correct ? 0 : 1)
     });
+  },
+
+  getAnsweredQuestions: async (uid: string): Promise<Record<string, { correct: boolean }>> => {
+    const snap = await get(ref(database, `users/${uid}/answered_questions`));
+    return snap.exists() ? snap.val() : {};
   },
 
   // --- COMMUNITY ---
@@ -324,10 +344,8 @@ export const DatabaseService = {
         await update(userRef, { essayCredits: increment(req.quantityCredits || 0) });
       }
       
-      // Update LTV (totalSpent)
       await update(userRef, { totalSpent: increment(req.amount) });
 
-      // Log transaction
       const transRef = push(ref(database, `user_transactions/${req.userId}`));
       await set(transRef, {
         id: transRef.key,
