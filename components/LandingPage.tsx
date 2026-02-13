@@ -11,6 +11,113 @@ interface LandingPageProps {
   onStartGame: () => void;
 }
 
+// --- STARRY BACKGROUND COMPONENT ---
+const StarryBackground = () => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        
+        const handleResize = () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        };
+        window.addEventListener('resize', handleResize);
+        handleResize();
+
+        // Stars Setup
+        const stars = Array.from({ length: 200 }, () => ({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            size: Math.random() * 1.5 + 0.5,
+            speed: Math.random() * 0.3 + 0.1, // Velocidade base lenta
+            opacity: Math.random() * 0.7 + 0.3
+        }));
+
+        let scrollVelocity = 0;
+        let lastScrollY = window.scrollY;
+
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            const delta = Math.abs(currentScrollY - lastScrollY);
+            // Aumenta a velocidade baseado na intensidade do scroll
+            scrollVelocity = Math.min(delta * 0.3, 20); 
+            lastScrollY = currentScrollY;
+        };
+        window.addEventListener('scroll', handleScroll);
+
+        let animationFrame: number;
+
+        const animate = () => {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Fundo Gradiente Estilizado (Céu Noturno Profundo)
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, '#020617'); // Slate 950
+            gradient.addColorStop(1, '#0f172a'); // Slate 900
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+            
+            // Decaimento da velocidade do scroll (volta ao normal suavemente)
+            scrollVelocity *= 0.92;
+            if(scrollVelocity < 0.01) scrollVelocity = 0;
+            
+            stars.forEach(star => {
+                // Movimento: Para cima (Y diminui)
+                // Velocidade efetiva = base + fator de scroll
+                const effectiveSpeed = star.speed + (scrollVelocity * star.speed * 2);
+                star.y -= effectiveSpeed;
+
+                // Reset quando sai da tela (loop infinito)
+                if (star.y < 0) {
+                    star.y = height;
+                    star.x = Math.random() * width;
+                }
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+                ctx.beginPath();
+                
+                // Efeito Warp: Estica a estrela quando rápido
+                if (scrollVelocity > 0.5) {
+                    const length = Math.min(star.size + (scrollVelocity * 3), 40);
+                    // Desenha um traço vertical
+                    ctx.rect(star.x, star.y, star.size, length);
+                } else {
+                    // Desenha círculo normal
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                }
+                
+                ctx.fill();
+            });
+
+            animationFrame = requestAnimationFrame(animate);
+        };
+
+        animate();
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('scroll', handleScroll);
+            cancelAnimationFrame(animationFrame);
+        };
+    }, []);
+
+    return (
+        <canvas 
+            ref={canvasRef} 
+            className="fixed inset-0 z-0 pointer-events-none"
+        />
+    );
+};
+
 const FakeProgressBar = ({ onHalfTime, onFinish }: { onHalfTime: () => void, onFinish: () => void }) => {
     const [progress, setProgress] = useState(75);
 
@@ -201,10 +308,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
         .star-layer { opacity: 0.3; background: radial-gradient(circle at 50% 50%, #fff 1%, transparent 1.5%); background-size: 50px 50px; }
       `}</style>
 
-      {/* Background Decor */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-30">
-          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[150px] rounded-full" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 blur-[150px] rounded-full" />
+      {/* STARRY BACKGROUND CANVAS */}
+      <StarryBackground />
+
+      {/* Overlay Decor (Nebula Globs) - kept for style but transparent */}
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-20 mix-blend-screen">
+          <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-600/30 blur-[150px] rounded-full animate-pulse-slow" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-600/20 blur-[150px] rounded-full animate-pulse-slow delay-1000" />
       </div>
 
       <div className="relative z-10">
