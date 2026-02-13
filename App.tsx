@@ -21,6 +21,7 @@ import { View, UserProfile } from './types';
 import { mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
+// Fix: Ensure modular import for onAuthStateChanged
 import { onAuthStateChanged } from 'firebase/auth';
 import { Smartphone, CheckCircle, Loader2 } from 'lucide-react';
 

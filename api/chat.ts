@@ -10,7 +10,7 @@ const firebaseConfig = {
   projectId: "neurostudy-d8a00",
 };
 
-// Inicialização do Firebase (Singleton para Serverless)
+// Fix: Ensure standard modular SDK functions are imported correctly for Node environment
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -29,8 +29,10 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // Verificar Chave de API
-  const apiKey = process.env.API_KEY;
+  // Capturar e Sanitizar Chave de API (Remove espaços e aspas acidentais do Vercel)
+  const rawApiKey = process.env.API_KEY || "";
+  const apiKey = rawApiKey.trim().replace(/^["']|["']$/g, '');
+
   if (!apiKey) {
     console.error("ERRO CRÍTICO: Variável de ambiente API_KEY não configurada no Vercel.");
     return res.status(500).json({ error: "Configuração de servidor incompleta (API_KEY missing)." });
@@ -92,7 +94,7 @@ export default async function handler(req: any, res: any) {
     const messages: any[] = [{ role: "system", content: systemInstruction }];
     
     if (history && history.length > 0) {
-      history.slice(-10).forEach((h: any) => { // Pegar apenas as últimas 10 para economizar tokens
+      history.slice(-10).forEach((h: any) => {
         messages.push({
           role: h.role === 'ai' ? 'assistant' : 'user',
           content: h.content
@@ -137,6 +139,15 @@ export default async function handler(req: any, res: any) {
 
   } catch (error: any) {
     console.error("ERRO OPENAI:", error?.response?.data || error.message);
+    
+    // Tratamento amigável para erro de chave
+    if (error?.status === 401 || error?.message?.includes('401')) {
+        return res.status(401).json({ 
+            error: "Chave de API Inválida.",
+            details: "A OpenAI recusou a chave configurada no servidor. Verifique se a API_KEY no Vercel está correta e sem aspas." 
+        });
+    }
+
     return res.status(500).json({ 
       error: "Falha na comunicação com a inteligência artificial.",
       details: error.message 

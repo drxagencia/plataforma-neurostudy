@@ -15,7 +15,7 @@ const firebaseConfig = {
   measurementId: "G-CFYSRSFF0V"
 };
 
-// Use standard v9 modular SDK imports
+// Fix: Standard modular SDK functions are exported from 'firebase/app'
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 // Initialize a SECONDARY app instance for Admin User Creation using correct FirebaseApp type

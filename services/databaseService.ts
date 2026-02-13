@@ -3,7 +3,7 @@ import {
   ref, get, set, update, push, remove, query, limitToLast, increment, orderByChild
 } from "firebase/database";
 import { database } from "./firebaseConfig";
-import { UserProfile, Lead, RechargeRequest, Transaction, Subject, Lesson, CommunityPost, Simulation, SimulationResult, EssayCorrection, SupportTicket, UserStatsMap, OperationalCost, TrafficConfig } from "../types";
+import { UserProfile, Lead, RechargeRequest, Transaction, Subject, Lesson, CommunityPost, Simulation, SimulationResult, EssayCorrection, SupportTicket, UserStatsMap, OperationalCost, TrafficConfig, Question } from "../types";
 import { SUBJECTS, XP_VALUES } from "../constants";
 
 export const DatabaseService = {
@@ -90,6 +90,15 @@ export const DatabaseService = {
     return snap.exists() ? Object.values(snap.val()) : SUBJECTS;
   },
 
+  updateSubject: async (id: string, data: Subject): Promise<void> => {
+    await set(ref(database, `subjects/${id}`), data);
+  },
+
+  deleteSubject: async (id: string): Promise<void> => {
+    await remove(ref(database, `subjects/${id}`));
+    await remove(ref(database, `lessons/${id}`));
+  },
+
   getSubjectsWithLessons: async (): Promise<string[]> => {
     const snap = await get(ref(database, 'lessons'));
     return snap.exists() ? Object.keys(snap.val()) : [];
@@ -98,6 +107,14 @@ export const DatabaseService = {
   getLessonsByTopic: async (subjectId: string): Promise<Record<string, Lesson[]>> => {
     const snap = await get(ref(database, `lessons/${subjectId}`));
     return snap.exists() ? snap.val() : {};
+  },
+
+  saveLesson: async (subjectId: string, topic: string, lessonId: string, data: Lesson): Promise<void> => {
+    await set(ref(database, `lessons/${subjectId}/${topic}/${lessonId}`), data);
+  },
+
+  deleteLesson: async (subjectId: string, topic: string, lessonId: string): Promise<void> => {
+    await remove(ref(database, `lessons/${subjectId}/${topic}/${lessonId}`));
   },
 
   getCompletedLessons: async (uid: string): Promise<string[]> => {
@@ -115,6 +132,10 @@ export const DatabaseService = {
     return snap.exists() ? snap.val() : {};
   },
 
+  saveTopic: async (subjectId: string, topics: string[]): Promise<void> => {
+    await set(ref(database, `topics/${subjectId}`), topics);
+  },
+
   getAnsweredQuestions: async (uid: string): Promise<Record<string, { correct: boolean }>> => {
     const snap = await get(ref(database, `users/${uid}/answered_questions`));
     return snap.exists() ? snap.val() : {};
@@ -122,15 +143,31 @@ export const DatabaseService = {
 
   getAvailableSubtopics: async (category: string, subject: string, topic: string): Promise<string[]> => {
     const snap = await get(ref(database, `subtopics/${category}/${subject}/${topic}`));
-    return snap.exists() ? Object.values(snap.val()) : [];
+    return snap.exists() ? Object.keys(snap.val()) : [];
   },
 
   getQuestions: async (category: string, subject: string, topic: string, subtopic?: string): Promise<any[]> => {
     const path = `questions/${category}/${subject}/${topic}${subtopic ? `/${subtopic}` : ''}`;
     const snap = await get(ref(database, path));
     if (!snap.exists()) return [];
+    
     const data = snap.val();
-    return Array.isArray(data) ? data : Object.values(data);
+    
+    // Se selecionou sub-tópico, o dado já é uma lista ou objeto de questões
+    if (subtopic) {
+        return Array.isArray(data) ? data : Object.values(data);
+    }
+
+    // Se NÃO selecionou sub-tópico, 'data' é um objeto onde as chaves são os nomes dos sub-tópicos
+    // Precisamos percorrer cada sub-tópico e pegar as questões de dentro
+    let allQuestions: any[] = [];
+    Object.keys(data).forEach(subKey => {
+        const subData = data[subKey];
+        const questionsInSub = Array.isArray(subData) ? subData : Object.values(subData);
+        allQuestions = [...allQuestions, ...questionsInSub];
+    });
+
+    return allQuestions;
   },
 
   getQuestionsFromSubtopics: async (category: string, subject: string, topic: string, subtopics: string[]): Promise<any[]> => {
@@ -191,6 +228,14 @@ export const DatabaseService = {
   getSimulations: async (): Promise<Simulation[]> => {
     const snap = await get(ref(database, 'simulations'));
     return snap.exists() ? Object.values(snap.val()) : [];
+  },
+
+  saveSimulation: async (id: string, data: Simulation): Promise<void> => {
+    await set(ref(database, `simulations/${id}`), data);
+  },
+
+  deleteSimulation: async (id: string): Promise<void> => {
+    await remove(ref(database, `simulations/${id}`));
   },
 
   getQuestionsByIds: async (ids: string[]): Promise<any[]> => {
