@@ -90,6 +90,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [selectedSubTopic, setSelectedSubTopic] = useState<string>('');
+  const [showUnansweredOnly, setShowUnansweredOnly] = useState(false); // New Filter State
   
   // Dynamic Subtopics List
   const [subTopicsList, setSubTopicsList] = useState<string[]>([]);
@@ -172,6 +173,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
         } else {
             fetched = await DatabaseService.getQuestions(selectedCategory, selectedSubject, selectedTopic, selectedSubTopic || undefined);
         }
+
+        // Apply "Show Unanswered Only" Filter
+        if (showUnansweredOnly) {
+            fetched = fetched.filter(q => q.id && !answeredMap[q.id]);
+        }
+
         setQuestions(fetched);
       } catch (e) { console.error(e); } finally { setListLoading(false); }
   };
@@ -255,6 +262,20 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                 <div>
                     <label className="text-xs text-slate-400 font-bold uppercase mb-1 block">Sub-tópico (Opcional)</label>
                     <select value={selectedSubTopic} onChange={(e) => setSelectedSubTopic(e.target.value)} disabled={!selectedTopic} className="w-full glass-input p-3 rounded-xl text-sm disabled:opacity-50"><option value="">Todos os sub-tópicos</option>{subTopicsList.map((st) => (<option key={st} value={st}>{st}</option>))}</select>
+                </div>
+
+                <div className="pt-2">
+                    <button 
+                        onClick={() => setShowUnansweredOnly(!showUnansweredOnly)}
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${showUnansweredOnly ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' : 'bg-slate-900 border-white/5 text-slate-400'}`}
+                    >
+                        <span className="text-xs font-bold uppercase flex items-center gap-2">
+                            {showUnansweredOnly ? <EyeOff size={14}/> : <Eye size={14}/>} Ocultar Resolvidas
+                        </span>
+                        <div className={`w-8 h-4 rounded-full relative transition-colors ${showUnansweredOnly ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+                            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${showUnansweredOnly ? 'left-4.5' : 'left-0.5'}`} style={{ left: showUnansweredOnly ? 'calc(100% - 14px)' : '2px' }}/>
+                        </div>
+                    </button>
                 </div>
             </div>
             <button onClick={() => handleFetchQuestions()} className="mt-6 w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl">Ver Questões</button>

@@ -98,6 +98,7 @@ export interface Lesson {
   materials?: LessonMaterial[];
   tag?: { text: string; color: string };
   exerciseFilters?: { category: string; subject: string; topic: string; subtopics?: string[] };
+  order?: number;
 }
 
 export interface Question {
