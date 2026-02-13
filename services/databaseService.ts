@@ -129,7 +129,15 @@ export const DatabaseService = {
   // --- QUESTION BANK ---
   getTopics: async (): Promise<Record<string, string[]>> => {
     const snap = await get(ref(database, 'topics'));
-    return snap.exists() ? snap.val() : {};
+    if (!snap.exists()) return {};
+    const data = snap.val();
+    const processed: Record<string, string[]> = {};
+    Object.keys(data).forEach(subId => {
+        const topicsVal = data[subId];
+        // Flatten topics from object keys if stored as { "TopicName": true }
+        processed[subId] = Array.isArray(topicsVal) ? topicsVal : Object.keys(topicsVal);
+    });
+    return processed;
   },
 
   saveTopic: async (subjectId: string, topics: string[]): Promise<void> => {
@@ -142,7 +150,8 @@ export const DatabaseService = {
   },
 
   getAvailableSubtopics: async (category: string, subject: string, topic: string): Promise<string[]> => {
-    const snap = await get(ref(database, `subtopics/${category}/${subject}/${topic}`));
+    // Correct path as per database seed: subtopics/subject/topic
+    const snap = await get(ref(database, `subtopics/${subject}/${topic}`));
     return snap.exists() ? Object.keys(snap.val()) : [];
   },
 
