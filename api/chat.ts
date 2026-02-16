@@ -61,8 +61,9 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ text: response.choices[0].message.content });
     }
 
-    // Validação de saldo com o valor CALCULADO
-    if (user.balance < calculatedCost) {
+    // Validação de saldo com o valor CALCULADO (Exceto para suporte)
+    // CORREÇÃO: Adicionado verificação 'mode !== support'
+    if (mode !== 'support' && user.balance < calculatedCost) {
         return res.status(402).json({ error: 'Saldo insuficiente na NeuroAI.' });
     }
 
@@ -74,21 +75,24 @@ export default async function handler(req: any, res: any) {
     const completion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages, temperature: 0.7 });
     const aiText = completion.choices[0].message.content;
 
-    // Débito do valor CALCULADO
-    await update(userRef, { balance: Math.max(0, (user.balance || 0) - calculatedCost) });
-    
-    // Log da transação com o valor que o usuário vê (multiplicado)
-    const transRef = push(ref(db, `user_transactions/${uid}`));
-    await set(transRef, {
-        id: transRef.key,
-        userId: uid,
-        type: 'debit',
-        amount: calculatedCost, // Valor real debitado (ex: 0.10)
-        description: mode === 'explain' ? 'Explicação de Questão IA' : 'Chat NeuroAI Mentor',
-        timestamp: Date.now()
-    });
+    // Débito do valor CALCULADO (Exceto para suporte)
+    // CORREÇÃO: Adicionado verificação 'mode !== support'
+    if (mode !== 'support') {
+        await update(userRef, { balance: Math.max(0, (user.balance || 0) - calculatedCost) });
+        
+        // Log da transação com o valor que o usuário vê (multiplicado)
+        const transRef = push(ref(db, `user_transactions/${uid}`));
+        await set(transRef, {
+            id: transRef.key,
+            userId: uid,
+            type: 'debit',
+            amount: calculatedCost, // Valor real debitado (ex: 0.10)
+            description: mode === 'explain' ? 'Explicação de Questão IA' : 'Chat NeuroAI Mentor',
+            timestamp: Date.now()
+        });
+    }
 
-    await DatabaseService_LogApiCost(uid, "NeuroAI Chat", 0.002);
+    await DatabaseService_LogApiCost(uid, mode === 'support' ? "Suporte IA" : "NeuroAI Chat", 0.002);
     return res.status(200).json({ text: aiText });
 
   } catch (error: any) {

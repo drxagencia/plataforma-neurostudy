@@ -14,11 +14,17 @@ const Competitivo: React.FC = () => {
   }, [period]);
 
   const fetchLeaderboard = async () => {
-    setLoading(true);
-    // Pass period to database service (which now handles client-side sorting if needed)
-    const data = await DatabaseService.getLeaderboard(period);
-    setLeaderboard(data);
-    setLoading(false);
+    try {
+        setLoading(true);
+        // Pass period to database service (which now handles client-side sorting if needed)
+        const data = await DatabaseService.getLeaderboard(period);
+        setLeaderboard(data);
+    } catch (error) {
+        console.error("Erro ao carregar ranking:", error);
+        setLeaderboard([]);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const top3 = leaderboard.slice(0, 3);
