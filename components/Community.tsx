@@ -76,7 +76,7 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
         content: newPost,
         timestamp: Date.now(),
         likes: 0,
-        authorXp: user.xp // Pass current XP
+        authorXp: user.xp || 0 // Fix: Ensure XP is defined (fallback to 0)
       }, user.uid);
       
       setNewPost('');

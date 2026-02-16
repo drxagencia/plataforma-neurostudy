@@ -1,5 +1,4 @@
 
-
 import { 
   ref, get, set, update, push, remove, query, limitToLast, increment, orderByChild
 } from "firebase/database";
@@ -156,33 +155,47 @@ export const DatabaseService = {
     return snap.exists() ? Object.keys(snap.val()) : [];
   },
 
-  // Fix: updated return type to Promise<Question[]>
   getQuestions: async (category: string, subject: string, topic: string, subtopic?: string): Promise<Question[]> => {
+    // Structure: questions/{category}/{subject}/{topic}/{subtopic}/{question_ID}/
     const basePath = `questions/${category}/${subject}/${topic}`;
     const path = subtopic ? `${basePath}/${subtopic}` : basePath;
+    
     const snap = await get(ref(database, path));
     
     if (!snap.exists()) return [];
     
     const data = snap.val();
     
-    // Se selecionou sub-tópico específico, retorna o array/objeto direto
+    // CASO 1: Subtópico Específico Selecionado
+    // data = { q1: {...}, q2: {...} }
     if (subtopic) {
-        return Array.isArray(data) ? data : Object.values(data);
+        // Garantimos que o ID está presente no objeto
+        return Object.entries(data).map(([key, val]: [string, any]) => ({
+            ...val,
+            id: val.id || key 
+        }));
     }
 
-    // Se NÃO selecionou sub-tópico, precisamos achatar a estrutura
-    let allQuestions: any[] = [];
+    // CASO 2: Apenas Tópico Selecionado (Buscar todos os subtópicos)
+    // data = { SubTopicoA: { q1: ... }, SubTopicoB: { q2: ... } }
+    let allQuestions: Question[] = [];
+    
     Object.keys(data).forEach(subKey => {
         const subData = data[subKey];
-        const questionsInSub = Array.isArray(subData) ? subData : Object.values(subData);
-        allQuestions = [...allQuestions, ...questionsInSub];
+        if (subData && typeof subData === 'object') {
+            // Mapeia as questões dentro do subtópico, injetando o ID se necessário
+            const questionsInSub = Object.entries(subData).map(([qid, qVal]: [string, any]) => ({
+                ...qVal,
+                id: qVal.id || qid,
+                subtopic: subKey // Opcional: Adicionar contexto do subtópico
+            }));
+            allQuestions = [...allQuestions, ...questionsInSub];
+        }
     });
 
     return allQuestions;
   },
 
-  // Fix: added missing getQuestionsFromSubtopics method to solve QuestionBank.tsx error
   getQuestionsFromSubtopics: async (category: string, subject: string, topic: string, subtopics: string[]): Promise<Question[]> => {
     let allQuestions: Question[] = [];
     for (const sub of subtopics) {
@@ -226,8 +239,15 @@ export const DatabaseService = {
   },
 
   createPost: async (post: Partial<CommunityPost>, uid: string): Promise<void> => {
+    // Sanitização para evitar erro de "undefined" no Firebase
+    const sanitizedPost = {
+        ...post,
+        authorXp: post.authorXp || 0, // Garante que XP nunca é undefined
+        likes: post.likes || 0
+    };
+    
     const newPostRef = push(ref(database, 'community_posts'));
-    await set(newPostRef, post);
+    await set(newPostRef, sanitizedPost);
     await update(ref(database, `users/${uid}`), { lastPostedAt: Date.now() });
   },
 
