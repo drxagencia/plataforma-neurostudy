@@ -40,7 +40,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   
   // Recharge State
   const [showRechargeModal, setShowRechargeModal] = useState(false);
-  const [rechargeAmount, setRechargeAmount] = useState('10');
+  const [rechargeAmount, setRechargeAmount] = useState('10,00');
   
   // Unlimited Plan State
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -108,11 +108,14 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
   const handleRecharge = async () => {
     if (!auth.currentUser) return;
     
-    // Fix: Replace comma with dot for float parsing
-    const numericAmount = parseFloat(rechargeAmount.replace(',', '.'));
+    // Sanitização robusta para moeda brasileira
+    // Remove tudo que não é dígito ou vírgula
+    const cleanString = rechargeAmount.replace(/[^0-9,]/g, '');
+    // Substitui vírgula por ponto para conversão
+    const numericAmount = parseFloat(cleanString.replace(',', '.'));
     
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-        alert("Por favor, insira um valor válido.");
+    if (isNaN(numericAmount) || numericAmount < 1) {
+        alert("Por favor, insira um valor válido (mínimo R$ 1,00).");
         return;
     }
 
@@ -126,10 +129,11 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
         undefined,
         'Recarga de Saldo NeuroAI'
       );
-      alert("Solicitação de recarga enviada! Aguarde a aprovação.");
+      alert("Solicitação de recarga enviada! Aguarde a aprovação do administrador.");
       setShowRechargeModal(false);
-    } catch (error) {
-      alert("Erro ao processar recarga.");
+    } catch (error: any) {
+      console.error(error);
+      alert(`Erro ao processar recarga: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -317,7 +321,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
             <div className="space-y-6">
               <p className="text-slate-400 text-sm">O saldo é consumido apenas quando você usa a IA (R$ 0,10 por mensagem aprox).</p>
               <div className="grid grid-cols-3 gap-2">
-                {['10', '20', '50'].map(val => (
+                {['10,00', '20,00', '50,00'].map(val => (
                   <button 
                     key={val} 
                     onClick={() => setRechargeAmount(val)}
@@ -345,9 +349,10 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser }) => {
         </div>
       )}
 
-      {/* PLAN UNLIMITED MODAL */}
+      {/* PLAN UNLIMITED MODAL (Same as before) */}
       {showPlanModal && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 overflow-y-auto">
+              {/* ... (Existing Plan Modal Code) ... */}
               <div className="bg-slate-900 border border-purple-500/30 p-8 rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 my-auto">
                   {!showPixPay ? (
                       <>

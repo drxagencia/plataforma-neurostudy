@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, View, UserStatsMap } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
-import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3, Bot } from 'lucide-react';
+import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3, Bot, Edit2, Check, CheckCircle } from 'lucide-react';
 import { getRank, getNextRank } from '../constants';
 import UpgradeModal from './UpgradeModal';
 
@@ -70,6 +70,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   const [mentorLoading, setMentorLoading] = useState(false);
   const [mentorTip, setMentorTip] = useState<string | null>(null);
 
+  // Goal State
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [newGoal, setNewGoal] = useState(user.dailyGoal || 2);
+
   useEffect(() => {
     const fetchData = async () => {
         // 1. Calculate Rank Progress
@@ -99,7 +103,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
     fetchData();
   }, [user]);
 
-  // --- STATS CALCULATION ---
+  // --- STATS CALCULATION (STRICT RULES) ---
   const performanceData = useMemo(() => {
       if (!userStats) return { strengths: [], weaknesses: [], totalStats: null };
 
@@ -108,7 +112,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       Object.entries(userStats).forEach(([subject, topics]) => {
           Object.entries(topics).forEach(([topicName, stats]) => {
               const total = stats.correct + stats.wrong;
-              if (total >= 3) { // Filter out statistically insignificant
+              if (total >= 5) { // Filter out statistically insignificant (min 5 questions)
                   allTopics.push({
                       name: `${topicName} (${subject})`,
                       correct: stats.correct,
@@ -120,17 +124,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
           });
       });
 
-      // Sort by percentage
-      allTopics.sort((a, b) => b.percentage - a.percentage);
+      // Regra Estrita:
+      // Pontos Fortes: >= 80%
+      // Pontos Fracos: < 70%
+      const strengths = allTopics.filter(t => t.percentage >= 80).sort((a,b) => b.percentage - a.percentage).slice(0, 3);
+      const weaknesses = allTopics.filter(t => t.percentage < 70).sort((a,b) => a.percentage - b.percentage).slice(0, 3);
 
       return {
-          strengths: allTopics.slice(0, 3), // Top 3
-          weaknesses: allTopics.slice(-3).reverse(), // Bottom 3 (reversed to show worst first)
+          strengths,
+          weaknesses,
           totalStats: allTopics
       };
   }, [userStats]);
 
-  // --- AI MENTOR HANDLER ---
+  const handleSaveGoal = async () => {
+      setEditingGoal(false);
+      if (newGoal <= 0) return;
+      await DatabaseService.setDailyGoal(user.uid, newGoal);
+      // Optimistic update handled by parent prop refresh usually, but UI might lag
+  };
+
   const handleGenerateTip = async () => {
       if (mentorLoading) return;
       if (user.balance < 0.01) {
@@ -141,7 +154,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       setMentorLoading(true);
       try {
           const { strengths, weaknesses } = performanceData;
-          
           let prompt = "Analise os dados de desempenho do aluno:\n";
           
           if (strengths.length > 0) {
@@ -169,6 +181,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       }
   };
 
+  // Helper Format Time
+  const formatTime = (totalMinutes: number) => {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      if (h === 0) return `${m}min`;
+      return `${h}h ${m}min`;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -178,8 +198,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   }
 
   const isBasic = user.plan === 'basic';
-  // Dynamic Lost XP Calculation: 1.5x Weekly XP (Fallback to 150 if 0 to ensure trigger works)
-  const lostXpAmount = Math.floor((user.weeklyXp || 100) * 1.5);
+  const dailyMinutes = user.dailyStudyMinutes || 0;
+  const dailyGoalMinutes = (user.dailyGoal || 2) * 60;
+  const goalProgress = Math.min((dailyMinutes / dailyGoalMinutes) * 100, 100);
+  const metGoal = dailyMinutes >= dailyGoalMinutes;
 
   return (
     <div className="space-y-8 animate-slide-up pb-20">
@@ -200,30 +222,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
         </div>
       </div>
 
-      {/* FOMO ALERT: LOST OPPORTUNITY (Only for Basic) */}
-      {isBasic && (
-          <div className="bg-gradient-to-r from-amber-900/20 to-red-900/20 border border-amber-500/30 p-4 rounded-2xl flex items-center justify-between animate-in slide-in-from-top-2 relative overflow-hidden group cursor-pointer" onClick={() => setShowUpgrade(true)}>
-              <div className="absolute inset-0 bg-amber-500/5 group-hover:bg-amber-500/10 transition-colors" />
-              <div className="flex items-center gap-4 relative z-10">
-                  <div className="bg-amber-500/20 p-2 rounded-lg text-amber-400">
-                      <AlertTriangle size={20} />
-                  </div>
-                  <div>
-                      <h4 className="text-amber-200 font-bold text-sm">Oportunidade Perdida</h4>
-                      <p className="text-amber-400/80 text-xs">
-                          Você deixou de ganhar <span className="font-bold text-white">{lostXpAmount} XP Competitivos</span> esta semana por limitações do plano.
-                      </p>
-                  </div>
-              </div>
-              <div className="relative z-10 hidden md:block">
-                  <span className="text-xs font-bold text-white bg-amber-600/20 border border-amber-500/50 px-3 py-1.5 rounded-lg uppercase tracking-wide">Recuperar Vantagem</span>
-              </div>
-          </div>
-      )}
-
       {/* Hero Card - Rank Progress */}
       <div className="relative w-full rounded-3xl overflow-hidden glass-card p-8 md:p-10 group transition-all duration-500 hover:shadow-[0_0_50px_rgba(79,70,229,0.15)]">
-        {/* Abstract Background */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 animate-pulse-slow" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[80px] translate-y-1/3 -translate-x-1/4" />
         
@@ -281,43 +281,80 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* STATS GRID */}
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[
-              { 
-                  icon: <Clock className="text-blue-400" />, 
-                  label: 'Horas Estudadas', 
-                  value: `${user.hoursStudied || 0}h`,
-                  sub: 'Total acumulado'
-              },
-              { 
-                  icon: <Target className="text-emerald-400" />, 
-                  label: 'Questões Feitas', 
-                  value: user.questionsAnswered || 0,
-                  sub: 'Exercícios resolvidos'
-              },
-              { 
-                  icon: <Zap className="text-purple-400" />, 
-                  label: 'Login Streak', 
-                  value: `${user.loginStreak || 0} Dias`,
-                  sub: 'Sequência atual'
-              },
-              { 
-                  icon: <TrendingUp className="text-yellow-400" />, 
-                  label: 'Likes Dados Hoje', 
-                  value: `${user.dailyLikesGiven || 0}/5`,
-                  sub: 'Apoio à comunidade'
-              },
-            ].map((stat, i) => (
-              <div key={i} className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 hover:-translate-y-1 group">
+            
+            {/* STUDY TIME CARD (DAILY) */}
+            <div className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 group flex flex-col justify-between relative overflow-hidden">
+                {/* Goal Progress Bar */}
+                <div className="absolute bottom-0 left-0 h-1 bg-slate-800 w-full">
+                    <div className={`h-full transition-all duration-1000 ${metGoal ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{width: `${goalProgress}%`}}/>
+                </div>
+
+                <div className="flex justify-between items-start mb-2">
+                    <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
+                        <Clock className="text-blue-400" />
+                    </div>
+                    {/* Meta Edit */}
+                    <div className="flex items-center gap-2">
+                        {editingGoal ? (
+                            <div className="flex items-center bg-slate-900 rounded-lg border border-white/10 p-1">
+                                <input type="number" className="w-10 bg-transparent text-center text-white text-xs outline-none" value={newGoal} onChange={e => setNewGoal(Number(e.target.value))} autoFocus/>
+                                <button onClick={handleSaveGoal} className="p-1 bg-emerald-600 rounded text-white"><Check size={12}/></button>
+                            </div>
+                        ) : (
+                            <button onClick={() => setEditingGoal(true)} className="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-500 hover:text-indigo-400 transition-colors">
+                                <Target size={12} /> Meta: {user.dailyGoal || 2}h <Edit2 size={10} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+                
+                <div>
+                    <p className="text-slate-400 text-sm font-medium font-sans">Tempo Hoje</p>
+                    <div className="flex items-baseline gap-2">
+                        <p className="text-3xl font-bold text-white font-display">{formatTime(dailyMinutes)}</p>
+                        {metGoal && <CheckCircle size={16} className="text-emerald-500 mb-1" />}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                        {metGoal ? 'Meta diária batida! (+XP)' : `Faltam ${Math.max(0, dailyGoalMinutes - dailyMinutes)}min para a meta`}
+                    </p>
+                </div>
+            </div>
+
+            {/* Questions Stats */}
+            <div className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 group">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
-                    {stat.icon}
+                    <Target className="text-emerald-400" />
                   </div>
                 </div>
-                <p className="text-slate-400 text-sm font-medium font-sans">{stat.label}</p>
-                <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{stat.value}</p>
-                <p className="text-xs text-slate-500 font-medium font-sans">{stat.sub}</p>
-              </div>
-            ))}
+                <p className="text-slate-400 text-sm font-medium font-sans">Questões Feitas</p>
+                <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{user.questionsAnswered || 0}</p>
+                <p className="text-xs text-slate-500 font-medium font-sans">Total acumulado</p>
+            </div>
+
+            {/* Login Streak */}
+            <div className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 group">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
+                    <Zap className="text-purple-400" />
+                  </div>
+                </div>
+                <p className="text-slate-400 text-sm font-medium font-sans">Sequência</p>
+                <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{user.loginStreak || 0} Dias</p>
+                <p className="text-xs text-slate-500 font-medium font-sans">Sem perder o foco</p>
+            </div>
+
+            {/* Community Likes */}
+            <div className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 group">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
+                    <TrendingUp className="text-yellow-400" />
+                  </div>
+                </div>
+                <p className="text-slate-400 text-sm font-medium font-sans">Likes Dados</p>
+                <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{user.dailyLikesGiven || 0}/5</p>
+                <p className="text-xs text-slate-500 font-medium font-sans">Hoje</p>
+            </div>
           </div>
 
           {/* ADVANCED RADAR (BLURRED FOR BASIC) */}
@@ -334,7 +371,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                       // BLURRED STATE (PAIN POINT)
                       <>
                         <div className="space-y-4 filter blur-sm opacity-50 select-none">
-                            {/* Fake data just for blur effect */}
                             <div className="space-y-1">
                                 <div className="flex justify-between text-xs text-slate-400"><span>Matemática (Funções)</span><span className="text-emerald-400">+18%</span></div>
                                 <div className="h-2 bg-slate-800 rounded-full"><div className="h-full w-[70%] bg-emerald-500 rounded-full"></div></div>
@@ -348,7 +384,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                             </div>
                         </div>
                         
-                        {/* OVERLAY CTA */}
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 backdrop-blur-[2px] text-center p-6">
                             <div className="bg-slate-900/90 p-4 rounded-2xl border border-indigo-500/30 shadow-2xl transform hover:scale-105 transition-transform cursor-pointer" onClick={() => setShowUpgrade(true)}>
                                 <EyeOff size={32} className="mx-auto text-indigo-400 mb-3" />
@@ -368,10 +403,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                           {performanceData.totalStats && performanceData.totalStats.length > 0 ? (
                               <>
                                   <div className="space-y-3">
-                                      {/* Strengths */}
+                                      {/* Strengths (Only >= 80%) */}
                                       {performanceData.strengths.length > 0 && (
                                           <div className="space-y-1 animate-in fade-in slide-in-from-left-2">
-                                              <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Seus Pontos Fortes</p>
+                                              <p className="text-[10px] text-emerald-500 uppercase font-bold mb-1 flex items-center gap-1"><CheckCircle size={10}/> Pontos Fortes {'>'}80%</p>
                                               {performanceData.strengths.map((s, idx) => (
                                                   <div key={idx} className="space-y-1">
                                                       <div className="flex justify-between text-xs font-bold text-white"><span>{s.name}</span><span className="text-emerald-400">{s.percentage.toFixed(0)}%</span></div>
@@ -381,10 +416,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                           </div>
                                       )}
                                       
-                                      {/* Weaknesses */}
+                                      {/* Weaknesses (Only < 70%) */}
                                       {performanceData.weaknesses.length > 0 && (
                                           <div className="space-y-1 pt-2 animate-in fade-in slide-in-from-left-2 delay-100">
-                                              <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Precisa Melhorar</p>
+                                              <p className="text-[10px] text-red-500 uppercase font-bold mb-1 flex items-center gap-1"><AlertTriangle size={10}/> Atenção {'<'}70%</p>
                                               {performanceData.weaknesses.map((s, idx) => (
                                                   <div key={idx} className="space-y-1">
                                                       <div className="flex justify-between text-xs font-bold text-white"><span>{s.name}</span><span className="text-red-400">{s.percentage.toFixed(0)}%</span></div>
@@ -392,6 +427,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                                                   </div>
                                               ))}
                                           </div>
+                                      )}
+
+                                      {performanceData.strengths.length === 0 && performanceData.weaknesses.length === 0 && (
+                                          <p className="text-xs text-slate-500 text-center italic py-2">Seu desempenho está na média (70-79%). Continue assim!</p>
                                       )}
                                   </div>
 
@@ -429,7 +468,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                           ) : (
                               <div className="text-center py-8">
                                   <BarChart3 size={32} className="text-slate-700 mx-auto mb-2"/>
-                                  <p className="text-slate-500 text-sm">Responda mais questões para calibrar o radar.</p>
+                                  <p className="text-slate-500 text-sm">Responda pelo menos 5 questões de um tópico para ativar o radar.</p>
                               </div>
                           )}
                       </div>

@@ -21,6 +21,9 @@ export const DatabaseService = {
       balance: 0,
       essayCredits: 0,
       hoursStudied: 0,
+      dailyStudyMinutes: 0, // NEW
+      dailyGoal: 2, // Default Goal 2h
+      lastStudyDate: new Date().toISOString().split('T')[0], // NEW
       questionsAnswered: 0,
       loginStreak: 1,
       theme: 'dark',
@@ -70,6 +73,54 @@ export const DatabaseService = {
       xp: increment(xpToAdd),
       weeklyXp: increment(xpToAdd)
     });
+  },
+
+  // NEW: Track Study Time & Handle Goal XP
+  trackStudyTime: async (uid: string, minutesToAdd: number): Promise<void> => {
+      const userRef = ref(database, `users/${uid}`);
+      const snap = await get(userRef);
+      if (!snap.exists()) return;
+      const user = snap.val() as UserProfile;
+
+      const today = new Date().toISOString().split('T')[0];
+      const lastDate = user.lastStudyDate || '';
+      
+      let currentDailyMinutes = user.dailyStudyMinutes || 0;
+      
+      // Reset if new day
+      if (lastDate !== today) {
+          currentDailyMinutes = 0;
+          await update(userRef, { lastStudyDate: today });
+      }
+
+      const newDailyMinutes = currentDailyMinutes + minutesToAdd;
+      const goalMinutes = (user.dailyGoal || 2) * 60;
+      
+      // Check if goal met just now
+      const metGoalBefore = currentDailyMinutes >= goalMinutes;
+      const metGoalNow = newDailyMinutes >= goalMinutes;
+
+      // Update basic stats
+      await update(userRef, { 
+          dailyStudyMinutes: newDailyMinutes,
+          hoursStudied: increment(minutesToAdd / 60)
+      });
+
+      // Award XP if goal crossed this session
+      if (!metGoalBefore && metGoalNow) {
+          // Rule: Hit Goal = XP. Higher Goal = More XP.
+          // Formula: Base 50 + (20 * Goal Hours)
+          const goalXp = 50 + ((user.dailyGoal || 2) * 20);
+          
+          await update(userRef, {
+              xp: increment(goalXp),
+              weeklyXp: increment(goalXp)
+          });
+      }
+  },
+
+  setDailyGoal: async (uid: string, hours: number): Promise<void> => {
+      await update(ref(database, `users/${uid}`), { dailyGoal: hours });
   },
 
   incrementQuestionsAnswered: async (uid: string, count: number): Promise<void> => {

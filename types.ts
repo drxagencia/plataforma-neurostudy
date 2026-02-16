@@ -1,5 +1,4 @@
 
-
 export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes' | 'suporte' | 'financeiro';
 
 export type UserPlan = 'basic' | 'advanced' | 'admin';
@@ -39,7 +38,13 @@ export interface UserProfile extends User {
   lastXpWeek?: number;
   balance: number;
   essayCredits?: number;
-  hoursStudied?: number;
+  
+  // Study Stats
+  hoursStudied?: number; // Total Lifetime Hours
+  dailyStudyMinutes?: number; // Minutes studied TODAY
+  dailyGoal?: number; // Goal in HOURS
+  lastStudyDate?: string; // ISO Date YYYY-MM-DD
+  
   questionsAnswered?: number;
   loginStreak?: number;
   dailyLikesGiven?: number;

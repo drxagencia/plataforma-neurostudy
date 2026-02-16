@@ -24,7 +24,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const [pixPayload, setPixPayload] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
-  const [payerName, setPayerName] = useState(''); // NEW
+  const [payerName, setPayerName] = useState('');
   
   // Upgrade Flow
   const [isUpgrading, setIsUpgrading] = useState(false);
@@ -50,14 +50,12 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
     fetchHistory();
   }, []);
 
-  // Autofill payer name when opening buy view
   useEffect(() => {
       if (view === 'buy' && user.displayName) {
           setPayerName(user.displayName);
       }
   }, [view, user.displayName]);
 
-  // Score Animation Effect
   useEffect(() => {
       if (view === 'result' && currentResult) {
           const target = currentResult.scoreTotal;
@@ -78,7 +76,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       }
   }, [view, currentResult]);
 
-  // Auto-dismiss notification
   useEffect(() => {
       if (notification) {
           const timer = setTimeout(() => setNotification(null), 4000);
@@ -100,7 +97,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
       setView('result');
   };
 
-  // --- Pricing Logic ---
   const getPricePerUnit = (qty: number) => {
       let basePrice = 4.00;
       if (qty >= 10) basePrice = 3.50;
@@ -111,12 +107,12 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
   const totalPrice = buyQty * getPricePerUnit(buyQty);
 
-  // --- Payment Handlers ---
   const handleGeneratePayment = () => {
       if (buyQty < 1) return;
       setIsUpgrading(false);
 
       if (paymentMethod === 'card') {
+          // This block might not be reachable via button if logic is correct, but safe to keep
           window.open(KIRVANO_LINKS.essay_credits, '_blank');
           setNotification({ type: 'success', message: "Redirecionando para pagamento..." });
           return;
@@ -134,25 +130,25 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   const handleConfirmPayment = async () => {
       if (!auth.currentUser) return;
       
-      // Auto-fill name if empty to avoid friction
       const finalName = payerName.trim() || user.displayName || 'Aluno';
 
-      if (isUpgrading) {
-          // ... (Upgrade logic remains same if needed here, mostly moved to UpgradeModal)
-      } else {
+      try {
           await DatabaseService.createRechargeRequest(
               auth.currentUser.uid, 
               finalName, 
               totalPrice, 
               'CREDIT', 
-              buyQty
+              buyQty,
+              'Recarga Redação Avulsa'
           );
           setNotification({ type: 'success', message: "Solicitação enviada! Aguarde a aprovação." });
+          setShowPix(false);
+          setIsUpgrading(false);
+          setView('home');
+      } catch (error: any) {
+          console.error(error);
+          setNotification({ type: 'error', message: "Erro ao registrar solicitação. Tente novamente." });
       }
-      
-      setShowPix(false);
-      setIsUpgrading(false);
-      setView('home');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,17 +199,13 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
           let cleanJson = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
 
-          // Force Round to 20 helper
           const roundToTwenty = (num: any) => {
               const val = Number(num);
               if (isNaN(val)) return 0;
-              // Clamp between 0 and 200
               const clamped = Math.min(Math.max(val, 0), 200);
-              // Round to nearest 20
               return Math.round(clamped / 20) * 20;
           };
 
-          // Parse and Enforce Scoring Rules
           const parseScore = (val: any) => roundToTwenty(val?.score ?? val);
 
           const c1Score = parseScore(parsed.c1);
@@ -245,7 +237,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
 
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
           
-          // Calculate Dynamic XP: Score * 0.6
           const xpEarned = Math.floor(finalTotal * 0.6);
           await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_CORRECTION', xpEarned);
 
@@ -325,7 +316,6 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
   }
 
   if (view === 'result' && currentResult) {
-      // (Result view code remains same as requested to keep minimal changes)
       const getScoreColor = (score: number) => {
           if (score >= 900) return 'text-emerald-400';
           if (score >= 700) return 'text-indigo-400';
@@ -571,9 +561,8 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                   </div>
               )}
 
-              {/* --- CARD VIEW (SUBSCRIPTIONS) --- */}
+              {/* --- CARD VIEW (RESTORED PLANS) --- */}
               {paymentMethod === 'card' && (
-                  // Card subscription content remains the same
                   <div className="animate-in fade-in slide-in-from-bottom-4">
                       <div className="max-w-4xl mx-auto mb-8 bg-amber-900/20 border border-amber-500/30 p-4 rounded-xl flex items-start gap-3 relative overflow-hidden">
                           <div className="absolute inset-0 bg-amber-500/5 animate-pulse" />
@@ -586,9 +575,42 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser }) => {
                               </p>
                           </div>
                       </div>
+                      
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-end">
-                          {/* Plan Cards Code (Unchanged) */}
-                          {/* ... */}
+                          <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/10 hover:border-indigo-500/50 transition-all cursor-pointer group" onClick={() => window.open(KIRVANO_LINKS.essay_pack_basic, '_blank')}>
+                              <h3 className="text-xl font-bold text-white mb-2">Básico</h3>
+                              <p className="text-sm text-slate-400 mb-6">Para quem está começando.</p>
+                              <div className="mb-6"><span className="text-3xl font-black text-white">R$ 19,90</span><span className="text-xs text-slate-500">/mês</span></div>
+                              <ul className="space-y-3 mb-8 text-sm text-slate-300">
+                                  <li className="flex gap-2"><Check size={16} className="text-indigo-500"/> 4 Correções</li>
+                                  <li className="flex gap-2"><Check size={16} className="text-indigo-500"/> Análise IA</li>
+                              </ul>
+                              <button className="w-full py-3 bg-white text-black font-bold rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all">Assinar</button>
+                          </div>
+
+                          <div className="bg-slate-900/80 p-8 rounded-3xl border-2 border-indigo-500 relative transform hover:scale-105 transition-all shadow-2xl z-10" onClick={() => window.open(KIRVANO_LINKS.essay_pack_intermediate, '_blank')}>
+                              <div className="absolute top-0 right-0 bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl">POPULAR</div>
+                              <h3 className="text-2xl font-bold text-white mb-2">Intensivo</h3>
+                              <p className="text-sm text-slate-400 mb-6">Foco total na nota 1000.</p>
+                              <div className="mb-6"><span className="text-4xl font-black text-white">R$ 34,90</span><span className="text-xs text-slate-500">/mês</span></div>
+                              <ul className="space-y-3 mb-8 text-sm text-white font-medium">
+                                  <li className="flex gap-2"><Check size={16} className="text-emerald-400"/> 10 Correções</li>
+                                  <li className="flex gap-2"><Check size={16} className="text-emerald-400"/> Análise Detalhada</li>
+                                  <li className="flex gap-2"><Check size={16} className="text-emerald-400"/> Prioridade</li>
+                              </ul>
+                              <button className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-900/20 transition-all">Assinar Agora</button>
+                          </div>
+
+                          <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/10 hover:border-purple-500/50 transition-all cursor-pointer group" onClick={() => window.open(KIRVANO_LINKS.essay_pack_advanced, '_blank')}>
+                              <h3 className="text-xl font-bold text-white mb-2">Elite</h3>
+                              <p className="text-sm text-slate-400 mb-6">Para medicina e alta performance.</p>
+                              <div className="mb-6"><span className="text-3xl font-black text-white">R$ 59,90</span><span className="text-xs text-slate-500">/mês</span></div>
+                              <ul className="space-y-3 mb-8 text-sm text-slate-300">
+                                  <li className="flex gap-2"><Check size={16} className="text-purple-500"/> 20 Correções</li>
+                                  <li className="flex gap-2"><Check size={16} className="text-purple-500"/> Feedback Profundo</li>
+                              </ul>
+                              <button className="w-full py-3 bg-white text-black font-bold rounded-xl group-hover:bg-purple-600 group-hover:text-white transition-all">Assinar</button>
+                          </div>
                       </div>
                   </div>
               )}

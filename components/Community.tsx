@@ -144,15 +144,15 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
       }
   };
 
-  // Helper to render Rank Badge
+  // Helper to render Rank Badge (FIXED: Clean rendering)
   const RankBadge = ({ xp }: { xp?: number }) => {
       const rank = getRank(xp || 0);
-      const isHighRank = xp && xp > 16000; // Diamante+
+      const isHighRank = (xp || 0) > 16000; // Diamante+
 
       return (
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${rank.colorClass} ${rank.bgClass} ${rank.borderClass} ${rank.effect === 'glow' ? 'shadow-[0_0_10px_currentColor] animate-pulse' : ''}`}>
               {isHighRank && <ShieldCheck size={10} />}
-              {rank.name}
+              <span>{rank.name}</span>
           </span>
       );
   };
