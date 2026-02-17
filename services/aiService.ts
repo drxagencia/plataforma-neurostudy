@@ -52,7 +52,7 @@ export const AiService = {
     if (!uid) throw new Error("Não autenticado");
 
     const message = `Questão: ${question}\nResposta Errada Escolhida: ${wrongAnswer}\nResposta Correta: ${correctAnswer}\nContexto: ${context}`;
-    const systemContext = "Você é um professor experiente. Explique de forma clara e didática por que a alternativa escolhida está incorreta e o raciocínio para chegar na correta. Use Markdown.";
+    const systemContext = "Você é um professor experiente. Explique de forma clara e didática por que a alternativa escolhida está incorreta e o raciocínio para chegar na correta. Use Markdown. IMPORTANTE: Não use LaTeX ou blocos matemáticos (como \\[, \\], \\frac, \\text). Para fórmulas, use sempre notação linear simples (ex: Velocidade = Distancia / Tempo) ou texto corrido para garantir a legibilidade.";
 
     const response = await fetch('/api/chat', {
         method: 'POST',

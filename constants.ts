@@ -7,7 +7,7 @@ import {
   Languages, 
   Microscope, 
   PenTool, 
-  Scale,
+  Scale, 
   BrainCircuit,
   ScrollText,
   Map,
@@ -30,10 +30,10 @@ export const KIRVANO_LINKS = {
     essay_pack_intermediate: "https://pay.kirvano.com/68671170-9b25-4bcc-93e0-5e04ffbd4151", // Intermediário
     essay_pack_advanced: "https://pay.kirvano.com/c476c796-86e4-4de2-9871-eef7fbc966a7",     // Avançado
 
-    // IA Ilimitada (Link único fornecido)
-    ai_unlimited_monthly: "https://pay.kirvano.com/2b01fe5f-9b22-4325-8d6c-835ed83119d8",
-    ai_unlimited_semester: "https://pay.kirvano.com/2b01fe5f-9b22-4325-8d6c-835ed83119d8",
-    ai_unlimited_yearly: "https://pay.kirvano.com/2b01fe5f-9b22-4325-8d6c-835ed83119d8",
+    // IA Ilimitada (Novos Planos)
+    ai_weekly: "https://pay.kirvano.com/weekly-link-placeholder", // Substituir pelo link real semanal
+    ai_monthly: "https://pay.kirvano.com/2b01fe5f-9b22-4325-8d6c-835ed83119d8",
+    // Anual é via PIX direto na plataforma
 
     // Upgrades (Direcionam para o Advanced)
     upgrade_monthly: "https://pay.kirvano.com/9364ce1c-9acd-48d1-ba53-1c8f764dcca6",
