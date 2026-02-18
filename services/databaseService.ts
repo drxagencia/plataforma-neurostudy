@@ -1,4 +1,3 @@
-
 import { 
   ref, 
   get, 
@@ -9,7 +8,7 @@ import {
   query, 
   orderByChild, 
   equalTo, 
-  increment,
+  increment, 
   limitToLast
 } from "firebase/database";
 import { database } from "./firebaseConfig";
@@ -24,7 +23,7 @@ import {
   Lead, 
   Transaction, 
   OperationalCost,
-  RechargeRequest,
+  RechargeRequest, 
   SupportTicket,
   EssayCorrection,
   TrafficConfig,
@@ -81,11 +80,9 @@ export const DatabaseService = {
     const amount = customAmount !== undefined ? customAmount : XP_VALUES[actionType];
     if (amount <= 0) return;
 
-    // We can handle weekly XP logic here or via cloud functions. 
-    // For simplicity, updating total XP.
     await update(ref(database, `users/${uid}`), {
       xp: increment(amount),
-      weeklyXp: increment(amount) // Resetting weekly XP would typically be a scheduled job
+      weeklyXp: increment(amount) 
     });
   },
 
@@ -110,14 +107,11 @@ export const DatabaseService = {
   async getSubjects(): Promise<Subject[]> {
     const snap = await get(ref(database, 'subjects'));
     if (!snap.exists()) return [];
-    // If it's an object, convert to array
     const val = snap.val();
     return Array.isArray(val) ? val : Object.values(val);
   },
 
   async getSubjectsWithLessons(): Promise<string[]> {
-    // This assumes we can infer it or we have a specific list. 
-    // Returning all subjects ids for now that have lessons
     const snap = await get(ref(database, 'lessons'));
     return snap.exists() ? Object.keys(snap.val()) : [];
   },
@@ -146,30 +140,39 @@ export const DatabaseService = {
 
   // --- QUESTIONS ---
   async getTopics(): Promise<Record<string, string[]>> {
-    // Assuming topics are stored under subjects or separately. 
-    // Implementing basic fetch from subjects/lessons structure if needed, 
-    // but typically this might be a separate metadata node.
-    const snap = await get(ref(database, 'topics_metadata')); 
-    return snap.exists() ? snap.val() : {};
+    const snap = await get(ref(database, 'topics'));
+    if (!snap.exists()) return {};
+    
+    const data = snap.val();
+    const result: Record<string, string[]> = {};
+    
+    // Parse nested object structure { subject: { topic: boolean } } -> { subject: [topics] }
+    Object.keys(data).forEach(subjectId => {
+        const topicsObj = data[subjectId];
+        if (topicsObj) {
+            result[subjectId] = Object.keys(topicsObj);
+        }
+    });
+    return result;
   },
 
   async getAvailableSubtopics(category: string, subject: string, topic: string): Promise<string[]> {
-      // Simplified: return empty or fetch from metadata
-      return []; 
+      const snap = await get(ref(database, `subtopics/${subject}/${topic}`));
+      return snap.exists() ? Object.keys(snap.val()) : [];
   },
 
   async getQuestions(category: string, subject: string, topic: string, subtopic?: string): Promise<Question[]> {
-    // Logic to query questions. Assuming structure questions/{subject}/{topic}/{id} or similar flat list
-    // This depends on how questions are indexed.
-    // Fallback: Query all questions for a subject/topic
     const q = query(ref(database, `questions`), orderByChild('topic'), equalTo(topic));
     const snap = await get(q);
     if (!snap.exists()) return [];
+    
     const questions: Question[] = Object.values(snap.val());
+    const filtered = questions.filter(q => q.subjectId === subject);
+    
     if (subtopic) {
-        return questions.filter(q => q.subtopic === subtopic);
+        return filtered.filter(q => q.subtopic === subtopic);
     }
-    return questions.filter(q => q.subjectId === subject); 
+    return filtered; 
   },
 
   async getQuestionsFromSubtopics(category: string, subject: string, topic: string, subtopics: string[]): Promise<Question[]> {
@@ -210,8 +213,8 @@ export const DatabaseService = {
       const q = query(ref(database, 'community_posts'), limitToLast(50));
       const snap = await get(q);
       if (!snap.exists()) return [];
-      // Firebase keys are sorted by time pushid usually, but explicit sort is safer
-      return Object.values(snap.val()).sort((a: any, b: any) => b.timestamp - a.timestamp);
+      const posts = Object.values(snap.val()) as CommunityPost[];
+      return posts.sort((a, b) => b.timestamp - a.timestamp);
   },
 
   async createPost(post: Omit<CommunityPost, 'id'>, uid: string): Promise<void> {
@@ -227,18 +230,15 @@ export const DatabaseService = {
           const post = snap.val();
           const likedBy = post.likedBy || {};
           if (likedBy[uid]) {
-              // Unlike
               await update(postRef, {
                   likes: increment(-1),
                   [`likedBy/${uid}`]: null
               });
           } else {
-              // Like
               await update(postRef, {
                   likes: increment(1),
                   [`likedBy/${uid}`]: true
               });
-              // Give XP to author? Maybe.
           }
       }
   },
@@ -315,26 +315,20 @@ export const DatabaseService = {
           const snap = await get(ref(database, `recharge_requests/${reqId}`));
           if (snap.exists()) {
               const req = snap.val() as RechargeRequest;
-              // If it's credits (redação), update essayCredits
               if (req.currencyType === 'CREDIT' && req.quantityCredits) {
                   await update(ref(database, `users/${req.userId}`), {
                       essayCredits: increment(req.quantityCredits),
                       totalSpent: increment(req.amount)
                   });
               } else if (req.currencyType === 'BRL') {
-                  // If it's balance or just financial record
-                  // Assuming balance recharge for now or plan upgrade
                   await update(ref(database, `users/${req.userId}`), {
-                      // balance: increment(req.amount), // Only if it's AI Balance
                       totalSpent: increment(req.amount)
                   });
-                  // If it was an Upgrade request
                   if (req.planLabel?.includes('UPGRADE')) {
                       await update(ref(database, `users/${req.userId}`), { plan: 'advanced' });
                   }
               }
 
-              // Create Transaction Record
               const tRef = push(ref(database, `user_transactions/${req.userId}`));
               await set(tRef, {
                   id: tRef.key,
@@ -354,8 +348,6 @@ export const DatabaseService = {
   },
 
   async getAllGlobalTransactions(): Promise<Transaction[]> {
-     // This is heavy, in prod should rely on a global log or functions
-     // Fetching all users' transactions manually for now
      const snap = await get(ref(database, 'user_transactions'));
      if (!snap.exists()) return [];
      const all: Transaction[] = [];

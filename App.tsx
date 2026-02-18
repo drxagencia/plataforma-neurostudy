@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import Auth from './components/Auth';
@@ -79,19 +78,22 @@ const App: React.FC = () => {
 
   // GLOBAL STUDY TIMER (TRACKS TIME ON DASHBOARD/APP)
   useEffect(() => {
-      if (!user || showLanding) return;
+      // Ensure we have a valid user ID and not on landing page
+      if (!user?.uid || showLanding) return;
 
       const timer = setInterval(() => {
-          // Track only if window is visible (user is active)
-          if (document.visibilityState === 'visible') {
-              DatabaseService.trackStudyTime(user.uid, 1);
-              // Optimistic UI Update for Dashboard
-              setUser(prev => prev ? {
-                  ...prev,
-                  dailyStudyMinutes: (prev.dailyStudyMinutes || 0) + 1,
-                  hoursStudied: (prev.hoursStudied || 0) + (1/60)
-              } : null);
-          }
+          // Track unequivocally every 60s while logged in
+          DatabaseService.trackStudyTime(user.uid, 1);
+          
+          // Optimistic UI Update for Dashboard using functional update to access current state
+          setUser(currentUser => {
+              if (!currentUser) return null;
+              return {
+                  ...currentUser,
+                  dailyStudyMinutes: (currentUser.dailyStudyMinutes || 0) + 1,
+                  hoursStudied: (currentUser.hoursStudied || 0) + (1/60)
+              };
+          });
       }, 60000); // Check every 1 minute
 
       return () => clearInterval(timer);
