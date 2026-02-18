@@ -1,16 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
 import { CommunityPost, UserProfile } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { auth } from '../services/firebaseConfig';
-import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle, Clock, CornerDownRight, ShieldCheck, Zap } from 'lucide-react';
+import { MessageCircle, Heart, Share2, Send, Loader2, AlertCircle, Clock, CornerDownRight, ShieldCheck, Zap, Lock } from 'lucide-react';
 import { getRank } from '../constants';
 
 interface CommunityProps {
     user: UserProfile;
+    onShowUpgrade?: () => void;
 }
 
-const Community: React.FC<CommunityProps> = ({ user }) => {
+const Community: React.FC<CommunityProps> = ({ user, onShowUpgrade }) => {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
@@ -18,20 +18,18 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [timerString, setTimerString] = useState<string | null>(null);
 
-  // Replies State
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
 
-  // 1. Fetch Posts
+  const isBasic = user.plan === 'basic';
+
   useEffect(() => {
     fetchPosts();
-    // Start local timer loop
     const timerInterval = setInterval(updateTimerDisplay, 1000);
-    updateTimerDisplay(); // Initial call
+    updateTimerDisplay(); 
     return () => clearInterval(timerInterval);
   }, []);
 
-  // 2. Timer Logic using props (No DB fetch)
   const updateTimerDisplay = () => {
       if (!user.lastPostedAt) {
           setTimerString(null);
@@ -42,9 +40,8 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
       const diff = nextPostTime - Date.now();
 
       if (diff <= 0) {
-          setTimerString(null); // Timer finished
+          setTimerString(null);
       } else {
-          // Format HH:MM:SS
           const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
           const minutes = Math.floor((diff / (1000 * 60)) % 60);
           const seconds = Math.floor((diff / 1000) % 60);
@@ -60,6 +57,14 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // BASIC LIMITATION
+    if (isBasic) {
+        if(onShowUpgrade) onShowUpgrade();
+        else alert("Recurso exclusivo Advanced");
+        return;
+    }
+
     if (!newPost.trim() || !auth.currentUser) return;
 
     if (timerString) {
@@ -76,12 +81,10 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
         content: newPost,
         timestamp: Date.now(),
         likes: 0,
-        authorXp: user.xp || 0 // Fix: Ensure XP is defined (fallback to 0)
+        authorXp: user.xp || 0 
       }, user.uid);
       
       setNewPost('');
-      // Force refresh posts. Note: User prop won't update instantly here without parent refresh,
-      // but for Community limiting, the backend rejection handles it, and we optimistically assume timer started.
       fetchPosts(); 
     } catch (error: any) {
       setErrorMsg(error.message);
@@ -91,43 +94,41 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
   };
 
   const handleToggleLike = async (postId: string) => {
+      // BASIC LIMITATION
+      if (isBasic) {
+          if(onShowUpgrade) onShowUpgrade();
+          return;
+      }
+
       if (!auth.currentUser) return;
       const uid = auth.currentUser.uid;
       
-      // 1. Optimistic Update
       setPosts(prevPosts => prevPosts.map(p => {
           if (p.id === postId) {
               const isLiked = p.likedBy && p.likedBy[uid];
               const newLikesCount = isLiked ? (p.likes - 1) : (p.likes + 1);
-              
-              // Create new likedBy object
               const newLikedBy = { ...(p.likedBy || {}) };
-              if (isLiked) {
-                  delete newLikedBy[uid];
-              } else {
-                  newLikedBy[uid] = true;
-              }
-
-              return {
-                  ...p,
-                  likes: newLikesCount,
-                  likedBy: newLikedBy
-              };
+              if (isLiked) delete newLikedBy[uid]; else newLikedBy[uid] = true;
+              return { ...p, likes: newLikesCount, likedBy: newLikedBy };
           }
           return p;
       }));
 
-      // 2. Database Transaction
       try {
         await DatabaseService.toggleLike(postId, uid);
       } catch (e) {
         console.error("Like toggle failed", e);
-        // Revert (could fetch posts again or revert logic)
         fetchPosts(); 
       }
   };
 
   const handleReplySubmit = async (postId: string) => {
+      // BASIC LIMITATION
+      if (isBasic) {
+          if(onShowUpgrade) onShowUpgrade();
+          return;
+      }
+
       if (!auth.currentUser || !replyContent.trim()) return;
       
       try {
@@ -138,16 +139,16 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
           
           setReplyContent('');
           setReplyingTo(null);
-          fetchPosts(); // Reload to show new reply
+          fetchPosts(); 
       } catch (e) {
           alert("Erro ao responder");
       }
   };
 
-  // Helper to render Rank Badge (FIXED: Clean rendering)
+  // Helper to render Rank Badge
   const RankBadge = ({ xp }: { xp?: number }) => {
       const rank = getRank(xp || 0);
-      const isHighRank = (xp || 0) > 16000; // Diamante+
+      const isHighRank = (xp || 0) > 16000; 
 
       return (
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${rank.colorClass} ${rank.bgClass} ${rank.borderClass} ${rank.effect === 'glow' ? 'shadow-[0_0_10px_currentColor] animate-pulse' : ''}`}>
@@ -178,18 +179,12 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
           <textarea
             value={newPost}
             onChange={(e) => setNewPost(e.target.value)}
-            placeholder={timerString ? `Você poderá postar novamente em ${timerString}` : "No que você está pensando? Dúvidas, dicas..."}
+            placeholder={isBasic ? "Atualize seu plano para participar da comunidade..." : (timerString ? `Você poderá postar novamente em ${timerString}` : "No que você está pensando? Dúvidas, dicas...")}
             disabled={!!timerString}
+            onClick={() => isBasic && onShowUpgrade && onShowUpgrade()}
             className="w-full bg-transparent text-white placeholder-slate-500 resize-none focus:outline-none min-h-[80px] disabled:opacity-50"
           />
           
-          {errorMsg && (
-             <div className="flex items-center gap-2 text-red-400 text-sm mt-2 p-2 bg-red-900/10 rounded-lg">
-                <AlertCircle size={14} />
-                {errorMsg}
-             </div>
-          )}
-
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/5">
              <div className={`flex gap-2 text-xs items-center ${timerString ? 'text-yellow-400 font-mono font-bold' : 'text-slate-500'}`}>
                 <Clock size={12} /> 
@@ -197,11 +192,11 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
              </div>
              <button 
                type="submit" 
-               disabled={!newPost.trim() || submitting || !!timerString}
+               disabled={(!newPost.trim() && !isBasic) || submitting || !!timerString}
                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
              >
-               {submitting ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
-               Publicar
+               {isBasic ? <Lock size={16}/> : (submitting ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />)}
+               {isBasic ? 'Desbloquear' : 'Publicar'}
              </button>
           </div>
         </div>
@@ -274,16 +269,17 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
                          <div className="flex-1 flex gap-2">
                             <textarea 
                                 className="flex-1 glass-input rounded-xl px-3 py-2 text-sm min-h-[40px] resize-none" 
-                                placeholder="Escreva sua resposta..."
+                                placeholder={isBasic ? "Bloqueado para Basic..." : "Escreva sua resposta..."}
                                 value={replyContent}
                                 onChange={(e) => setReplyContent(e.target.value)}
+                                onClick={() => isBasic && onShowUpgrade && onShowUpgrade()}
                             />
                             <button 
                                 onClick={() => handleReplySubmit(post.id)} 
-                                disabled={!replyContent.trim()}
+                                disabled={(!replyContent.trim() && !isBasic)}
                                 className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl text-white h-[40px] w-[40px] flex items-center justify-center"
                             >
-                                <Send size={16}/>
+                                {isBasic ? <Lock size={16}/> : <Send size={16}/>}
                             </button>
                          </div>
                      </div>
@@ -292,9 +288,6 @@ const Community: React.FC<CommunityProps> = ({ user }) => {
              </div>
           </div>
         )})}
-        {posts.length === 0 && (
-          <p className="text-center text-slate-500 mt-10">Nenhuma postagem ainda.</p>
-        )}
       </div>
     </div>
   );

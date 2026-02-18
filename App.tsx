@@ -8,7 +8,7 @@ import Community from './components/Community';
 import Simulations from './components/Simulations';
 import Settings from './components/Settings';
 import AdminPanel from './components/AdminPanel';
-import FinanceiroPanel from './components/FinanceiroPanel'; // NEW
+import FinanceiroPanel from './components/FinanceiroPanel'; 
 import Competitivo from './components/Competitivo';
 import AiTutor from './components/AiTutor';
 import Redacao from './components/Redacao';
@@ -16,11 +16,11 @@ import Militares from './components/Militares';
 import FullScreenPrompt from './components/FullScreenPrompt'; 
 import LandingPage from './components/LandingPage'; 
 import Support from './components/Support';
+import UpgradeModal from './components/UpgradeModal'; // Import global modal
 import { View, UserProfile } from './types';
 import { mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
-// Fix: Ensure modular import for onAuthStateChanged
 import { onAuthStateChanged } from 'firebase/auth';
 import { Smartphone, CheckCircle, Loader2 } from 'lucide-react';
 
@@ -33,6 +33,9 @@ const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [whatsappInput, setWhatsappInput] = useState('');
   const [onboardingLoading, setOnboardingLoading] = useState(false);
+  
+  // Global Upgrade Modal State
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -55,13 +58,10 @@ const App: React.FC = () => {
           });
           
           const finalUser = { ...mappedUser, ...dbUser };
-          // Ensure daily counters are initialized in local state even if DB didn't have them
           if (typeof finalUser.dailyStudyMinutes === 'undefined') finalUser.dailyStudyMinutes = 0;
           
           setUser(finalUser);
           
-          // CRÍTICO: Só ativa o estado de onboarding se NÃO estiver na Landing Page
-          // E se o setup inicial ainda não foi concluído.
           if (!dbUser.firstTimeSetupDone && !showLanding) {
               setShowOnboarding(true);
           } else {
@@ -79,18 +79,14 @@ const App: React.FC = () => {
       }
     });
     return () => unsubscribe();
-  }, [showLanding]); // Re-executa se o usuário sair da LP para o Dashboard
+  }, [showLanding]); 
 
-  // GLOBAL STUDY TIMER (TRACKS TIME ON DASHBOARD/APP)
+  // GLOBAL STUDY TIMER
   useEffect(() => {
-      // Ensure we have a valid user ID and not on landing page
       if (!user?.uid || showLanding) return;
 
       const timer = setInterval(() => {
-          // Track unequivocally every 60s while logged in
           DatabaseService.trackStudyTime(user.uid, 1);
-          
-          // Optimistic UI Update for Dashboard using functional update to access current state
           setUser(currentUser => {
               if (!currentUser) return null;
               return {
@@ -99,7 +95,7 @@ const App: React.FC = () => {
                   hoursStudied: (currentUser.hoursStudied || 0) + (1/60)
               };
           });
-      }, 60000); // Check every 1 minute
+      }, 60000); 
 
       return () => clearInterval(timer);
   }, [user?.uid, showLanding]);
@@ -118,7 +114,10 @@ const App: React.FC = () => {
       }
   };
 
-  // Se estiver na Landing Page, renderiza ela e interrompe qualquer outro fluxo (inclusive modal)
+  const handleShowUpgrade = () => {
+      setShowUpgradeModal(true);
+  };
+
   if (showLanding) {
       return <LandingPage onStartGame={() => setShowLanding(false)} />;
   }
@@ -136,7 +135,10 @@ const App: React.FC = () => {
   return (
     <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       
-      {/* MODAL DE CAPTURA DE WHATSAPP (Aparece apenas na área logada) */}
+      {/* Global Upgrade Modal */}
+      {showUpgradeModal && <UpgradeModal user={user} onClose={() => setShowUpgradeModal(false)} />}
+
+      {/* MODAL DE CAPTURA DE WHATSAPP */}
       {showOnboarding && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/95 backdrop-blur-xl p-4">
               <div className="bg-slate-900 border border-indigo-500/30 p-8 rounded-3xl max-w-md w-full shadow-2xl animate-in zoom-in-95 text-center">
@@ -191,12 +193,14 @@ const App: React.FC = () => {
             {currentView === 'militares' && <Militares />}
             {currentView === 'redacao' && <Redacao user={user} onUpdateUser={u => setUser(u)} />}
             {currentView === 'questoes' && <QuestionBank onUpdateUser={u => setUser(u)} />}
-            {currentView === 'comunidade' && <Community user={user} />}
-            {currentView === 'simulados' && <Simulations />}
-            {currentView === 'tutor' && <AiTutor user={user} onUpdateUser={u => setUser(u)} />}
+            {/* Pass onShowUpgrade to restricted/demo views */}
+            {currentView === 'comunidade' && <Community user={user} onShowUpgrade={handleShowUpgrade} />}
+            {currentView === 'simulados' && <Simulations user={user} onShowUpgrade={handleShowUpgrade} />}
+            {currentView === 'tutor' && <AiTutor user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={handleShowUpgrade} />}
+            {currentView === 'competitivo' && <Competitivo user={user} onShowUpgrade={handleShowUpgrade} />}
+            
             {currentView === 'ajustes' && <Settings user={user} onUpdateUser={u => setUser(u)} />}
             {currentView === 'suporte' && <Support user={user} />}
-            {currentView === 'competitivo' && <Competitivo />}
             {currentView === 'financeiro' && (user.isAdmin ? <FinanceiroPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />)}
             {currentView === 'admin' && (user.isAdmin ? <AdminPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />)}
         </div>
