@@ -77,6 +77,26 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [showLanding]); // Re-executa se o usuário sair da LP para o Dashboard
 
+  // GLOBAL STUDY TIMER (TRACKS TIME ON DASHBOARD/APP)
+  useEffect(() => {
+      if (!user || showLanding) return;
+
+      const timer = setInterval(() => {
+          // Track only if window is visible (user is active)
+          if (document.visibilityState === 'visible') {
+              DatabaseService.trackStudyTime(user.uid, 1);
+              // Optimistic UI Update for Dashboard
+              setUser(prev => prev ? {
+                  ...prev,
+                  dailyStudyMinutes: (prev.dailyStudyMinutes || 0) + 1,
+                  hoursStudied: (prev.hoursStudied || 0) + (1/60)
+              } : null);
+          }
+      }, 60000); // Check every 1 minute
+
+      return () => clearInterval(timer);
+  }, [user?.uid, showLanding]);
+
   const handleOnboardingSubmit = async () => {
       if (whatsappInput.length < 10 || !user) return;
       setOnboardingLoading(true);
