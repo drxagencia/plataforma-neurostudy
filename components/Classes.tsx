@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { DatabaseService } from '../services/databaseService';
 // Added missing auth import
@@ -108,9 +107,10 @@ interface ClassesProps {
     onNavigate: (view: View) => void;
     user: UserProfile;
     onUpdateUser: (u: UserProfile) => void;
+    onShowUpgrade?: () => void;
 }
 
-const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => {
+const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser, onShowUpgrade }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -241,6 +241,13 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
 
   const handleTutorAction = async (actionType: 'summary' | 'mindmap' | 'custom') => {
       if (!selectedLesson) return;
+      
+      // BASIC USER UPSELL INTERCEPT
+      if (user.plan === 'basic') {
+          onShowUpgrade?.();
+          return;
+      }
+
       if (user.balance < 0.05) {
           alert("Saldo insuficiente para utilizar o NeuroTutor Avançado.");
           return;
@@ -350,7 +357,7 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser }) => 
                   <div className="p-4 border-t border-white/10 bg-slate-900 pb-safe">
                       <div className="relative">
                           <input value={tutorInput} onChange={(e) => setTutorInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleTutorAction('custom')} placeholder="Pergunte algo específico sobre a aula..." className="w-full bg-slate-950 border border-slate-800 rounded-xl py-4 pl-4 pr-12 text-white focus:border-indigo-500 focus:outline-none transition-colors" />
-                          <button onClick={() => handleTutorAction('custom')} disabled={!tutorInput.trim() || tutorLoading} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 hover:bg-indigo-50 text-white rounded-lg transition-colors disabled:opacity-50">
+                          <button onClick={() => handleTutorAction('custom')} disabled={!tutorInput.trim() || tutorLoading} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors disabled:opacity-50">
                               <ArrowRight size={18} />
                           </button>
                       </div>

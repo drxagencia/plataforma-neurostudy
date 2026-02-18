@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
@@ -21,6 +20,8 @@ import {
 
 interface QuestionBankProps {
   onUpdateUser: (u: UserProfile) => void;
+  user?: UserProfile;
+  onShowUpgrade?: () => void;
 }
 
 // --- PROFESSIONAL MARKDOWN RENDERER ---
@@ -75,7 +76,7 @@ const ProfessionalMarkdown: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
-const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
+const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowUpgrade }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
@@ -200,6 +201,11 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   };
 
   const handleExplain = async () => {
+      if (user && user.plan === 'basic') {
+          onShowUpgrade?.();
+          return;
+      }
+
       const currentQ = questions[currentIndex];
       if (!currentQ) return;
       

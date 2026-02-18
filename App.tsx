@@ -189,10 +189,10 @@ const App: React.FC = () => {
       <main className={`flex-1 relative overflow-y-auto transition-all duration-300 z-10 ${isMobile ? 'pb-24 p-4' : 'ml-64 p-8'}`} style={{ height: '100vh' }}>
         <div className="max-w-7xl mx-auto h-full">
             {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} />}
-            {currentView === 'aulas' && <Classes onNavigate={setCurrentView} user={user} onUpdateUser={u => setUser(u)} />}
+            {currentView === 'aulas' && <Classes onNavigate={setCurrentView} user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={handleShowUpgrade} />}
             {currentView === 'militares' && <Militares />}
-            {currentView === 'redacao' && <Redacao user={user} onUpdateUser={u => setUser(u)} />}
-            {currentView === 'questoes' && <QuestionBank onUpdateUser={u => setUser(u)} />}
+            {currentView === 'redacao' && <Redacao user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={handleShowUpgrade} />}
+            {currentView === 'questoes' && <QuestionBank user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={handleShowUpgrade} />}
             {/* Pass onShowUpgrade to restricted/demo views */}
             {currentView === 'comunidade' && <Community user={user} onShowUpgrade={handleShowUpgrade} />}
             {currentView === 'simulados' && <Simulations user={user} onShowUpgrade={handleShowUpgrade} />}
