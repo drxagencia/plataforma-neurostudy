@@ -15,12 +15,65 @@ import {
   ChevronUp,
   FileQuestion,
   Search,
-  BookOpen
+  BookOpen,
+  Zap
 } from 'lucide-react';
 
 interface QuestionBankProps {
   onUpdateUser: (u: UserProfile) => void;
 }
+
+// --- PROFESSIONAL MARKDOWN RENDERER ---
+const parseInlineStyles = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+                <span key={i} className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-cyan-200 to-sky-300">
+                    {part.slice(2, -2)}
+                </span>
+            );
+        }
+        return part;
+    });
+};
+
+const ProfessionalMarkdown: React.FC<{ text: string }> = ({ text }) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+
+    return (
+        <div className="space-y-3 font-sans text-sm leading-relaxed">
+            {lines.map((line, idx) => {
+                const trimmed = line.trim();
+                
+                if (trimmed.startsWith('###')) {
+                    const content = trimmed.replace(/^###\s*/, '');
+                    return (
+                        <div key={idx} className="flex items-center gap-2 mt-4 mb-2">
+                            <div className="w-1.5 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
+                            <h3 className="text-base font-bold text-white tracking-tight">{content}</h3>
+                        </div>
+                    );
+                }
+
+                if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                    const content = trimmed.replace(/^[-*]\s*/, '');
+                    return (
+                        <div key={idx} className="flex gap-2 pl-2 group">
+                            <div className="mt-1.5 min-w-[6px] h-[6px] rounded-full bg-indigo-400 shrink-0" />
+                            <p className="text-slate-300">{parseInlineStyles(content)}</p>
+                        </div>
+                    );
+                }
+
+                if (!trimmed) return <div key={idx} className="h-1"></div>;
+
+                return <p key={idx} className="text-slate-200">{parseInlineStyles(line)}</p>;
+            })}
+        </div>
+    );
+};
 
 const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -355,10 +408,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser }) => {
                     {/* AI Explanation Box */}
                     {aiExplanation && (
                         <div className="mt-6 p-6 bg-indigo-950/30 border border-indigo-500/30 rounded-2xl animate-in fade-in slide-in-from-top-2">
-                             <h4 className="text-indigo-400 font-bold text-sm mb-2 flex items-center gap-2">
+                             <h4 className="text-indigo-400 font-bold text-sm mb-4 flex items-center gap-2">
                                  <BrainCircuit size={16}/> Explicação do NeuroTutor
                              </h4>
-                             <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{aiExplanation}</p>
+                             <ProfessionalMarkdown text={aiExplanation} />
                         </div>
                     )}
                 </div>
