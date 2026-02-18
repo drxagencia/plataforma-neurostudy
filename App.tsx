@@ -53,7 +53,12 @@ const App: React.FC = () => {
                  plan: mappedUser.isAdmin ? 'admin' : 'basic',
                  isAdmin: mappedUser.isAdmin
           });
-          setUser({ ...mappedUser, ...dbUser });
+          
+          const finalUser = { ...mappedUser, ...dbUser };
+          // Ensure daily counters are initialized in local state even if DB didn't have them
+          if (typeof finalUser.dailyStudyMinutes === 'undefined') finalUser.dailyStudyMinutes = 0;
+          
+          setUser(finalUser);
           
           // CRÍTICO: Só ativa o estado de onboarding se NÃO estiver na Landing Page
           // E se o setup inicial ainda não foi concluído.

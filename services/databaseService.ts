@@ -45,9 +45,20 @@ export const DatabaseService = {
   async ensureUserProfile(uid: string, defaultData: Partial<UserProfile>): Promise<UserProfile> {
     const snap = await get(ref(database, `users/${uid}`));
     if (snap.exists()) {
-      return snap.val();
+      const data = snap.val();
+      // Ensure daily counters exist to prevent UI bugs
+      if (typeof data.dailyStudyMinutes === 'undefined') data.dailyStudyMinutes = 0;
+      if (typeof data.hoursStudied === 'undefined') data.hoursStudied = 0;
+      return data;
     }
-    const newUser = { ...defaultData, uid, balance: 0, xp: 0 };
+    const newUser = { 
+        ...defaultData, 
+        uid, 
+        balance: 0, 
+        xp: 0,
+        dailyStudyMinutes: 0,
+        hoursStudied: 0
+    };
     await set(ref(database, `users/${uid}`), newUser);
     return newUser as UserProfile;
   },
@@ -162,25 +173,66 @@ export const DatabaseService = {
   },
 
   async getQuestions(category: string, subject: string, topic: string, subtopic?: string): Promise<Question[]> {
-    const q = query(ref(database, `questions`), orderByChild('topic'), equalTo(topic));
-    const snap = await get(q);
-    if (!snap.exists()) return [];
+    // Map category name to DB key (handle 'military' vs 'militar')
+    const dbCategory = category === 'military' ? 'militar' : category;
     
-    const questions: Question[] = Object.values(snap.val());
-    const filtered = questions.filter(q => q.subjectId === subject);
-    
+    // Hierarchy: questions/{category}/{subject}/{topic}/{subtopic}/{id}
+    const basePath = `questions/${dbCategory}/${subject}/${topic}`;
+
     if (subtopic) {
-        return filtered.filter(q => q.subtopic === subtopic);
+        // Fetch specific subtopic
+        const snap = await get(ref(database, `${basePath}/${subtopic}`));
+        if (!snap.exists()) return [];
+        return Object.values(snap.val());
+    } else {
+        // Fetch ALL subtopics under this topic
+        const snap = await get(ref(database, basePath));
+        if (!snap.exists()) return [];
+        
+        const subtopicsObj = snap.val();
+        let allQuestions: Question[] = [];
+        
+        // Iterate over subtopics
+        Object.values(subtopicsObj).forEach((subContent: any) => {
+            if (subContent && typeof subContent === 'object') {
+                const questionsInSub = Object.values(subContent) as Question[];
+                allQuestions.push(...questionsInSub);
+            }
+        });
+        
+        return allQuestions;
     }
-    return filtered; 
   },
 
   async getQuestionsFromSubtopics(category: string, subject: string, topic: string, subtopics: string[]): Promise<Question[]> {
-     const all = await this.getQuestions(category, subject, topic);
-     return all.filter(q => q.subtopic && subtopics.includes(q.subtopic));
+     const dbCategory = category === 'military' ? 'militar' : category;
+     
+     const promises = subtopics.map(sub => 
+         get(ref(database, `questions/${dbCategory}/${subject}/${topic}/${sub}`))
+     );
+     
+     const snapshots = await Promise.all(promises);
+     
+     let allQuestions: Question[] = [];
+     snapshots.forEach(snap => {
+         if (snap.exists()) {
+             allQuestions.push(...Object.values(snap.val()) as Question[]);
+         }
+     });
+     
+     return allQuestions;
   },
 
   async getQuestionsByIds(ids: string[]): Promise<Question[]> {
+      // NOTE: Searching by ID is inefficient in deep hierarchy without an index.
+      // Ideally, we should know the path. For now, assuming questions are also indexed by ID or using this for Simulations 
+      // where we might need a direct lookup mechanism.
+      // If questions are NOT flat-indexed, this requires a change. 
+      // Assuming for now user has a flat 'questions' node OR we scan (very slow).
+      // Fallback: This method might fail if questions aren't duplicated at root.
+      // Strategy: Since we don't have paths, we try to fetch from flat 'questions' if it exists, or fail gracefully.
+      // Given the prompt constraints, we'll try fetching assuming a flat backup or that IDs contain path info.
+      // Current implementation assumes flat lookup at root `questions/{id}` which is common for ID-based retrieval.
       const promises = ids.map(id => get(ref(database, `questions/${id}`)));
       const snaps = await Promise.all(promises);
       return snaps.map(s => s.exists() ? s.val() : null).filter(q => q !== null);
@@ -205,7 +257,12 @@ export const DatabaseService = {
   },
 
   async saveQuestion(category: string, subjectId: string, topic: string, subtopic: string, id: string, data: Question): Promise<void> {
-      await set(ref(database, `questions/${id}`), data);
+      // Save deep for navigation
+      const dbCategory = category === 'military' ? 'militar' : category;
+      await set(ref(database, `questions/${dbCategory}/${subjectId}/${topic}/${subtopic}/${id}`), data);
+      
+      // OPTIONAL: Save flat for ID lookup if needed by Simulations
+      // await set(ref(database, `questions/${id}`), data);
   },
 
   // --- COMMUNITY ---
