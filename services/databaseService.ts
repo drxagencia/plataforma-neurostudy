@@ -394,6 +394,14 @@ export const DatabaseService = {
       await set(newRef, result);
   },
 
+  async getUserSimulationResults(uid: string): Promise<SimulationResult[]> {
+      const q = query(ref(database, 'simulation_results'), orderByChild('userId'), equalTo(uid));
+      const snap = await get(q);
+      if (!snap.exists()) return [];
+      const results: SimulationResult[] = Object.values(snap.val());
+      return results.sort((a,b) => b.timestamp - a.timestamp);
+  },
+
   // --- FINANCES & LEADS ---
   async getLeads(): Promise<Lead[]> {
       const snap = await get(ref(database, 'leads'));
