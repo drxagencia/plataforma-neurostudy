@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { DatabaseService } from '../services/databaseService';
 // Added missing auth import
@@ -242,14 +243,12 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser, onSho
   const handleTutorAction = async (actionType: 'summary' | 'mindmap' | 'custom') => {
       if (!selectedLesson) return;
       
-      // BASIC USER UPSELL INTERCEPT
-      if (user.plan === 'basic') {
-          onShowUpgrade?.();
-          return;
-      }
+      // Validar acesso IA Ilimitada
+      const hasValidExpiry = user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now();
+      const isAiActive = user.plan === 'admin' || hasValidExpiry;
 
-      if (user.balance < 0.05) {
-          alert("Saldo insuficiente para utilizar o NeuroTutor Avançado.");
+      if (!isAiActive) {
+          onShowUpgrade?.();
           return;
       }
 

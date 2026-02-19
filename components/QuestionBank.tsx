@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
@@ -201,7 +202,11 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
   };
 
   const handleExplain = async () => {
-      if (user && user.plan === 'basic') {
+      // Validar acesso IA Ilimitada
+      const hasValidExpiry = user?.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now();
+      const isAiActive = user?.plan === 'admin' || hasValidExpiry;
+
+      if (!isAiActive) {
           onShowUpgrade?.();
           return;
       }
@@ -381,14 +386,15 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
                     {/* Actions Footer */}
                     <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="flex gap-3">
-                            {questions[currentIndex].id && answeredMap[questions[currentIndex].id!] && !answeredMap[questions[currentIndex].id!].correct && (
+                            {/* Always show Explanation button if answered, regardless of correctness */}
+                            {questions[currentIndex].id && answeredMap[questions[currentIndex].id!] && (
                                 <button 
                                     onClick={handleExplain}
                                     disabled={isExplaining}
                                     className="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-indigo-500/30"
                                 >
                                     {isExplaining ? <Loader2 className="animate-spin" size={14}/> : <BrainCircuit size={14}/>}
-                                    Explicar Erro (IA)
+                                    Explicar Questão (IA)
                                 </button>
                             )}
                         </div>
