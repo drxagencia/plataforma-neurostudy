@@ -55,10 +55,15 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
     : false;
 
   // Se 'expirado', forçar false
+  // Lógica Hierárquica:
+  // 1. Expirado? -> False
+  // 2. Admin? -> True
+  // 3. Tem Data? -> Usa a validade da data (Ignora Flag)
+  // 4. Sem Data? -> Usa a Flag
   const isAiActive = user.ia_ilimitada === 'expirado' ? false :
-    (user.plan === 'admin') || 
-    (user.ia_ilimitada === true || user.ia_ilimitada === "true") ||
-    hasValidExpiry;
+    (user.plan === 'admin') ? true :
+    (user.aiUnlimitedExpiry) ? hasValidExpiry :
+    (user.ia_ilimitada === true || user.ia_ilimitada === "true");
 
   const expiryDate = user.aiUnlimitedExpiry 
     ? new Date(user.aiUnlimitedExpiry).toLocaleDateString() 

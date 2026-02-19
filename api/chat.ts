@@ -41,28 +41,48 @@ export default async function handler(req: any, res: any) {
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
     // --- CHECK FOR EXPIRATION LOGIC ---
-    // Verifica se a data de expiração existe e se já passou
+    // Regra: Se a data de validade EXISTIR no banco, ela TEM PRECEDÊNCIA.
+    // Mesmo que 'ia_ilimitada' esteja como "true", se tiver uma data passada, deve expirar.
+    // A única exceção é o Admin.
+    const now = Date.now();
+    let isExpired = false;
+
     if (user.aiUnlimitedExpiry) {
         const expiryDate = new Date(user.aiUnlimitedExpiry).getTime();
-        const now = Date.now();
-        
-        // Se expirou e ainda não está marcado como "expirado" (e não é admin/permanente)
-        if (expiryDate < now && user.ia_ilimitada !== 'expirado' && user.plan !== 'admin' && user.ia_ilimitada !== true && user.ia_ilimitada !== "true") {
-            // Atualiza no banco para "expirado"
-            await userRef.update({ ia_ilimitada: 'expirado' });
-            // Atualiza objeto local para bloquear a requisição atual
-            user.ia_ilimitada = 'expirado';
+        // Verifica se a data é válida e se já passou
+        if (!isNaN(expiryDate) && expiryDate < now) {
+            isExpired = true;
         }
     }
 
-    // CHECK FOR UNLIMITED AI ACCESS
-    // Regra: Admin OU Flag ia_ilimitada "true" (permanente) OU Data de validade no futuro
-    // Se "expirado", hasUnlimitedAi deve ser FALSE
-    const hasUnlimitedAi = 
-        user.plan === 'admin' || 
-        user.ia_ilimitada === true || 
-        user.ia_ilimitada === "true" || 
-        (user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now() && user.ia_ilimitada !== 'expirado');
+    // Se expirou e ainda não está marcado como "expirado" (e não é admin)
+    // Atualiza o banco e o objeto local
+    if (isExpired && user.ia_ilimitada !== 'expirado' && user.plan !== 'admin') {
+        await userRef.update({ ia_ilimitada: 'expirado' });
+        user.ia_ilimitada = 'expirado';
+    }
+
+    // --- DETERMINE ACCESS ---
+    // 1. Admin sempre tem acesso.
+    // 2. Se estiver marcado como 'expirado', bloqueia (exceto admin).
+    // 3. Se tiver data de validade, usa a data (já verificada acima, mas checamos novamente para consistência).
+    // 4. Se NÃO tiver data, usa a flag booleana/string "true".
+    
+    let hasUnlimitedAi = false;
+
+    if (user.plan === 'admin') {
+        hasUnlimitedAi = true;
+    } else if (user.ia_ilimitada === 'expirado') {
+        hasUnlimitedAi = false;
+    } else if (user.aiUnlimitedExpiry) {
+        // Se existe data, a validade dela determina o acesso (mesmo que a flag fosse true)
+        // Como já atualizamos para 'expirado' se passou, aqui basta checar se não expirou.
+        const expiryDate = new Date(user.aiUnlimitedExpiry).getTime();
+        hasUnlimitedAi = expiryDate > now;
+    } else {
+        // Fallback: Sem data, usa flag manual (vitalício/manual)
+        hasUnlimitedAi = (user.ia_ilimitada === true || user.ia_ilimitada === "true");
+    }
 
     // CÁLCULO DE CONSUMO COM MULTIPLICADOR 50X (Used only if not unlimited)
     const baseCost = 0.002;
@@ -118,9 +138,9 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ text: response.choices[0].message.content });
     }
 
-    // Se estiver "expirado" ou sem saldo, bloqueia
+    // Se estiver "expirado" ou sem saldo e não for suporte
     if (mode !== 'support' && !hasUnlimitedAi) {
-        if (user.ia_ilimitada === 'expirado') {
+        if (user.ia_ilimitada === 'expirado' || (user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() < now)) {
              // Retorna status especial para o front saber que expirou
              return res.status(403).json({ error: 'PLAN_EXPIRED', message: 'Seu plano de IA Ilimitada expirou.' });
         }

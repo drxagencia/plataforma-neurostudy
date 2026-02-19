@@ -63,6 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
   const [currentRank, setCurrentRank] = useState(getRank(0));
   const [nextRank, setNextRank] = useState(getNextRank(0));
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeMode, setUpgradeMode] = useState<'plan' | 'ai'>('ai');
   
   // Stats State (Fetched independently)
   const [userStats, setUserStats] = useState<UserStatsMap | null>(null);
@@ -158,8 +159,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
 
   const handleGenerateTip = async () => {
       if (mentorLoading) return;
-      if (user.balance < 0.01) {
-          alert("Saldo insuficiente para gerar dica.");
+
+      // --- PERMISSION LOGIC ---
+      const hasValidExpiry = user.aiUnlimitedExpiry 
+        ? new Date(user.aiUnlimitedExpiry).getTime() > Date.now() 
+        : false;
+
+      const isAiActive = user.ia_ilimitada === 'expirado' ? false :
+        (user.plan === 'admin') ? true :
+        (user.aiUnlimitedExpiry) ? hasValidExpiry : // Se tem data, usa data (flag é ignorada)
+        (user.ia_ilimitada === true || user.ia_ilimitada === "true"); // Se não tem data, usa flag
+
+      // Permite se tiver IA Ilimitada OU saldo suficiente (fallback)
+      const hasBalance = (user.balance || 0) >= 0.02; // Custo estimado baixo
+
+      if (!isAiActive && !hasBalance) {
+          setUpgradeMode('ai');
+          setShowUpgrade(true);
           return;
       }
       
@@ -185,9 +201,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
 
           const response = await AiService.sendMessage(prompt, [], "Dica Mentor Dashboard");
           setMentorTip(response);
-      } catch (e) {
-          console.error(e);
-          setMentorTip("Não foi possível gerar a dica agora. Tente resolver mais questões!");
+      } catch (e: any) {
+          if (e.message && e.message.includes('expirou')) {
+              setUpgradeMode('ai');
+              setShowUpgrade(true);
+          } else {
+              setMentorTip("Não foi possível gerar a dica agora. Tente resolver mais questões!");
+          }
       } finally {
           setMentorLoading(false);
       }
@@ -217,7 +237,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
 
   return (
     <div className="space-y-8 animate-slide-up pb-20">
-      {showUpgrade && <UpgradeModal user={user} onClose={() => setShowUpgrade(false)} />}
+      {showUpgrade && <UpgradeModal user={user} onClose={() => setShowUpgrade(false)} mode={upgradeMode} />}
 
       {/* Header */}
       <div className="flex justify-between items-end">
@@ -402,7 +422,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
                         </div>
                         
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 backdrop-blur-[2px] text-center p-6">
-                            <div className="bg-slate-900/90 p-4 rounded-2xl border border-indigo-500/30 shadow-2xl transform hover:scale-105 transition-transform cursor-pointer" onClick={() => setShowUpgrade(true)}>
+                            <div className="bg-slate-900/90 p-4 rounded-2xl border border-indigo-500/30 shadow-2xl transform hover:scale-105 transition-transform cursor-pointer" onClick={() => { setUpgradeMode('plan'); setShowUpgrade(true); }}>
                                 <EyeOff size={32} className="mx-auto text-indigo-400 mb-3" />
                                 <h4 className="text-white font-bold mb-1">Você está estudando no escuro</h4>
                                 <p className="text-slate-400 text-xs mb-4 leading-relaxed">
