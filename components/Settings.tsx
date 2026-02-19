@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, PlanConfig } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AuthService } from '../services/authService';
-import { Save, Loader2, CheckCircle, Moon, Sun, Palette, Trophy, Shield, Star, Lock, RefreshCw, CreditCard, ArrowUpCircle } from 'lucide-react';
+import { Save, Loader2, CheckCircle, Moon, Sun, Palette, Trophy, Shield, Star, Lock, RefreshCw, CreditCard, ArrowUpCircle, Smartphone } from 'lucide-react';
 import { RANKS, getRank, getNextRank } from '../constants';
 import UpgradeModal from './UpgradeModal'; // Ensure this is imported
 
@@ -14,6 +14,7 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   const [displayName, setDisplayName] = useState(user.displayName);
+  const [whatsapp, setWhatsapp] = useState(user.whatsapp || '');
   const [photoURL, setPhotoURL] = useState(user.photoURL || '');
   const [selectedTheme, setSelectedTheme] = useState<'dark' | 'light'>(user.theme || 'dark');
   const [isSaving, setIsSaving] = useState(false);
@@ -31,6 +32,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
 
   useEffect(() => {
     setDisplayName(user.displayName);
+    setWhatsapp(user.whatsapp || '');
     setPhotoURL(user.photoURL || '');
     const theme = user.theme === 'light' ? 'light' : 'dark';
     setSelectedTheme(theme);
@@ -60,11 +62,12 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
       const updatedAuthUser = await AuthService.updateProfile(user, authUpdates);
       await DatabaseService.saveUserProfile(user.uid, {
         displayName,
+        whatsapp,
         photoURL,
         theme: 'dark'
       });
 
-      const updatedProfile: UserProfile = { ...user, ...updatedAuthUser, photoURL, theme: 'dark' };
+      const updatedProfile: UserProfile = { ...user, ...updatedAuthUser, whatsapp, photoURL, theme: 'dark' };
       onUpdateUser(updatedProfile);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -119,6 +122,20 @@ const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
                     type="text" 
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+
+                {/* WhatsApp Input */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                      <Smartphone size={16} /> WhatsApp / Celular
+                  </label>
+                  <input 
+                    type="tel" 
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="DDD + Número (apenas números)"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                 </div>

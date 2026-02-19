@@ -38,7 +38,11 @@ export default async function handler(req: any, res: any) {
     const user = userSnap.val();
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
-    // CÁLCULO DE CONSUMO COM MULTIPLICADOR 50X
+    // CHECK FOR UNLIMITED AI ACCESS
+    // Checks if expiration date exists AND is in the future
+    const hasUnlimitedAi = (user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now()) || user.plan === 'admin';
+
+    // CÁLCULO DE CONSUMO COM MULTIPLICADOR 50X (Used only if not unlimited)
     const baseCost = 0.002;
     const isAdvanced = user.plan === 'advanced';
     const multiplier = isAdvanced ? 25 : 50; 
@@ -61,10 +65,9 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ text: response.choices[0].message.content });
     }
 
-    // Validação de saldo com o valor CALCULADO (Exceto para suporte)
-    // CORREÇÃO: Adicionado verificação 'mode !== support'
-    if (mode !== 'support' && user.balance < calculatedCost) {
-        return res.status(402).json({ error: 'Saldo insuficiente na NeuroAI.' });
+    // Validação de saldo (SOMENTE SE NÃO TIVER IA ILIMITADA E NÃO FOR SUPORTE)
+    if (mode !== 'support' && !hasUnlimitedAi && user.balance < calculatedCost) {
+        return res.status(402).json({ error: 'Saldo insuficiente na NeuroAI. Faça upgrade para IA Ilimitada.' });
     }
 
     const sysMsg = systemOverride || "Você é a NeuroAI, tutora focado no ENEM.";
@@ -75,9 +78,8 @@ export default async function handler(req: any, res: any) {
     const completion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages, temperature: 0.7 });
     const aiText = completion.choices[0].message.content;
 
-    // Débito do valor CALCULADO (Exceto para suporte)
-    // CORREÇÃO: Adicionado verificação 'mode !== support'
-    if (mode !== 'support') {
+    // Débito do valor (SOMENTE SE NÃO TIVER IA ILIMITADA E NÃO FOR SUPORTE)
+    if (mode !== 'support' && !hasUnlimitedAi) {
         await update(userRef, { balance: Math.max(0, (user.balance || 0) - calculatedCost) });
         
         // Log da transação com o valor que o usuário vê (multiplicado)
@@ -87,7 +89,7 @@ export default async function handler(req: any, res: any) {
             userId: uid,
             type: 'debit',
             amount: calculatedCost, // Valor real debitado (ex: 0.10)
-            description: mode === 'explain' ? 'Explicação de Questão IA' : 'Chat NeuroAI Mentor',
+            description: mode === 'explain' ? 'Explicação de Questão IA (Avulso)' : 'Chat NeuroAI Mentor (Avulso)',
             timestamp: Date.now()
         });
     }

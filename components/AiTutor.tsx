@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Send, 
@@ -14,7 +15,9 @@ import {
   Lock,
   Check,
   Zap,
-  ArrowRight
+  ArrowRight,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { UserProfile, ChatMessage, Transaction } from '../types';
 import { DatabaseService } from '../services/databaseService';
@@ -41,10 +44,23 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // --- AUTOMATIC CHECK: AI UNLIMITED EXPIRATION ---
+  useEffect(() => {
+      // Logic: If user has a date, check if it's past. If past, we rely on the 'isAiActive' calculation below 
+      // which will naturally be false. 
+      // Note: We don't strictly need to write 'false' to the DB every 2 days because the check 
+      // 'getTime() > Date.now()' ensures access is revoked immediately upon expiration.
+      // The API also checks this.
+  }, [user]);
+
   // Check Subscription Status or Advanced Plan
-  const isAiActive = (user.plan === 'advanced' || user.plan === 'admin') || (user.aiUnlimitedExpiry 
+  // Update: Only grant access if expiry is valid. 
+  // 'Advanced' plan allows access, but 'aiUnlimitedExpiry' is the specific key.
+  const hasValidExpiry = user.aiUnlimitedExpiry 
     ? new Date(user.aiUnlimitedExpiry).getTime() > Date.now() 
-    : false);
+    : false;
+
+  const isAiActive = (user.plan === 'admin') || hasValidExpiry;
 
   const expiryDate = user.aiUnlimitedExpiry 
     ? new Date(user.aiUnlimitedExpiry).toLocaleDateString() 
@@ -134,7 +150,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
             <div className="text-right">
               <p className="text-[10px] text-slate-500 uppercase font-bold">Status Assinatura</p>
               <p className={`text-sm font-bold flex items-center justify-end gap-1 ${isAiActive ? 'text-emerald-400' : 'text-slate-300'}`}>
-                  {isAiActive ? <><Check size={14}/> Ativo</> : 'Acesso Limitado'}
+                  {isAiActive ? <><Check size={14}/> Ativo até {expiryDate}</> : 'Acesso Limitado'}
               </p>
             </div>
             {!isAiActive && (
@@ -173,29 +189,46 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
                   {msg.role === 'ai' ? <Bot size={20}/> : <User size={20}/>}
                 </div>
                 
-                {/* Custom Content for Basic User Upsell */}
+                {/* Custom Content for Basic/Non-Subscriber User Upsell */}
                 {msg.content === 'UPSELL_TRIGGER' ? (
-                    <div className="p-6 rounded-2xl max-w-[85%] bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/50 shadow-[0_0_30px_rgba(79,70,229,0.15)] relative overflow-hidden group">
+                    <div className="p-6 rounded-3xl max-w-2xl w-full bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/50 shadow-[0_0_30px_rgba(79,70,229,0.15)] relative overflow-hidden group mx-auto">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 rounded-full blur-[40px] group-hover:bg-indigo-600/20 transition-all" />
                         
-                        <div className="flex items-center gap-3 mb-3">
+                        <div className="flex items-center gap-3 mb-4">
                             <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-400"><Lock size={18} /></div>
-                            <h4 className="font-bold text-white text-sm uppercase tracking-wide">Resposta Bloqueada</h4>
+                            <h4 className="font-bold text-white text-lg uppercase tracking-wide">Resposta Bloqueada</h4>
                         </div>
                         
-                        <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                            Eu tenho a resposta exata para sua dúvida, incluindo exemplos práticos e macetes de memorização. 
-                            <br/><br/>
-                            <strong className="text-white">Alunos do plano Advanced estudam 2x mais rápido</strong> porque não perdem tempo pesquisando respostas no Google.
+                        <p className="text-slate-300 text-sm leading-relaxed mb-6">
+                            Eu tenho a resposta exata para sua dúvida, incluindo exemplos práticos. 
+                            Escolha um plano de <strong>IA Ilimitada</strong> para continuar:
                         </p>
 
-                        <button 
-                            onClick={onShowUpgrade}
-                            className="w-full py-3 bg-white text-indigo-950 font-black text-sm rounded-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 shadow-lg"
-                        >
-                            <Zap size={16} className="fill-indigo-950" /> DESBLOQUEAR NEUROAI
-                        </button>
-                        <p className="text-[10px] text-center text-slate-500 mt-2">Satisfação garantida ou seu dinheiro de volta.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                            {/* PLANO SEMANAL */}
+                            <a href={KIRVANO_LINKS.ai_weekly} target="_blank" rel="noopener noreferrer" className="flex flex-col p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-indigo-500/50 transition-all text-center group/card">
+                                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Semanal</div>
+                                <div className="text-xl font-black text-white mb-1">R$ 9,90</div>
+                                <div className="text-[10px] text-slate-500 group-hover/card:text-indigo-300">Acesso por 7 dias</div>
+                            </a>
+
+                            {/* PLANO MENSAL */}
+                            <a href={KIRVANO_LINKS.ai_monthly} target="_blank" rel="noopener noreferrer" className="flex flex-col p-4 rounded-xl border-2 border-indigo-500 bg-indigo-500/10 hover:bg-indigo-500/20 transition-all text-center relative shadow-lg">
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">Recomendado</div>
+                                <div className="text-xs text-indigo-200 font-bold uppercase mb-1">Mensal</div>
+                                <div className="text-xl font-black text-white mb-1">R$ 19,90</div>
+                                <div className="text-[10px] text-indigo-300">Renova mensalmente</div>
+                            </a>
+
+                            {/* PLANO ANUAL */}
+                            <a href={KIRVANO_LINKS.ai_yearly} target="_blank" rel="noopener noreferrer" className="flex flex-col p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-emerald-500/50 transition-all text-center group/card">
+                                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Anual</div>
+                                <div className="text-xl font-black text-white mb-1">R$ 49,90</div>
+                                <div className="text-[10px] text-emerald-400 font-bold">Melhor Valor</div>
+                            </a>
+                        </div>
+
+                        <p className="text-[10px] text-center text-slate-500 mt-2">Satisfação garantida ou seu dinheiro de volta em 7 dias.</p>
                     </div>
                 ) : (
                     <div className={`p-4 rounded-2xl max-w-[80%] text-sm leading-relaxed ${msg.role === 'ai' ? 'bg-slate-900 border border-white/10 text-slate-200' : 'bg-indigo-600 text-white'}`}>
