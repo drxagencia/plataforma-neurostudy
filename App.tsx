@@ -22,7 +22,6 @@ import { View, UserProfile } from './types';
 import { mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
 import { Smartphone, CheckCircle, Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -47,7 +46,8 @@ const App: React.FC = () => {
 
   // Monitora o estado de autenticação e decide se mostra o onboarding
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // Use compat auth.onAuthStateChanged
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       try {
         if (firebaseUser) {
           const mappedUser = mapUser(firebaseUser);

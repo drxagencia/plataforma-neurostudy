@@ -28,7 +28,6 @@ const AdminUsers: React.FC = () => {
     setLoading(true);
     try {
         const data = await DatabaseService.getAllUsers();
-        // Ordenar por LTV (Gasto Total) decrescente por padrão
         setAllUsers(data.sort((a,b) => (b.totalSpent || 0) - (a.totalSpent || 0)));
     } catch (e) {
         console.error(e);
@@ -39,7 +38,7 @@ const AdminUsers: React.FC = () => {
 
   const handleEditClick = async (user: UserProfile) => {
       setSelectedUser(user);
-      setFormData(user); // Inicializa form com dados atuais
+      setFormData(user); 
       setLoadingTrans(true);
       try {
           const trans = await DatabaseService.getUserTransactions(user.uid);
@@ -53,14 +52,13 @@ const AdminUsers: React.FC = () => {
 
   const handleSave = async () => {
       if (!selectedUser || !formData) return;
-      
       if (!confirm("Confirmar alterações nos dados do usuário?")) return;
 
       try {
           await DatabaseService.saveUserProfile(selectedUser.uid, formData);
           alert("Dados atualizados com sucesso!");
           setSelectedUser(null);
-          fetchUsers(); // Refresh list
+          fetchUsers(); 
       } catch (e) {
           alert("Erro ao salvar.");
       }
@@ -71,10 +69,8 @@ const AdminUsers: React.FC = () => {
       u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Helper para formatar data ISO string YYYY-MM-DD para input date
   const formatDateForInput = (isoDate?: string | number) => {
       if (!isoDate) return '';
-      // Se for timestamp (number), converte. Se for string ISO, corta.
       const d = new Date(isoDate);
       return d.toISOString().split('T')[0];
   };
@@ -126,7 +122,11 @@ const AdminUsers: React.FC = () => {
                                     <span className={`text-[10px] font-black px-2 py-1 rounded uppercase ${user.plan === 'advanced' ? 'bg-indigo-600 text-white' : user.plan === 'admin' ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
                                         {user.plan}
                                     </span>
-                                    {user.billingCycle && <span className="ml-2 text-[10px] text-slate-500 uppercase">{user.billingCycle === 'yearly' ? 'Anual' : 'Mensal'}</span>}
+                                    {user.essayPlanType && (
+                                        <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-bold uppercase">
+                                            Red. {user.essayPlanType}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="p-4">
                                     <span className="font-mono font-bold text-emerald-400">R$ {(user.totalSpent || 0).toFixed(2)}</span>
@@ -135,14 +135,12 @@ const AdminUsers: React.FC = () => {
                                     <button 
                                         onClick={() => handleEditClick(user)}
                                         className="p-2 bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-lg transition-colors"
-                                        title="Editar Usuário"
                                     >
                                         <Edit size={16} />
                                     </button>
                                 </td>
                             </tr>
                         ))}
-                        {filteredUsers.length === 0 && <tr><td colSpan={4} className="p-10 text-center text-slate-500">Nenhum aluno encontrado</td></tr>}
                     </tbody>
                 </table>
             </div>
@@ -192,13 +190,13 @@ const AdminUsers: React.FC = () => {
                                         onChange={e => setFormData({...formData, plan: e.target.value as any})}
                                         className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white text-sm outline-none focus:border-indigo-500"
                                     >
-                                        <option value="basic">Basic (Soldado)</option>
-                                        <option value="advanced">Advanced (Elite)</option>
-                                        <option value="admin">Administrador</option>
+                                        <option value="basic">Basic</option>
+                                        <option value="advanced">Advanced</option>
+                                        <option value="admin">Admin</option>
                                     </select>
                                 </div>
                                 <div className="bg-slate-900 p-4 rounded-2xl border border-white/5">
-                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Ciclo de Cobrança</label>
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Ciclo</label>
                                     <select 
                                         value={formData.billingCycle || 'monthly'} 
                                         onChange={e => setFormData({...formData, billingCycle: e.target.value as any})}
@@ -209,7 +207,7 @@ const AdminUsers: React.FC = () => {
                                     </select>
                                 </div>
                                 <div className="bg-slate-900 p-4 rounded-2xl border border-white/5">
-                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Expiração da Assinatura</label>
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Expiração</label>
                                     <input 
                                         type="date"
                                         value={formatDateForInput(formData.subscriptionExpiry)}
@@ -220,106 +218,87 @@ const AdminUsers: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Seção 2: Recursos Adicionais */}
+                        {/* Seção 2: Plano de Redação (NOVO) */}
                         <div className="space-y-4">
                             <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                                <Zap size={14}/> Recursos & IA
+                                <FileText size={14}/> Plano de Redação
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Redação */}
-                                <div className="bg-slate-900/50 p-5 rounded-2xl border border-white/5">
-                                    <div className="flex items-center gap-2 mb-4 text-white font-bold">
-                                        <FileText size={18} className="text-slate-400"/> Redação
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Créditos Restantes</label>
-                                            <input 
-                                                type="number"
-                                                value={formData.essayCredits || 0}
-                                                onChange={e => setFormData({...formData, essayCredits: parseInt(e.target.value)})}
-                                                className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white font-mono text-sm"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Expiração Pacote</label>
-                                            <input 
-                                                type="date"
-                                                value={formatDateForInput(formData.essayPlanExpiry)}
-                                                onChange={e => setFormData({...formData, essayPlanExpiry: e.target.value})}
-                                                className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white text-sm"
-                                            />
-                                        </div>
-                                    </div>
+                            <div className="bg-slate-900/50 p-5 rounded-2xl border border-white/5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Nível do Plano</label>
+                                    <select 
+                                        value={formData.essayPlanType || ''}
+                                        onChange={e => setFormData({...formData, essayPlanType: e.target.value as any || null})}
+                                        className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white text-sm outline-none focus:border-emerald-500"
+                                    >
+                                        <option value="">Sem Plano</option>
+                                        <option value="basic">Básico (1/sem)</option>
+                                        <option value="medium">Médio (2/sem)</option>
+                                        <option value="advanced">Avançado (4/sem)</option>
+                                    </select>
                                 </div>
-
-                                {/* IA Ilimitada / Saldo */}
-                                <div className="bg-slate-900/50 p-5 rounded-2xl border border-white/5">
-                                    <div className="flex items-center gap-2 mb-4 text-white font-bold">
-                                        <Zap size={18} className="text-slate-400"/> NeuroAI (Chat)
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Saldo (R$)</label>
-                                            <input 
-                                                type="number"
-                                                step="0.01"
-                                                value={formData.balance || 0}
-                                                onChange={e => setFormData({...formData, balance: parseFloat(e.target.value)})}
-                                                className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white font-mono text-sm"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Expiração IA Ilimitada</label>
-                                            <input 
-                                                type="date"
-                                                value={formatDateForInput(formData.aiUnlimitedExpiry)}
-                                                onChange={e => setFormData({...formData, aiUnlimitedExpiry: e.target.value})}
-                                                className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white text-sm"
-                                            />
-                                        </div>
-                                    </div>
+                                <div>
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Créditos (Saldo)</label>
+                                    <input 
+                                        type="number"
+                                        value={formData.essayCredits || 0}
+                                        onChange={e => setFormData({...formData, essayCredits: parseInt(e.target.value)})}
+                                        className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white font-mono text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Vencimento Redação</label>
+                                    <input 
+                                        type="date"
+                                        value={formatDateForInput(formData.essayPlanExpiry)}
+                                        onChange={e => setFormData({...formData, essayPlanExpiry: e.target.value})}
+                                        className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white text-sm"
+                                    />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Seção 3: Histórico Financeiro */}
-                        <div className="space-y-4 pt-4 border-t border-white/5">
-                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <History size={14}/> Histórico de Transações
+                        {/* Seção 3: Outros Recursos */}
+                        <div className="space-y-4">
+                            <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                                <Zap size={14}/> Outros Recursos
                             </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-slate-900/50 p-5 rounded-2xl border border-white/5">
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Saldo IA (R$)</label>
+                                    <input 
+                                        type="number"
+                                        step="0.01"
+                                        value={formData.balance || 0}
+                                        onChange={e => setFormData({...formData, balance: parseFloat(e.target.value)})}
+                                        className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white font-mono text-sm"
+                                    />
+                                </div>
+                                <div className="bg-slate-900/50 p-5 rounded-2xl border border-white/5">
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Vencimento IA Ilimitada</label>
+                                    <input 
+                                        type="date"
+                                        value={formatDateForInput(formData.aiUnlimitedExpiry)}
+                                        onChange={e => setFormData({...formData, aiUnlimitedExpiry: e.target.value})}
+                                        className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Histórico */}
+                        <div className="pt-4 border-t border-white/5">
+                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Histórico</h4>
                             <div className="bg-black/30 rounded-2xl border border-white/5 overflow-hidden max-h-60 overflow-y-auto custom-scrollbar">
-                                {loadingTrans ? (
-                                    <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-slate-500"/></div>
-                                ) : userTransactions.length > 0 ? (
+                                {loadingTrans ? <div className="p-10 flex justify-center"><Loader2 className="animate-spin"/></div> : (
                                     <table className="w-full text-left text-xs">
-                                        <thead className="bg-white/5 text-slate-500 uppercase font-bold sticky top-0">
-                                            <tr>
-                                                <th className="p-3">Data</th>
-                                                <th className="p-3">Descrição / Método</th>
-                                                <th className="p-3">Tipo</th>
-                                                <th className="p-3 text-right">Valor</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5">
+                                        <thead className="bg-white/5 text-slate-500 uppercase font-bold sticky top-0"><tr><th className="p-3">Data</th><th className="p-3">Desc</th><th className="p-3 text-right">Valor</th></tr></thead>
+                                        <tbody>
                                             {userTransactions.map(t => (
-                                                <tr key={t.id} className="hover:bg-white/5">
-                                                    <td className="p-3 text-slate-400">{new Date(t.timestamp).toLocaleDateString()}</td>
-                                                    <td className="p-3 text-white font-medium">{t.description}</td>
-                                                    <td className="p-3">
-                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${t.type === 'credit' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                                            {t.type === 'credit' ? 'Entrada' : 'Saída'}
-                                                        </span>
-                                                    </td>
-                                                    <td className={`p-3 text-right font-mono font-bold ${t.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                        {t.type === 'credit' ? '+' : '-'} R$ {t.amount.toFixed(2)}
-                                                    </td>
-                                                </tr>
+                                                <tr key={t.id} className="hover:bg-white/5"><td className="p-3 text-slate-400">{new Date(t.timestamp).toLocaleDateString()}</td><td className="p-3 text-white">{t.description}</td><td className="p-3 text-right text-emerald-400">R$ {t.amount.toFixed(2)}</td></tr>
                                             ))}
                                         </tbody>
                                     </table>
-                                ) : (
-                                    <div className="p-8 text-center text-slate-500 text-xs uppercase font-bold">Nenhuma transação registrada.</div>
                                 )}
                             </div>
                         </div>

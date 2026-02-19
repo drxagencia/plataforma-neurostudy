@@ -28,7 +28,8 @@ import {
   SupportTicket,
   EssayCorrection,
   TrafficConfig,
-  UserStatsMap
+  UserStatsMap,
+  EssayPlanType
 } from "../types";
 import { XP_VALUES } from "../constants";
 
@@ -245,18 +246,59 @@ export const DatabaseService = {
   },
 
   async getQuestionsByIds(ids: string[]): Promise<Question[]> {
-      // NOTE: Searching by ID is inefficient in deep hierarchy without an index.
-      // Ideally, we should know the path. For now, assuming questions are also indexed by ID or using this for Simulations 
-      // where we might need a direct lookup mechanism.
-      // If questions are NOT flat-indexed, this requires a change. 
-      // Assuming for now user has a flat 'questions' node OR we scan (very slow).
-      // Fallback: This method might fail if questions aren't duplicated at root.
-      // Strategy: Since we don't have paths, we try to fetch from flat 'questions' if it exists, or fail gracefully.
-      // Given the prompt constraints, we'll try fetching assuming a flat backup or that IDs contain path info.
-      // Current implementation assumes flat lookup at root `questions/{id}` which is common for ID-based retrieval.
-      const promises = ids.map(id => get(ref(database, `questions/${id}`)));
-      const snaps = await Promise.all(promises);
-      return snaps.map(s => s.exists() ? s.val() : null).filter(q => q !== null);
+      // Recursive deep search helper
+      const findQuestionDeep = async (currentPath: string, targetId: string): Promise<Question | null> => {
+          const snap = await get(ref(database, currentPath));
+          if (!snap.exists()) return null;
+          
+          const val = snap.val();
+          
+          // Case 1: Found the question directly
+          if (val.id === targetId) return val as Question;
+          
+          // Case 2: It's a folder, search children
+          if (typeof val === 'object') {
+              // Optimization: If the key matches targetId, we found it (assuming structure id: data)
+              if (val[targetId]) return val[targetId] as Question;
+
+              const keys = Object.keys(val);
+              for (const key of keys) {
+                  // Skip primitive values
+                  if (typeof val[key] !== 'object') continue;
+                  
+                  // If child has 'id' property matching target, return it
+                  if (val[key].id === targetId) return val[key] as Question;
+                  
+                  // Else recurse if it looks like a folder (not a question leaf yet)
+                  // Heuristic: questions usually have 'text' and 'correctAnswer'. If not, recurse.
+                  if (!val[key].text) {
+                      const found = await findQuestionDeep(`${currentPath}/${key}`, targetId);
+                      if (found) return found;
+                  }
+              }
+          }
+          return null;
+      };
+
+      // Execution strategy:
+      // Since a full DB scan for each ID is expensive, we'll assume a structure or try specific paths if possible.
+      // However, given the prompt constraints and lack of flat index, we must scan 'questions' root.
+      // To optimize, we fetch 'questions' once (or per category) and scan in memory if dataset is small,
+      // OR we implement the recursive search properly.
+      // For this solution, let's try to fetch specific paths if we knew them, otherwise do a broad search.
+      // Better approach for stability: Scan questions/regular and questions/militar.
+      
+      const promises = ids.map(async (id) => {
+          // Try regular first
+          let q = await findQuestionDeep('questions/regular', id);
+          if (q) return q;
+          // Try militar
+          q = await findQuestionDeep('questions/militar', id);
+          return q;
+      });
+
+      const results = await Promise.all(promises);
+      return results.filter(q => q !== null) as Question[];
   },
 
   async markQuestionAsAnswered(uid: string, qid: string, correct: boolean, selectedOption: number, subjectId: string, topic: string): Promise<void> {
@@ -394,53 +436,91 @@ export const DatabaseService = {
           const snap = await get(ref(database, `recharge_requests/${reqId}`));
           if (snap.exists()) {
               const req = snap.val() as RechargeRequest;
+              const userId = req.userId;
               
-              // 1. Process Credits (Essay)
-              if (req.currencyType === 'CREDIT' && req.quantityCredits) {
-                  await update(ref(database, `users/${req.userId}`), {
-                      essayCredits: increment(req.quantityCredits),
-                      totalSpent: increment(req.amount)
-                  });
-              } 
-              // 2. Process Balance / Plans
-              else if (req.currencyType === 'BRL') {
-                  await update(ref(database, `users/${req.userId}`), {
-                      totalSpent: increment(req.amount)
-                  });
+              const updates: any = {
+                  totalSpent: increment(req.amount)
+              };
+
+              // --- ESSAY PLAN LOGIC ---
+              if (req.planLabel?.includes('Redação')) {
+                  const label = req.planLabel.toLowerCase();
+                  let planType: EssayPlanType = 'basic';
+                  let creditsToAdd = 0;
+                  let daysToAdd = 0;
+
+                  // Identify Plan Tier
+                  if (label.includes('médio') || label.includes('medio')) planType = 'medium';
+                  else if (label.includes('avançado') || label.includes('advanced')) planType = 'advanced';
                   
-                  // PLAN UPGRADE: Basic -> Advanced
-                  if (req.planLabel?.includes('UPGRADE')) {
-                      await update(ref(database, `users/${req.userId}`), { plan: 'advanced' });
+                  // Identify Cycle & Calculate Total Credits (Bulk Addition)
+                  const creditsPerWeek = planType === 'basic' ? 1 : planType === 'medium' ? 2 : 4;
+                  
+                  if (label.includes('semanal')) {
+                      daysToAdd = 7;
+                      creditsToAdd = creditsPerWeek * 1; 
+                  } else if (label.includes('mensal')) {
+                      daysToAdd = 30;
+                      creditsToAdd = creditsPerWeek * 4; // Approx 4 weeks
+                  } else if (label.includes('anual')) {
+                      daysToAdd = 365;
+                      creditsToAdd = creditsPerWeek * 52; // 52 weeks
                   }
 
-                  // AI UNLIMITED: Update Expiry
-                  if (req.planLabel?.includes('IA Ilimitada')) {
-                      // Fetch current profile to check existing expiry
-                      const userSnap = await get(ref(database, `users/${req.userId}`));
-                      const user = userSnap.val() as UserProfile;
-                      const now = Date.now();
-                      
-                      // Determine current valid expiry (if future, use it; if past/null, use now)
-                      let currentExpiryTime = user?.aiUnlimitedExpiry ? new Date(user.aiUnlimitedExpiry).getTime() : now;
-                      if (currentExpiryTime < now) currentExpiryTime = now;
+                  // Update Plan Expiry
+                  const userSnap = await get(ref(database, `users/${userId}`));
+                  const user = userSnap.val() as UserProfile;
+                  const now = Date.now();
+                  let currentExpiry = user.essayPlanExpiry ? new Date(user.essayPlanExpiry).getTime() : now;
+                  if (currentExpiry < now) currentExpiry = now;
+                  
+                  const newExpiry = new Date(currentExpiry + (daysToAdd * 24 * 60 * 60 * 1000)).toISOString();
 
-                      // Calculate duration based on label
-                      let daysToAdd = 0;
-                      if (req.planLabel.includes('Semanal')) daysToAdd = 7;
-                      else if (req.planLabel.includes('Mensal')) daysToAdd = 30;
-                      else if (req.planLabel.includes('Anual')) daysToAdd = 365;
+                  updates.essayPlanType = planType;
+                  updates.essayPlanExpiry = newExpiry;
+                  updates.essayCredits = increment(creditsToAdd);
+              } 
+              // --- GENERIC CREDITS / BALANCE / OTHER UPGRADES ---
+              else {
+                  if (req.currencyType === 'CREDIT' && req.quantityCredits) {
+                      updates.essayCredits = increment(req.quantityCredits);
+                  } 
+                  else if (req.currencyType === 'BRL') {
+                      // PLAN UPGRADE: Basic -> Advanced
+                      if (req.planLabel?.includes('UPGRADE')) {
+                          updates.plan = 'advanced';
+                      }
 
-                      if (daysToAdd > 0) {
-                          const newExpiry = new Date(currentExpiryTime + (daysToAdd * 24 * 60 * 60 * 1000)).toISOString();
-                          await update(ref(database, `users/${req.userId}`), { aiUnlimitedExpiry: newExpiry });
+                      // AI UNLIMITED: Update Expiry
+                      if (req.planLabel?.includes('IA Ilimitada')) {
+                          const userSnap = await get(ref(database, `users/${userId}`));
+                          const user = userSnap.val() as UserProfile;
+                          const now = Date.now();
+                          
+                          let currentExpiryTime = user?.aiUnlimitedExpiry ? new Date(user.aiUnlimitedExpiry).getTime() : now;
+                          if (currentExpiryTime < now) currentExpiryTime = now;
+
+                          let daysToAdd = 0;
+                          if (req.planLabel.includes('Semanal')) daysToAdd = 7;
+                          else if (req.planLabel.includes('Mensal')) daysToAdd = 30;
+                          else if (req.planLabel.includes('Anual')) daysToAdd = 365;
+
+                          if (daysToAdd > 0) {
+                              const newExpiry = new Date(currentExpiryTime + (daysToAdd * 24 * 60 * 60 * 1000)).toISOString();
+                              updates.aiUnlimitedExpiry = newExpiry;
+                          }
                       }
                   }
               }
 
-              const tRef = push(ref(database, `user_transactions/${req.userId}`));
+              // Apply Updates
+              await update(ref(database, `users/${userId}`), updates);
+
+              // Log Transaction
+              const tRef = push(ref(database, `user_transactions/${userId}`));
               await set(tRef, {
                   id: tRef.key,
-                  userId: req.userId,
+                  userId: userId,
                   type: 'credit',
                   amount: req.amount,
                   description: req.planLabel || 'Recarga Aprovada',

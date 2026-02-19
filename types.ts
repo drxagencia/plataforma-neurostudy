@@ -2,6 +2,7 @@
 export type View = 'dashboard' | 'aulas' | 'militares' | 'redacao' | 'tutor' | 'simulados' | 'questoes' | 'comunidade' | 'competitivo' | 'admin' | 'ajustes' | 'suporte' | 'financeiro';
 
 export type UserPlan = 'basic' | 'advanced' | 'admin';
+export type EssayPlanType = 'basic' | 'medium' | 'advanced' | null; // NEW
 export type BillingCycle = 'monthly' | 'yearly';
 
 export interface ChatMessage {
@@ -31,13 +32,19 @@ export interface UserProfile extends User {
   plan: UserPlan;
   billingCycle?: BillingCycle;
   subscriptionExpiry?: string;
+  
+  // Feature Specific Expiries
   aiUnlimitedExpiry?: string; 
-  essayPlanExpiry?: string;    
+  
+  // Essay System
+  essayPlanType?: EssayPlanType; // NEW: Controls the tier (Basic/Medium/Advanced)
+  essayPlanExpiry?: string;      // NEW: Controls access duration
+  essayCredits?: number;         // Controls consumption (1 credit per use)
+  
   xp?: number;
   weeklyXp?: number;
   lastXpWeek?: number;
   balance: number;
-  essayCredits?: number;
   
   // Study Stats
   hoursStudied?: number; // Total Lifetime Hours

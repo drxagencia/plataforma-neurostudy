@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { auth } from '../services/firebaseConfig';
 import { EssayCorrection, UserProfile } from '../types';
-import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight, Crown, CreditCard, Star, Repeat, Gift, Zap, ShieldCheck, Lock } from 'lucide-react';
+import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight, Crown, CreditCard, Star, Repeat, Gift, Zap, ShieldCheck, Lock, User, Clock, Rocket, Target, FileCheck } from 'lucide-react';
 import { KIRVANO_LINKS } from '../constants';
 
 interface RedacaoProps {
@@ -15,53 +16,74 @@ interface RedacaoProps {
 const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) => {
   const [history, setHistory] = useState<EssayCorrection[]>([]);
   
-  // Views
-  const [view, setView] = useState<'home' | 'buy' | 'upload' | 'scanning' | 'result'>('home');
+  // Views: home (with plans or dashboard), upload, scanning, result, pay_pix
+  const [view, setView] = useState<'home' | 'upload' | 'scanning' | 'result' | 'pay_pix'>('home');
   
-  // Buy Flow
-  const [buyQty, setBuyQty] = useState<number>(1);
-  const [showPix, setShowPix] = useState(false);
+  // Payment State
+  const [selectedPlanTier, setSelectedPlanTier] = useState<'basic' | 'medium' | 'advanced'>('medium');
+  const [selectedCycle, setSelectedCycle] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
   const [pixPayload, setPixPayload] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
+  const [pixAmount, setPixAmount] = useState(0);
   const [payerName, setPayerName] = useState('');
+  const [copied, setCopied] = useState(false);
   
-  // Upgrade Flow
-  const [isUpgrading, setIsUpgrading] = useState(false);
-
-  // Upload Flow
+  // Correction State
   const [theme, setTheme] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
   const [currentResult, setCurrentResult] = useState<EssayCorrection | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-
-  // Result Animation State
+  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  
+  // Animations
   const [displayScore, setDisplayScore] = useState(0);
   const [expandedCompetency, setExpandedCompetency] = useState<string | null>('c1');
 
-  // Notification State
-  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  // PLAN CONFIGURATION
+  const PLAN_CONFIG = {
+      basic: {
+          name: 'Básico',
+          creditsPerWeek: 1,
+          prices: { weekly: 9.90, monthly: 19.90, yearly: 49.90 },
+          features: ['1 Redação / semana', 'Correção via IA', 'Nota Competências']
+      },
+      medium: {
+          name: 'Médio',
+          creditsPerWeek: 2,
+          prices: { weekly: 14.90, monthly: 29.90, yearly: 69.90 },
+          features: ['2 Redações / semana', 'Prioridade na fila', 'Feedback Detalhado']
+      },
+      advanced: {
+          name: 'Avançado+',
+          creditsPerWeek: 4,
+          prices: { weekly: 19.90, monthly: 39.90, yearly: 97.00 },
+          features: ['4 Redações / semana', 'Análise Profunda', 'Dicas de Estrutura', 'Histórico Ilimitado']
+      }
+  };
 
-  const isBasicPlan = user.plan === 'basic';
-  const priceMultiplier = isBasicPlan ? 4 : 1;
+  // CHECK ACTIVE PLAN
+  const hasActivePlan = user.essayPlanExpiry ? new Date(user.essayPlanExpiry).getTime() > Date.now() : false;
+  const credits = user.essayCredits || 0;
+  const canSend = hasActivePlan && credits > 0;
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+    if (user.displayName) setPayerName(user.displayName);
+  }, [user]);
 
   useEffect(() => {
-      if (view === 'buy' && user.displayName) {
-          setPayerName(user.displayName);
+      if (notification) {
+          const timer = setTimeout(() => setNotification(null), 4000);
+          return () => clearTimeout(timer);
       }
-  }, [view, user.displayName]);
+  }, [notification]);
 
+  // Score Animation
   useEffect(() => {
       if (view === 'result' && currentResult) {
           const target = currentResult.scoreTotal;
           let start = 0;
           const duration = 1500;
           const increment = target / (duration / 16);
-          
           const timer = setInterval(() => {
               start += increment;
               if (start >= target) {
@@ -75,87 +97,66 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
       }
   }, [view, currentResult]);
 
-  useEffect(() => {
-      if (notification) {
-          const timer = setTimeout(() => setNotification(null), 4000);
-          return () => clearTimeout(timer);
-      }
-  }, [notification]);
-
   const fetchHistory = async () => {
     if (!auth.currentUser) return;
     const essays = await DatabaseService.getEssayCorrections(auth.currentUser.uid);
     setHistory(essays.reverse());
   };
 
-  const handleSelectHistoryItem = async (item: EssayCorrection) => {
-      setLoadingDetails(true);
-      setCurrentResult(item);
-      setExpandedCompetency('c1');
-      setLoadingDetails(false);
-      setView('result');
+  // --- HANDLERS ---
+
+  const handleSelectPlan = (tier: 'basic' | 'medium' | 'advanced') => {
+      setSelectedPlanTier(tier);
   };
 
-  const getPricePerUnit = (qty: number) => {
-      let basePrice = 4.00;
-      if (qty >= 10) basePrice = 3.50;
-      else if (qty >= 5) basePrice = 3.75;
+  const handleBuyPlan = (method: 'pix' | 'card') => {
+      const price = PLAN_CONFIG[selectedPlanTier].prices[selectedCycle];
       
-      return basePrice * priceMultiplier;
-  };
-
-  const totalPrice = buyQty * getPricePerUnit(buyQty);
-
-  const handleGeneratePayment = () => {
-      if (buyQty < 1) return;
-      setIsUpgrading(false);
-
-      if (paymentMethod === 'card') {
-          window.open(KIRVANO_LINKS.essay_credits, '_blank');
-          setNotification({ type: 'success', message: "Redirecionando para pagamento..." });
+      // External Checkout (Only for Monthly/Weekly usually, but sticking to prompt logic: External vs PIX)
+      // For simplified demo, Card redirects to a generic link, PIX generates code.
+      if (method === 'card') {
+          // Redirect to appropriate Kirvano link based on cycle/tier logic if available
+          // Using fallbacks from constants for now
+          window.open(KIRVANO_LINKS.essay_credits, '_blank'); 
           return;
       }
 
+      // Generate PIX
       try {
-          const payload = PixService.generatePayload(totalPrice);
+          const payload = PixService.generatePayload(price);
           setPixPayload(payload);
-          setShowPix(true);
+          setPixAmount(price);
+          setView('pay_pix');
       } catch (e) {
           setNotification({ type: 'error', message: "Erro ao gerar PIX" });
       }
   };
 
-  const handleConfirmPayment = async () => {
+  const handleConfirmPixPayment = async () => {
       if (!auth.currentUser) return;
-      
       if (!payerName.trim()) {
-          setNotification({ type: 'error', message: "Digite o nome do pagador." });
+          setNotification({ type: 'error', message: "Nome do pagador obrigatório" });
           return;
       }
+      if (!window.confirm(`CONFIRMAÇÃO:\n\nNome: ${payerName}\nValor: R$ ${pixAmount.toFixed(2)}\n\nO nome do pagador está correto?`)) return;
 
-      // STRICT CONFIRMATION
-      if (!window.confirm("ATENÇÃO: Você tem certeza que o nome do pagador está 100% correto? Isso é essencial para a liberação.")) {
-          return;
-      }
-      
-      const finalName = payerName.trim();
+      const cycleLabel = selectedCycle === 'weekly' ? 'Semanal' : selectedCycle === 'monthly' ? 'Mensal' : 'Anual';
+      const tierName = PLAN_CONFIG[selectedPlanTier].name;
+      const label = `Redação ${tierName} - ${cycleLabel}`;
 
       try {
           await DatabaseService.createRechargeRequest(
-              auth.currentUser.uid, 
-              finalName, 
-              totalPrice, 
-              'CREDIT', 
-              buyQty,
-              'Recarga Redação Avulsa'
+              auth.currentUser.uid,
+              payerName.toUpperCase(),
+              pixAmount,
+              'BRL',
+              0, // Quantity handled by backend logic for plans
+              label
           );
-          setNotification({ type: 'success', message: "Solicitação enviada! Aguarde a aprovação." });
-          setShowPix(false);
-          setIsUpgrading(false);
+          setNotification({ type: 'success', message: "Solicitação enviada! Seus créditos serão liberados em breve." });
           setView('home');
-      } catch (error: any) {
-          console.error(error);
-          setNotification({ type: 'error', message: "Erro ao registrar solicitação. Tente novamente." });
+      } catch (e) {
+          setNotification({ type: 'error', message: "Erro ao enviar solicitação." });
       }
   };
 
@@ -163,23 +164,18 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
       if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
           const reader = new FileReader();
-          reader.onloadend = () => {
-              setImage(reader.result as string);
-          };
+          reader.onloadend = () => setImage(reader.result as string);
           reader.readAsDataURL(file);
       }
   };
 
   const handleCorrectionSubmit = async () => {
-      const availableCredits = typeof user.essayCredits === 'number' ? user.essayCredits : 0;
-      if (availableCredits <= 0) {
-          setNotification({ type: 'error', message: "Sem créditos suficientes para enviar a redação." });
-          setTimeout(() => setView('buy'), 1500);
+      if (!canSend) {
+          setNotification({ type: 'error', message: "Plano inativo ou sem créditos." });
           return;
       }
-
       if (confirmText !== 'CONFIRMAR') {
-          setNotification({ type: 'error', message: "Digite CONFIRMAR corretamente para prosseguir." });
+          setNotification({ type: 'error', message: "Digite CONFIRMAR corretamente." });
           return;
       }
       if (!image || !theme || !auth.currentUser) return;
@@ -198,67 +194,38 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
               })
           });
 
-          if (!res.ok) {
-              const err = await res.json();
-              throw new Error(err.error || "Erro na correção");
-          }
+          if (!res.ok) throw new Error("Erro na análise da IA");
 
           const data = await res.json();
-          let cleanJson = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
+          const cleanJson = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
-
-          const roundToTwenty = (num: any) => {
-              const val = Number(num);
-              if (isNaN(val)) return 0;
-              const clamped = Math.min(Math.max(val, 0), 200);
-              return Math.round(clamped / 20) * 20;
-          };
-
-          const parseScore = (val: any) => roundToTwenty(val?.score ?? val);
-
-          const c1Score = parseScore(parsed.c1);
-          const c2Score = parseScore(parsed.c2);
-          const c3Score = parseScore(parsed.c3);
-          const c4Score = parseScore(parsed.c4);
-          const c5Score = parseScore(parsed.c5);
-          
-          const finalTotal = c1Score + c2Score + c3Score + c4Score + c5Score;
 
           const result: EssayCorrection = {
               theme,
               imageUrl: null, 
               date: Date.now(),
-              scoreTotal: finalTotal,
-              competencies: { c1: c1Score, c2: c2Score, c3: c3Score, c4: c4Score, c5: c5Score },
-              detailedCompetencies: {
-                  c1: parsed.c1,
-                  c2: parsed.c2,
-                  c3: parsed.c3,
-                  c4: parsed.c4,
-                  c5: parsed.c5
+              scoreTotal: parsed.score_total || 0,
+              competencies: { 
+                  c1: parsed.c1 || 0, c2: parsed.c2 || 0, c3: parsed.c3 || 0, c4: parsed.c4 || 0, c5: parsed.c5 || 0 
               },
-              feedback: parsed.general_feedback || parsed.feedback || "Análise concluída.",
+              detailedCompetencies: {
+                  c1: parsed.c1_analysis, c2: parsed.c2_analysis, c3: parsed.c3_analysis, c4: parsed.c4_analysis, c5: parsed.c5_analysis
+              },
+              feedback: parsed.general_feedback || "Análise concluída.",
               strengths: parsed.strengths || [],
               weaknesses: parsed.weaknesses || [],
               structuralTips: parsed.structural_tips || ""
           };
 
           await DatabaseService.saveEssayCorrection(auth.currentUser.uid, result);
-          
-          const xpEarned = Math.floor(finalTotal * 0.6);
-          await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_CORRECTION', xpEarned);
+          await DatabaseService.processXpAction(auth.currentUser.uid, 'ESSAY_CORRECTION', Math.floor(result.scoreTotal * 0.6));
 
-          const currentCredits = Number(user.essayCredits || 0);
-          onUpdateUser({
-              ...user,
-              essayCredits: Math.max(0, currentCredits - 1)
-          });
+          // Decrement Credit locally
+          onUpdateUser({ ...user, essayCredits: Math.max(0, credits - 1) });
 
           setCurrentResult({ ...result, imageUrl: image }); 
-          
           setExpandedCompetency('c1');
           setView('result');
-          
           fetchHistory();
 
       } catch (e: any) {
@@ -267,254 +234,88 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
       }
   };
 
-  const COMPETENCY_LABELS: Record<string, string> = {
-      c1: 'Norma Culta',
-      c2: 'Tema e Estrutura',
-      c3: 'Argumentação',
-      c4: 'Coesão',
-      c5: 'Proposta de Intervenção'
-  };
+  // --- RENDERERS ---
 
-  const COMPETENCY_ICONS: Record<string, any> = {
-      c1: PenTool,
-      c2: Layers,
-      c3: MessageSquareText,
-      c4: BookOpen,
-      c5: CheckCircle
-  };
-
-  const renderNotification = () => {
-      if (!notification) return null;
-      return (
-        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl backdrop-blur-md border animate-in slide-in-from-top-4 duration-300 ${
-            notification.type === 'error' 
-            ? 'bg-red-500/90 border-red-400/50 text-white' 
-            : 'bg-emerald-500/90 border-emerald-400/50 text-white'
-        }`}>
-            {notification.type === 'error' ? <AlertCircle size={24} /> : <CheckCircle size={24} />}
-            <span className="font-bold text-sm md:text-base">{notification.message}</span>
-            <button onClick={() => setNotification(null)} className="ml-2 opacity-80 hover:opacity-100"><X size={18}/></button>
-        </div>
-      );
-  };
-
-  if (view === 'scanning') {
-      return (
-          <div className="h-full flex flex-col items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-slate-900/50 z-10 flex items-center justify-center flex-col">
-                  <div className="relative w-64 h-80 border-2 border-indigo-500 rounded-lg overflow-hidden bg-white/5 shadow-[0_0_50px_rgba(99,102,241,0.2)]">
-                      {image && <img src={image} className="w-full h-full object-cover opacity-50" />}
-                      <div className="absolute top-0 left-0 w-full h-1 bg-indigo-400 shadow-[0_0_15px_rgba(99,102,241,1)] animate-[scan_2s_ease-in-out_infinite]" />
-                  </div>
-                  <div className="mt-8 flex items-center gap-3 text-indigo-400 font-bold animate-pulse text-xl">
-                      <Scan size={32} />
-                      <span className="tracking-widest">ANALISANDO</span>
-                  </div>
-                  <p className="text-slate-400 text-sm mt-2">Identificando padrões de escrita e critérios ENEM...</p>
-                  <style>{`
-                    @keyframes scan {
-                        0% { top: 0%; }
-                        50% { top: 100%; }
-                        100% { top: 0%; }
-                    }
-                  `}</style>
+  const renderPlans = () => (
+      <div className="space-y-8 animate-in slide-in-from-bottom-4">
+          <div className="flex justify-center mb-8">
+              <div className="bg-slate-900 p-1 rounded-xl border border-white/10 flex">
+                  {(['weekly', 'monthly', 'yearly'] as const).map(cycle => (
+                      <button 
+                        key={cycle}
+                        onClick={() => setSelectedCycle(cycle)}
+                        className={`px-6 py-2 rounded-lg text-sm font-bold capitalize transition-all ${selectedCycle === cycle ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                      >
+                          {cycle === 'weekly' ? 'Semanal' : cycle === 'monthly' ? 'Mensal' : 'Anual'}
+                      </button>
+                  ))}
               </div>
           </div>
-      );
-  }
 
-  if (view === 'result' && currentResult) {
-      const getScoreColor = (score: number) => {
-          if (score >= 900) return 'text-emerald-400';
-          if (score >= 700) return 'text-indigo-400';
-          return 'text-yellow-400';
-      };
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {(['basic', 'medium', 'advanced'] as const).map(tier => {
+                  const cfg = PLAN_CONFIG[tier];
+                  const isSelected = selectedPlanTier === tier;
+                  const price = cfg.prices[selectedCycle];
+                  
+                  return (
+                      <div 
+                        key={tier} 
+                        onClick={() => handleSelectPlan(tier)}
+                        className={`relative p-6 rounded-3xl border-2 transition-all cursor-pointer flex flex-col ${isSelected ? 'border-indigo-500 bg-slate-900/80 shadow-2xl scale-105 z-10' : 'border-white/5 bg-slate-900/40 hover:border-white/20'}`}
+                      >
+                          {tier === 'advanced' && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Recomendado</div>}
+                          
+                          <div className="text-center mb-6">
+                              <h3 className="text-xl font-bold text-white mb-2">{cfg.name}</h3>
+                              <p className="text-3xl font-black text-white">R$ {price.toFixed(2).replace('.', ',')}</p>
+                              <p className="text-xs text-slate-500 capitalize">/{selectedCycle === 'weekly' ? 'semana' : selectedCycle === 'monthly' ? 'mês' : 'ano'}</p>
+                          </div>
 
-      const getBarColor = (score: number) => {
-          if (score >= 160) return 'bg-emerald-500';
-          if (score >= 120) return 'bg-indigo-500';
-          if (score >= 80) return 'bg-yellow-500';
-          return 'bg-red-500';
-      };
+                          <ul className="space-y-3 mb-8 flex-1">
+                              {cfg.features.map((feat, i) => (
+                                  <li key={i} className="flex items-center gap-2 text-xs text-slate-300">
+                                      <CheckCircle size={14} className="text-emerald-500 shrink-0"/> {feat}
+                                  </li>
+                              ))}
+                          </ul>
 
-      return (
-          <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 pb-20">
-              {renderNotification()}
-              
-              <div className="flex items-center justify-between">
-                  <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-                      <Sparkles size={28} className="text-indigo-400" />
-                      Análise da Redação
-                  </h2>
-                  <button onClick={() => { setView('home'); setImage(null); }} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors text-white">
-                      <X size={24}/>
+                          <button className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${isSelected ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400'}`}>
+                              {isSelected ? 'Selecionado' : 'Escolher'}
+                          </button>
+                      </div>
+                  )
+              })}
+          </div>
+
+          <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+              <div>
+                  <h4 className="font-bold text-white text-lg">Finalizar Assinatura</h4>
+                  <p className="text-slate-400 text-sm">Plano {PLAN_CONFIG[selectedPlanTier].name} ({selectedCycle === 'weekly' ? 'Semanal' : selectedCycle === 'monthly' ? 'Mensal' : 'Anual'})</p>
+              </div>
+              <div className="flex gap-3 w-full md:w-auto">
+                  <button onClick={() => handleBuyPlan('pix')} className="flex-1 md:flex-none px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-900/20">
+                      <QrCode size={18}/> Pagar com PIX
+                  </button>
+                  <button onClick={() => handleBuyPlan('card')} className="flex-1 md:flex-none px-6 py-3 bg-white hover:bg-indigo-50 text-slate-900 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg">
+                      <CreditCard size={18}/> Cartão
                   </button>
               </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="space-y-6">
-                      <div className="glass-card p-10 rounded-3xl text-center relative overflow-hidden border border-indigo-500/20 shadow-[0_0_40px_rgba(99,102,241,0.1)]">
-                          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
-                          <p className="text-slate-400 font-bold text-sm uppercase tracking-widest mb-2">Nota Geral</p>
-                          <div className={`text-7xl font-black ${getScoreColor(displayScore)} mb-4`}>
-                              {displayScore}
-                          </div>
-                          <div className="inline-block px-4 py-2 rounded-full bg-slate-900 border border-white/10 text-xs font-bold text-slate-300">
-                              Data: {new Date(currentResult.date).toLocaleDateString()}
-                          </div>
-                      </div>
-
-                      {/* Competencies Breakdown */}
-                      <div className="space-y-3">
-                          {Object.entries(currentResult.competencies).map(([key, score]) => {
-                               const isOpen = expandedCompetency === key;
-                               const Icon = COMPETENCY_ICONS[key] || PenTool;
-                               return (
-                                   <div key={key} className="glass-card rounded-2xl overflow-hidden transition-all duration-300 border border-white/5">
-                                       <button 
-                                        onClick={() => setExpandedCompetency(isOpen ? null : key)}
-                                        className={`w-full p-4 flex items-center justify-between ${isOpen ? 'bg-indigo-600/10' : 'hover:bg-slate-800'}`}
-                                       >
-                                           <div className="flex items-center gap-3">
-                                               <div className={`p-2 rounded-lg ${isOpen ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
-                                                   <Icon size={18} />
-                                               </div>
-                                               <span className="font-bold text-sm text-slate-200">{COMPETENCY_LABELS[key]}</span>
-                                           </div>
-                                           <div className="flex items-center gap-3">
-                                               <span className={`font-black ${getScoreColor(score)}`}>{score}</span>
-                                               <div className={`w-16 h-2 bg-slate-900 rounded-full overflow-hidden border border-white/5`}>
-                                                   <div className={`h-full ${getBarColor(score)}`} style={{ width: `${(score/200)*100}%` }} />
-                                               </div>
-                                           </div>
-                                       </button>
-                                       {isOpen && currentResult.detailedCompetencies && (
-                                           <div className="p-4 bg-slate-900/50 border-t border-white/5 text-sm text-slate-300 animate-in slide-in-from-top-2">
-                                               {currentResult.detailedCompetencies[key]?.analysis || "Análise detalhada indisponível para esta competência."}
-                                           </div>
-                                       )}
-                                   </div>
-                               );
-                          })}
-                      </div>
-                  </div>
-
-                  <div className="lg:col-span-2 space-y-6">
-                       <div className="glass-card p-8 rounded-3xl border border-white/5">
-                           <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                               <MessageSquareText size={20} className="text-indigo-400" /> Feedback Geral
-                           </h3>
-                           <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">
-                               {currentResult.feedback}
-                           </p>
-                       </div>
-
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           <div className="glass-card p-6 rounded-3xl border border-emerald-500/10 bg-emerald-900/5">
-                               <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
-                                   <ThumbsUp size={18} /> Pontos Fortes
-                               </h3>
-                               <ul className="space-y-2">
-                                   {currentResult.strengths?.map((s, i) => (
-                                       <li key={i} className="flex gap-2 text-sm text-emerald-200/80">
-                                           <CheckCircle size={14} className="mt-1 shrink-0" /> {s}
-                                       </li>
-                                   ))}
-                               </ul>
-                           </div>
-
-                           <div className="glass-card p-6 rounded-3xl border border-red-500/10 bg-red-900/5">
-                               <h3 className="text-lg font-bold text-red-400 mb-4 flex items-center gap-2">
-                                   <ThumbsDown size={18} /> Pontos de Atenção
-                               </h3>
-                               <ul className="space-y-2">
-                                   {currentResult.weaknesses?.map((w, i) => (
-                                       <li key={i} className="flex gap-2 text-sm text-red-200/80">
-                                           <AlertTriangle size={14} className="mt-1 shrink-0" /> {w}
-                                       </li>
-                                   ))}
-                               </ul>
-                           </div>
-                       </div>
-                  </div>
-              </div>
           </div>
-      );
-  }
+      </div>
+  );
 
-  // --- DEFAULT VIEW (HOME) ---
-  if (view === 'home') {
-      return (
-          <div className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 pb-20">
-              {renderNotification()}
-              
-              <div className="flex justify-between items-end">
-                  <div>
-                      <h2 className="text-3xl font-bold text-white mb-2">Correção de Redação</h2>
-                      <p className="text-slate-400">Envie sua redação e receba uma correção detalhada em segundos.</p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                      <div className="text-right">
-                          <p className="text-[10px] uppercase font-bold text-slate-500">Créditos Disponíveis</p>
-                          <p className="text-2xl font-black text-white">{user.essayCredits || 0}</p>
-                      </div>
-                      <button onClick={() => setView('buy')} className="p-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white shadow-lg transition-all hover:scale-105">
-                          <Plus size={24}/>
-                      </button>
-                  </div>
-              </div>
-
-              {history.length === 0 ? (
-                  <div className="glass-card rounded-[2.5rem] p-12 text-center border-2 border-dashed border-white/10 flex flex-col items-center justify-center min-h-[400px]">
-                      <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mb-6">
-                          <FileText size={48} className="text-slate-600" />
-                      </div>
-                      <h3 className="text-2xl font-bold text-white mb-2">Nenhuma redação enviada</h3>
-                      <p className="text-slate-500 max-w-md mx-auto mb-8">
-                          Pratique sua escrita e receba feedback instantâneo da nossa IA treinada com os critérios do ENEM.
-                      </p>
-                      <button onClick={() => setView('upload')} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-xl transition-all hover:scale-105 flex items-center gap-2">
-                          <PenTool size={20} /> Nova Correção
-                      </button>
-                  </div>
-              ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <button onClick={() => setView('upload')} className="glass-card rounded-3xl p-6 border-2 border-dashed border-indigo-500/30 flex flex-col items-center justify-center gap-4 text-indigo-400 hover:bg-indigo-500/10 transition-all group min-h-[200px]">
-                          <div className="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Plus size={32} />
-                          </div>
-                          <span className="font-bold uppercase tracking-widest text-sm">Nova Correção</span>
-                      </button>
-                      
-                      {history.map(item => (
-                          <div key={item.id} onClick={() => handleSelectHistoryItem(item)} className="glass-card p-6 rounded-3xl border border-white/5 hover:border-indigo-500/50 hover:bg-slate-800/80 transition-all cursor-pointer group relative overflow-hidden">
-                              <div className="flex justify-between items-start mb-4">
-                                  <div className="p-3 bg-slate-900 rounded-xl text-slate-300 group-hover:text-white transition-colors">
-                                      <FileText size={24} />
-                                  </div>
-                                  <div className={`text-2xl font-black ${item.scoreTotal >= 900 ? 'text-emerald-400' : 'text-white'}`}>
-                                      {item.scoreTotal}
-                                  </div>
-                              </div>
-                              <h4 className="font-bold text-white line-clamp-2 mb-2 group-hover:text-indigo-300 transition-colors h-12">
-                                  {item.theme}
-                              </h4>
-                              <p className="text-xs text-slate-500">
-                                  {new Date(item.date).toLocaleDateString()}
-                              </p>
-                          </div>
-                      ))}
-                  </div>
-              )}
-          </div>
-      );
-  }
-
-  // --- UPLOAD VIEW ---
+  // --- VIEW: UPLOAD ---
   if (view === 'upload') {
       return (
           <div className="max-w-2xl mx-auto py-8 animate-in fade-in slide-in-from-bottom-8">
-              {renderNotification()}
+              {notification && (
+                  <div className={`fixed top-4 left-1/2 -translate-x-1/2 p-4 rounded-xl shadow-2xl z-50 flex items-center gap-3 ${notification.type === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
+                      {notification.type === 'error' ? <AlertTriangle/> : <CheckCircle/>}
+                      {notification.message}
+                  </div>
+              )}
+              
               <div className="flex items-center gap-4 mb-8">
                   <button onClick={() => setView('home')} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
                       <ArrowRight className="rotate-180" size={24} />
@@ -527,7 +328,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
                       <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-2 block">Tema da Redação</label>
                       <input 
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white focus:border-indigo-500 outline-none transition-colors"
-                        placeholder="Ex: Desafios para a valorização de comunidades e povos tradicionais no Brasil"
+                        placeholder="Ex: Caminhos para combater a intolerância religiosa"
                         value={theme}
                         onChange={e => setTheme(e.target.value)}
                       />
@@ -557,7 +358,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
                       <div>
                           <p className="text-amber-200 text-sm font-bold">Confirmação de Envio</p>
                           <p className="text-amber-200/70 text-xs mt-1">
-                              Ao enviar, <strong>1 crédito</strong> será debitado da sua conta. Esta ação não pode ser desfeita.
+                              Será debitado <strong>1 crédito</strong> da sua conta.
                           </p>
                       </div>
                   </div>
@@ -584,124 +385,131 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
       );
   }
 
-  // --- BUY VIEW ---
-  if (view === 'buy') {
+  // --- VIEW: PAY PIX ---
+  if (view === 'pay_pix') {
       return (
-          <div className="max-w-2xl mx-auto py-8 animate-in fade-in slide-in-from-bottom-8">
-              {renderNotification()}
-              <div className="flex items-center gap-4 mb-8">
-                  <button onClick={() => setView('home')} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
-                      <ArrowRight className="rotate-180" size={24} />
-                  </button>
-                  <h2 className="text-2xl font-bold text-white">Adquirir Créditos</h2>
-              </div>
+          <div className="max-w-md mx-auto py-12 text-center animate-in zoom-in-95">
+              <div className="bg-slate-900 border border-white/10 p-8 rounded-[2.5rem] shadow-2xl relative">
+                  <button onClick={() => setView('home')} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={24}/></button>
+                  
+                  <h3 className="text-2xl font-black text-white mb-2">Pagamento via PIX</h3>
+                  <p className="text-slate-400 text-sm mb-6">Escaneie ou copie o código abaixo.</p>
 
-              {showPix ? (
-                  <div className="glass-card p-8 rounded-[2rem] border border-white/10 text-center">
-                      <h3 className="text-2xl font-bold text-white mb-6">Pagamento via PIX</h3>
-                      
-                      <div className="bg-white p-4 rounded-2xl inline-block mb-6 shadow-xl">
-                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-48 h-48" />
-                      </div>
-                      
-                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex gap-2 mb-6">
-                          <input readOnly value={pixPayload || ''} className="flex-1 bg-transparent text-slate-400 text-xs outline-none truncate" />
-                          <button onClick={() => { navigator.clipboard.writeText(pixPayload || ''); setCopied(true); setNotification({type:'success', message:'Código copiado!'}); }} className="text-indigo-400 hover:text-white">
-                              {copied ? <Check size={18} /> : <Copy size={18} />}
-                          </button>
-                      </div>
-
-                      <div className="bg-slate-900 p-4 rounded-xl border border-white/5 mb-6 text-left space-y-3">
-                          <div>
-                            <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 flex items-center gap-1"><User size={12}/> Nome do Pagador</label>
-                            <input 
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm mt-1 focus:border-indigo-500 outline-none" 
-                                placeholder="Nome completo do titular da conta" 
-                                value={payerName}
-                                onChange={e => setPayerName(e.target.value)}
-                            />
-                          </div>
-                      </div>
-
-                      <div className="flex gap-3">
-                          <button onClick={() => setShowPix(false)} className="flex-1 py-4 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors font-bold text-sm">
-                              Voltar
-                          </button>
-                          <button onClick={handleConfirmPayment} className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
-                              <CheckCircle size={18} /> Já paguei
-                          </button>
-                      </div>
+                  <div className="bg-white p-4 rounded-3xl inline-block mb-6 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixPayload || '')}`} className="w-48 h-48 mix-blend-multiply" />
                   </div>
-              ) : (
-                  <div className="glass-card p-8 rounded-[2rem] border border-white/10 space-y-8">
-                      {isBasicPlan && (
-                          <div className="bg-gradient-to-r from-indigo-900/50 to-purple-900/50 p-6 rounded-2xl border border-indigo-500/30 flex items-center justify-between">
-                              <div>
-                                  <h4 className="font-bold text-white flex items-center gap-2"><Crown size={18} className="text-yellow-400"/> Plano Basic Ativo</h4>
-                                  <p className="text-indigo-200 text-xs mt-1 max-w-xs">Membros Advanced pagam 4x menos por correção.</p>
-                              </div>
-                              <button onClick={() => onShowUpgrade?.()} className="px-4 py-2 bg-white text-indigo-900 font-bold rounded-lg text-xs hover:scale-105 transition-transform">
-                                  Virar Advanced
-                              </button>
-                          </div>
-                      )}
 
-                      <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-4 block">Quantidade de Redações</label>
-                          <div className="grid grid-cols-3 gap-4">
-                              {[1, 5, 10].map(qty => (
-                                  <button 
-                                    key={qty}
-                                    onClick={() => setBuyQty(qty)}
-                                    className={`p-4 rounded-2xl border transition-all flex flex-col items-center gap-2 ${buyQty === qty ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg scale-105' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-600'}`}
-                                  >
-                                      <span className="text-2xl font-black">{qty}</span>
-                                      <span className="text-[10px] uppercase font-bold">Redações</span>
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-
-                      <div className="bg-slate-950 rounded-2xl p-6 border border-white/5 space-y-4">
-                          <div className="flex justify-between items-center text-sm">
-                              <span className="text-slate-400">Preço Unitário</span>
-                              <span className="text-white font-bold">R$ {getPricePerUnit(buyQty).toFixed(2).replace('.', ',')}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xl font-black text-white pt-4 border-t border-white/10">
-                              <span>Total</span>
-                              <span>R$ {totalPrice.toFixed(2).replace('.', ',')}</span>
-                          </div>
-                      </div>
-
-                      <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-4 block">Forma de Pagamento</label>
-                          <div className="grid grid-cols-2 gap-4">
-                              <button 
-                                onClick={() => setPaymentMethod('pix')}
-                                className={`p-4 rounded-xl border flex items-center justify-center gap-2 font-bold transition-all ${paymentMethod === 'pix' ? 'bg-emerald-900/20 border-emerald-500 text-emerald-400' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
-                              >
-                                  <QrCode size={18} /> PIX
-                              </button>
-                              <button 
-                                onClick={() => setPaymentMethod('card')}
-                                className={`p-4 rounded-xl border flex items-center justify-center gap-2 font-bold transition-all ${paymentMethod === 'card' ? 'bg-indigo-900/20 border-indigo-500 text-indigo-400' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
-                              >
-                                  <CreditCard size={18} /> Cartão
-                              </button>
-                          </div>
-                      </div>
-
-                      <button onClick={handleGeneratePayment} className="w-full py-4 bg-white text-slate-900 font-black rounded-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02]">
-                          <Wallet size={20} /> Ir para Pagamento
+                  <div className="flex gap-2 mb-6">
+                      <input readOnly value={pixPayload || ''} className="flex-1 bg-black border border-zinc-800 rounded-xl px-4 text-xs text-slate-400 truncate" />
+                      <button onClick={() => {navigator.clipboard.writeText(pixPayload||''); setCopied(true)}} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-white transition-colors">
+                          {copied ? <Check size={18} className="text-emerald-400"/> : <Copy size={18}/>}
                       </button>
                   </div>
-              )}
+
+                  <div className="bg-black/30 p-4 rounded-xl border border-white/5 mb-6 text-left">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase ml-1 flex items-center gap-1"><User size={12}/> Nome do Pagador (Obrigatório)</label>
+                      <input 
+                          className="w-full bg-transparent border-b border-slate-700 py-2 text-white text-sm outline-none focus:border-indigo-500" 
+                          placeholder="Nome completo do titular" 
+                          value={payerName}
+                          onChange={e => setPayerName(e.target.value)}
+                      />
+                  </div>
+
+                  <div className="bg-emerald-900/20 border border-emerald-500/20 p-3 rounded-xl mb-6">
+                      <p className="text-emerald-400 font-bold text-lg">Total: R$ {pixAmount.toFixed(2).replace('.', ',')}</p>
+                  </div>
+
+                  <button onClick={handleConfirmPixPayment} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2">
+                      <CheckCircle size={20}/> Já realizei o pagamento
+                  </button>
+              </div>
           </div>
       );
   }
 
-  // Fallback
-  return null;
+  // --- VIEW: HOME (DASHBOARD OR PLANS) ---
+  return (
+      <div className="max-w-6xl mx-auto pb-20 animate-in fade-in">
+          {notification && (
+              <div className={`fixed top-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 font-bold border ${notification.type === 'error' ? 'bg-red-950/90 border-red-500 text-red-200' : 'bg-emerald-950/90 border-emerald-500 text-emerald-200'}`}>
+                  {notification.message}
+              </div>
+          )}
+
+          {/* ACTIVE PLAN DASHBOARD */}
+          {hasActivePlan ? (
+              <div className="space-y-8">
+                  <div className="bg-gradient-to-r from-indigo-900/40 to-slate-900 border border-indigo-500/30 rounded-[2.5rem] p-8 md:p-10 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-600/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3" />
+                      
+                      <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                          <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                  <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-300"><Crown size={20}/></div>
+                                  <span className="text-sm font-bold text-indigo-300 uppercase tracking-widest">Plano Ativo</span>
+                              </div>
+                              <h2 className="text-4xl font-black text-white mb-2">Redação {PLAN_CONFIG[user.essayPlanType || 'basic'].name}</h2>
+                              <p className="text-slate-400">Válido até {new Date(user.essayPlanExpiry!).toLocaleDateString()}</p>
+                          </div>
+                          
+                          <div className="flex items-center gap-6 bg-slate-950/50 p-6 rounded-3xl border border-white/5 backdrop-blur-sm">
+                              <div className="text-center">
+                                  <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Créditos Restantes</p>
+                                  <p className="text-4xl font-black text-white">{credits}</p>
+                              </div>
+                              <div className="h-10 w-px bg-white/10" />
+                              <button 
+                                onClick={() => setView('upload')}
+                                disabled={credits <= 0}
+                                className="px-6 py-4 bg-white text-slate-950 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed font-black rounded-xl shadow-lg transition-all flex items-center gap-2 hover:scale-105 active:scale-95"
+                              >
+                                  {credits > 0 ? <><PenTool size={20}/> NOVA CORREÇÃO</> : <><Lock size={20}/> SEM CRÉDITOS</>}
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* HISTORY LIST */}
+                  <div className="space-y-4">
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2"><FileCheck size={20} className="text-slate-500"/> Histórico de Correções</h3>
+                      {history.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {history.map(item => (
+                                  <div key={item.id} onClick={() => { setCurrentResult(item); setView('result'); }} className="glass-card p-5 rounded-2xl border border-white/5 hover:border-indigo-500/30 hover:bg-slate-800/60 transition-all cursor-pointer group">
+                                      <div className="flex justify-between items-start mb-3">
+                                          <span className="text-[10px] bg-slate-900 px-2 py-1 rounded text-slate-400">{new Date(item.date).toLocaleDateString()}</span>
+                                          <span className={`font-black text-xl ${item.scoreTotal >= 900 ? 'text-emerald-400' : 'text-white'}`}>{item.scoreTotal}</span>
+                                      </div>
+                                      <p className="text-sm font-bold text-slate-200 line-clamp-2 group-hover:text-indigo-300 transition-colors">{item.theme}</p>
+                                  </div>
+                              ))}
+                          </div>
+                      ) : (
+                          <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-3xl">
+                              <p className="text-slate-500">Nenhuma redação enviada ainda.</p>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          ) : (
+              // SALES PAGE (NO PLAN)
+              <div className="text-center space-y-12">
+                  <div className="max-w-2xl mx-auto space-y-4">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-widest">
+                          <Sparkles size={14}/> Método Comprovado
+                      </div>
+                      <h2 className="text-5xl font-black text-white tracking-tighter">Domine a Redação Nota 1000</h2>
+                      <p className="text-lg text-slate-400 leading-relaxed">
+                          Correção instantânea por Inteligência Artificial treinada com os critérios oficiais do ENEM. Escolha seu plano e comece a evoluir hoje.
+                      </p>
+                  </div>
+
+                  {renderPlans()}
+              </div>
+          )}
+      </div>
+  );
 };
 
 export default Redacao;

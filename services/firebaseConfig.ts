@@ -1,7 +1,6 @@
 
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import type { FirebaseApp } from 'firebase/app';
-import { getAuth } from "firebase/auth";
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
 import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
@@ -15,17 +14,17 @@ const firebaseConfig = {
   measurementId: "G-CFYSRSFF0V"
 };
 
-// Fix: Standard modular SDK functions are exported from 'firebase/app'
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+// Initialize Firebase (Compat)
+const app = firebase.apps.length > 0 ? firebase.app() : firebase.initializeApp(firebaseConfig);
 
-// Initialize a SECONDARY app instance for Admin User Creation using correct FirebaseApp type
-let secondaryApp: FirebaseApp;
+// Initialize Secondary App (Compat)
+let secondaryApp;
 try {
-    secondaryApp = getApp("SecondaryApp");
+    secondaryApp = firebase.app("SecondaryApp");
 } catch (e) {
-    secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+    secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp");
 }
 
-export const auth = getAuth(app);
-export const secondaryAuth = getAuth(secondaryApp); 
-export const database = getDatabase(app);
+export const auth = app.auth();
+export const secondaryAuth = secondaryApp.auth(); 
+export const database = getDatabase(app); // Modular Database instance

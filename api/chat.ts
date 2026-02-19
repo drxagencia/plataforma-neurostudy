@@ -1,6 +1,7 @@
 
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getDatabase, ref, get, update, push, set } from "firebase/database";
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/database';
+import { getDatabase, ref, get, update, push, set } from "firebase/database"; // keep modular for types/utils if available, or switch to compat logic if needed
 import OpenAI from "openai";
 
 const firebaseConfig = {
@@ -10,8 +11,9 @@ const firebaseConfig = {
   projectId: "neurostudy-d8a00",
 };
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// Use Compat Init
+const app = firebase.apps.length > 0 ? firebase.app() : firebase.initializeApp(firebaseConfig);
+const db = app.database(); // Compat DB instance
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -33,8 +35,8 @@ export default async function handler(req: any, res: any) {
     const { message, history, mode, uid, image, systemOverride } = req.body;
     if (!uid) return res.status(401).json({ error: 'User ID required' });
 
-    const userRef = ref(db, `users/${uid}`);
-    const userSnap = await get(userRef);
+    const userRef = db.ref(`users/${uid}`);
+    const userSnap = await userRef.once('value');
     const user = userSnap.val();
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
@@ -80,11 +82,11 @@ export default async function handler(req: any, res: any) {
 
     // Débito do valor (SOMENTE SE NÃO TIVER IA ILIMITADA E NÃO FOR SUPORTE)
     if (mode !== 'support' && !hasUnlimitedAi) {
-        await update(userRef, { balance: Math.max(0, (user.balance || 0) - calculatedCost) });
+        await userRef.update({ balance: Math.max(0, (user.balance || 0) - calculatedCost) });
         
         // Log da transação com o valor que o usuário vê (multiplicado)
-        const transRef = push(ref(db, `user_transactions/${uid}`));
-        await set(transRef, {
+        const transRef = db.ref(`user_transactions/${uid}`).push();
+        await transRef.set({
             id: transRef.key,
             userId: uid,
             type: 'debit',
@@ -104,8 +106,8 @@ export default async function handler(req: any, res: any) {
 
 async function DatabaseService_LogApiCost(uid: string, desc: string, amount: number) {
     try {
-        const costRef = push(ref(db, 'operational_costs'));
-        await set(costRef, {
+        const costRef = db.ref('operational_costs').push();
+        await costRef.set({
             id: costRef.key,
             name: `OpenAI: ${desc} (User ${uid.substring(0,5)})`,
             amount: amount,
