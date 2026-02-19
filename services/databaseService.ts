@@ -393,17 +393,46 @@ export const DatabaseService = {
           const snap = await get(ref(database, `recharge_requests/${reqId}`));
           if (snap.exists()) {
               const req = snap.val() as RechargeRequest;
+              
+              // 1. Process Credits (Essay)
               if (req.currencyType === 'CREDIT' && req.quantityCredits) {
                   await update(ref(database, `users/${req.userId}`), {
                       essayCredits: increment(req.quantityCredits),
                       totalSpent: increment(req.amount)
                   });
-              } else if (req.currencyType === 'BRL') {
+              } 
+              // 2. Process Balance / Plans
+              else if (req.currencyType === 'BRL') {
                   await update(ref(database, `users/${req.userId}`), {
                       totalSpent: increment(req.amount)
                   });
+                  
+                  // PLAN UPGRADE: Basic -> Advanced
                   if (req.planLabel?.includes('UPGRADE')) {
                       await update(ref(database, `users/${req.userId}`), { plan: 'advanced' });
+                  }
+
+                  // AI UNLIMITED: Update Expiry
+                  if (req.planLabel?.includes('IA Ilimitada')) {
+                      // Fetch current profile to check existing expiry
+                      const userSnap = await get(ref(database, `users/${req.userId}`));
+                      const user = userSnap.val() as UserProfile;
+                      const now = Date.now();
+                      
+                      // Determine current valid expiry (if future, use it; if past/null, use now)
+                      let currentExpiryTime = user?.aiUnlimitedExpiry ? new Date(user.aiUnlimitedExpiry).getTime() : now;
+                      if (currentExpiryTime < now) currentExpiryTime = now;
+
+                      // Calculate duration based on label
+                      let daysToAdd = 0;
+                      if (req.planLabel.includes('Semanal')) daysToAdd = 7;
+                      else if (req.planLabel.includes('Mensal')) daysToAdd = 30;
+                      else if (req.planLabel.includes('Anual')) daysToAdd = 365;
+
+                      if (daysToAdd > 0) {
+                          const newExpiry = new Date(currentExpiryTime + (daysToAdd * 24 * 60 * 60 * 1000)).toISOString();
+                          await update(ref(database, `users/${req.userId}`), { aiUnlimitedExpiry: newExpiry });
+                      }
                   }
               }
 

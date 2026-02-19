@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import Auth from './components/Auth';
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   
   // Global Upgrade Modal State
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeMode, setUpgradeMode] = useState<'plan' | 'ai'>('plan');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -114,7 +116,8 @@ const App: React.FC = () => {
       }
   };
 
-  const handleShowUpgrade = () => {
+  const handleShowUpgrade = (mode: 'plan' | 'ai' = 'plan') => {
+      setUpgradeMode(mode);
       setShowUpgradeModal(true);
   };
 
@@ -136,7 +139,7 @@ const App: React.FC = () => {
     <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       
       {/* Global Upgrade Modal */}
-      {showUpgradeModal && <UpgradeModal user={user} onClose={() => setShowUpgradeModal(false)} />}
+      {showUpgradeModal && <UpgradeModal user={user} onClose={() => setShowUpgradeModal(false)} mode={upgradeMode} />}
 
       {/* MODAL DE CAPTURA DE WHATSAPP */}
       {showOnboarding && (
@@ -188,17 +191,20 @@ const App: React.FC = () => {
 
       <main className={`flex-1 relative overflow-y-auto transition-all duration-300 z-10 ${isMobile ? 'pb-24 p-4' : 'ml-64 p-8'}`} style={{ height: '100vh' }}>
         <div className="max-w-7xl mx-auto h-full">
+            {/* PLAN FEATURES (Basic vs Advanced) */}
             {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} />}
-            {currentView === 'aulas' && <Classes onNavigate={setCurrentView} user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={handleShowUpgrade} />}
-            {currentView === 'militares' && <Militares />}
-            {currentView === 'redacao' && <Redacao user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={handleShowUpgrade} />}
-            {currentView === 'questoes' && <QuestionBank user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={handleShowUpgrade} />}
-            {/* Pass onShowUpgrade to restricted/demo views */}
-            {currentView === 'comunidade' && <Community user={user} onShowUpgrade={handleShowUpgrade} />}
-            {currentView === 'simulados' && <Simulations user={user} onShowUpgrade={handleShowUpgrade} />}
-            {currentView === 'tutor' && <AiTutor user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={handleShowUpgrade} />}
-            {currentView === 'competitivo' && <Competitivo user={user} onShowUpgrade={handleShowUpgrade} />}
+            {currentView === 'redacao' && <Redacao user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={() => handleShowUpgrade('plan')} />}
+            {currentView === 'comunidade' && <Community user={user} onShowUpgrade={() => handleShowUpgrade('plan')} />}
+            {currentView === 'simulados' && <Simulations user={user} onShowUpgrade={() => handleShowUpgrade('plan')} />}
+            {currentView === 'competitivo' && <Competitivo user={user} onShowUpgrade={() => handleShowUpgrade('plan')} />}
             
+            {/* AI FEATURES (Separate Subscription) */}
+            {currentView === 'aulas' && <Classes onNavigate={setCurrentView} user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={() => handleShowUpgrade('ai')} />}
+            {currentView === 'questoes' && <QuestionBank user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={() => handleShowUpgrade('ai')} />}
+            {currentView === 'tutor' && <AiTutor user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={() => handleShowUpgrade('ai')} />}
+            
+            {/* STANDARD FEATURES */}
+            {currentView === 'militares' && <Militares />}
             {currentView === 'ajustes' && <Settings user={user} onUpdateUser={u => setUser(u)} />}
             {currentView === 'suporte' && <Support user={user} />}
             {currentView === 'financeiro' && (user.isAdmin ? <FinanceiroPanel /> : <Dashboard user={user} onNavigate={setCurrentView} />)}
