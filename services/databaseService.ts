@@ -363,8 +363,9 @@ export const DatabaseService = {
       await set(newRef, { ...lead, id: newRef.key });
   },
 
-  async markLeadProcessed(leadId: string): Promise<void> {
-      await update(ref(database, `leads/${leadId}`), { processed: true, status: 'approved_access' });
+  // MODIFIED: Delete lead instead of just marking as processed
+  async deleteLead(leadId: string): Promise<void> {
+      await remove(ref(database, `leads/${leadId}`));
   },
 
   async getRechargeRequests(): Promise<RechargeRequest[]> {
@@ -388,7 +389,7 @@ export const DatabaseService = {
   },
 
   async processRecharge(reqId: string, status: 'approved' | 'rejected'): Promise<void> {
-      await update(ref(database, `recharge_requests/${reqId}`), { status });
+      // 1. If approved, execute logic
       if (status === 'approved') {
           const snap = await get(ref(database, `recharge_requests/${reqId}`));
           if (snap.exists()) {
@@ -447,6 +448,9 @@ export const DatabaseService = {
               });
           }
       }
+
+      // 2. ALWAYS DELETE THE REQUEST FROM DATABASE (Clean up)
+      await remove(ref(database, `recharge_requests/${reqId}`));
   },
 
   async getUserTransactions(uid: string): Promise<Transaction[]> {

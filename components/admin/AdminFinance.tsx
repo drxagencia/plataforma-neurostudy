@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { RechargeRequest } from '../../types';
+import { RechargeRequest, UserProfile } from '../../types';
 import { DatabaseService } from '../../services/databaseService';
 import { DollarSign, Loader2, RefreshCw } from 'lucide-react';
 
@@ -26,8 +26,20 @@ const AdminFinance: React.FC = () => {
 
   const handleProcessRecharge = async (req: RechargeRequest, status: 'approved' | 'rejected') => {
       if (!confirm(`Confirmar ${status === 'approved' ? 'APROVAÇÃO' : 'REJEIÇÃO'} da recarga de R$ ${req.amount}?`)) return;
+      
       setLoading(true);
       try {
+          if (status === 'rejected') {
+              // Fetch user to get WhatsApp
+              const user = await DatabaseService.getUserProfile(req.userId);
+              if (user && user.whatsapp) {
+                  const phone = user.whatsapp.replace(/\D/g, '');
+                  const message = encodeURIComponent(`Olá ${user.displayName}, vimos seu pedido de recarga/upgrade (${req.planLabel}). Houve um problema na confirmação. Poderia enviar o comprovante?`);
+                  window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+              }
+          }
+
+          // Service handles approval logic and DELETION for both statuses
           await DatabaseService.processRecharge(req.id, status);
           fetchData();
       } catch (e) {
@@ -96,4 +108,3 @@ const AdminFinance: React.FC = () => {
 };
 
 export default AdminFinance;
-    

@@ -17,6 +17,7 @@ type UpgradeStep = 'benefits' | 'method' | 'pix_cycle' | 'pix_pay' | 'card_warn'
 const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan' }) => {
     const [step, setStep] = useState<UpgradeStep>('benefits');
     const [selectedCycle, setSelectedCycle] = useState<'weekly' | 'monthly' | 'yearly'>(mode === 'ai' ? 'monthly' : 'yearly');
+    const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
     const [pixPayload, setPixPayload] = useState('');
     const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -58,6 +59,12 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
     // --- HANDLERS ---
 
     const handlePixCycleSelection = (cycle: 'weekly' | 'monthly' | 'yearly') => {
+        // Prevent Weekly/Monthly PIX for AI
+        if (mode === 'ai' && paymentMethod === 'pix' && cycle !== 'yearly') {
+            alert("Este plano só está disponível via Cartão de Crédito.");
+            return;
+        }
+
         const cost = calculateCost(cycle);
         setUpgradeCost(cost);
         setSelectedCycle(cycle);
@@ -71,14 +78,15 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
         }
     };
 
-    const handleCardRedirect = () => {
+    const handleCardRedirect = (cycle?: 'weekly' | 'monthly' | 'yearly') => {
+        const finalCycle = cycle || selectedCycle;
         if (mode === 'ai') {
             let link = KIRVANO_LINKS.ai_monthly;
-            if (selectedCycle === 'weekly') link = KIRVANO_LINKS.ai_weekly;
-            if (selectedCycle === 'yearly') link = KIRVANO_LINKS.ai_yearly;
+            if (finalCycle === 'weekly') link = KIRVANO_LINKS.ai_weekly;
+            if (finalCycle === 'yearly') link = KIRVANO_LINKS.ai_yearly;
             window.open(link, '_blank');
         } else {
-            const link = selectedCycle === 'yearly' ? KIRVANO_LINKS.upgrade_yearly : KIRVANO_LINKS.upgrade_monthly;
+            const link = finalCycle === 'yearly' ? KIRVANO_LINKS.upgrade_yearly : KIRVANO_LINKS.upgrade_monthly;
             window.open(link, '_blank');
         }
         onClose();
@@ -187,7 +195,6 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                         <p className="text-xs text-slate-400 mt-1">Receba créditos de redação todo mês automaticamente.</p>
                     </div>
                 </div>
-                {/* ... other items ... */}
             </div>
 
             <button 
@@ -199,53 +206,66 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
         </div>
     );
 
-    const renderAiCycles = () => (
-        <div className="space-y-4 mb-8">
-            {/* WEEKLY */}
-            <div onClick={() => handlePixCycleSelection('weekly')} className="cursor-pointer p-4 rounded-2xl bg-slate-800 border border-white/10 hover:border-indigo-500/50 hover:bg-slate-700 transition-all flex justify-between items-center group">
-                <div className="flex items-center gap-4">
-                    <div className="p-2 bg-slate-900 rounded-lg text-slate-300 group-hover:text-white"><Clock size={20}/></div>
-                    <div>
-                        <h4 className="font-bold text-white">Semanal</h4>
-                        <p className="text-xs text-slate-400">7 dias de acesso total</p>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <p className="text-xl font-black text-white">R$ 9,90</p>
-                </div>
-            </div>
+    const renderAiCycles = () => {
+        // Only allow Annual if PIX is selected
+        const isPix = paymentMethod === 'pix';
 
-            {/* MONTHLY */}
-            <div onClick={() => handlePixCycleSelection('monthly')} className="cursor-pointer p-4 rounded-2xl bg-indigo-900/20 border border-indigo-500/50 hover:bg-indigo-900/40 transition-all flex justify-between items-center group relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg uppercase">Popular</div>
-                <div className="flex items-center gap-4 relative z-10">
-                    <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400"><BrainCircuit size={20}/></div>
-                    <div>
-                        <h4 className="font-bold text-white">Mensal</h4>
-                        <p className="text-xs text-indigo-300">Renova a cada 30 dias</p>
+        return (
+            <div className="space-y-4 mb-8">
+                {/* WEEKLY */}
+                <div 
+                    onClick={() => !isPix && handleCardRedirect('weekly')} 
+                    className={`cursor-pointer p-4 rounded-2xl border transition-all flex justify-between items-center group ${isPix ? 'bg-slate-900 border-white/5 opacity-40 cursor-not-allowed' : 'bg-slate-800 border-white/10 hover:border-indigo-500/50 hover:bg-slate-700'}`}
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="p-2 bg-slate-900 rounded-lg text-slate-300"><Clock size={20}/></div>
+                        <div>
+                            <h4 className="font-bold text-white">Semanal</h4>
+                            <p className="text-xs text-slate-400">{isPix ? 'Apenas Cartão' : '7 dias de acesso total'}</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xl font-black text-white">R$ 9,90</p>
                     </div>
                 </div>
-                <div className="text-right relative z-10">
-                    <p className="text-xl font-black text-white">R$ 19,90</p>
-                </div>
-            </div>
 
-            {/* YEARLY */}
-            <div onClick={() => handlePixCycleSelection('yearly')} className="cursor-pointer p-4 rounded-2xl bg-emerald-900/10 border border-emerald-500/30 hover:bg-emerald-900/20 transition-all flex justify-between items-center group">
-                <div className="flex items-center gap-4">
-                    <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400"><Rocket size={20}/></div>
-                    <div>
-                        <h4 className="font-bold text-white">Anual</h4>
-                        <p className="text-xs text-emerald-300/80">Melhor custo-benefício</p>
+                {/* MONTHLY */}
+                <div 
+                    onClick={() => !isPix && handleCardRedirect('monthly')} 
+                    className={`cursor-pointer p-4 rounded-2xl border transition-all flex justify-between items-center group relative overflow-hidden ${isPix ? 'bg-slate-900 border-white/5 opacity-40 cursor-not-allowed' : 'bg-indigo-900/20 border-indigo-500/50 hover:bg-indigo-900/40'}`}
+                >
+                    {!isPix && <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg uppercase">Popular</div>}
+                    <div className="flex items-center gap-4 relative z-10">
+                        <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400"><BrainCircuit size={20}/></div>
+                        <div>
+                            <h4 className="font-bold text-white">Mensal</h4>
+                            <p className="text-xs text-indigo-300">{isPix ? 'Apenas Cartão' : 'Renova a cada 30 dias'}</p>
+                        </div>
+                    </div>
+                    <div className="text-right relative z-10">
+                        <p className="text-xl font-black text-white">R$ 19,90</p>
                     </div>
                 </div>
-                <div className="text-right">
-                    <p className="text-xl font-black text-white">R$ 49,90</p>
-                    <p className="text-[10px] text-emerald-400 font-bold">Economize 80%</p>
+
+                {/* YEARLY */}
+                <div onClick={() => isPix ? handlePixCycleSelection('yearly') : handleCardRedirect('yearly')} className="cursor-pointer p-4 rounded-2xl bg-emerald-900/10 border border-emerald-500/30 hover:bg-emerald-900/20 transition-all flex justify-between items-center group">
+                    <div className="flex items-center gap-4">
+                        <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400"><Rocket size={20}/></div>
+                        <div>
+                            <h4 className="font-bold text-white">Anual</h4>
+                            <p className="text-xs text-emerald-300/80">Melhor custo-benefício</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xl font-black text-white">R$ 49,90</p>
+                        <p className="text-[10px] text-emerald-400 font-bold">Economize 80%</p>
+                    </div>
                 </div>
+                
+                {isPix && <p className="text-center text-xs text-yellow-500 mt-2">Pagamento via PIX disponível apenas para o plano Anual.</p>}
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderPlanCycles = () => (
         <div className="space-y-4 mb-8">
@@ -316,7 +336,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                         
                         <div className="grid grid-cols-1 gap-4 mb-6">
                             <button 
-                                onClick={() => setStep('pix_cycle')}
+                                onClick={() => { setPaymentMethod('pix'); setStep('pix_cycle'); }}
                                 className="group relative p-6 rounded-2xl bg-slate-800 border border-emerald-500/30 hover:bg-emerald-900/10 hover:border-emerald-500 transition-all text-left flex items-center justify-between"
                             >
                                 <div className="flex items-center gap-4">
@@ -332,26 +352,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                             </button>
 
                             <button 
-                                onClick={() => { 
-                                    // For card, we usually just need to know month vs year for Plan, but AI has 3 cycles.
-                                    // For AI with Card, we need to pick cycle first?
-                                    // Let's reuse 'pix_cycle' logic but redirect instead of QR code.
-                                    // Actually, simpler flow: Go to cycle select, then redirect.
-                                    // But here we select method first. Let's make user pick cycle then method?
-                                    // Current flow: Benefits -> Method -> Cycle -> Pay.
-                                    // Let's keep it, but 'card' also needs cycle selection.
-                                    // FIX: Redirect to 'pix_cycle' but with a flag?
-                                    // Easier: Just let user pick cycle in next step for both, and toggle payment mode there?
-                                    // Or simply reuse 'pix_cycle' step for cycle selection, and handle the click action there.
-                                    setStep('pix_cycle'); 
-                                    // We will handle the "Card" click inside the cycle selection step by adding a toggle or separate buttons?
-                                    // To keep simple: Go to cycle selection. Inside cycle selection, clicking an option triggers PIX generation.
-                                    // We need to know user wants card.
-                                    // Let's stick to: Select Method -> Select Cycle -> (If Pix: QR, If Card: Redirect)
-                                    // But `handlePixCycleSelection` generates Payload immediately.
-                                    // Let's just create a `card_cycle` step or modify `pix_cycle` to handle card redirects.
-                                    // For now, let's direct to 'pix_cycle' and add Card buttons there or just use the cycle selection to set cost then redirect.
-                                }}
+                                onClick={() => { setPaymentMethod('card'); setStep('pix_cycle'); }}
                                 className="group relative p-6 rounded-2xl bg-slate-800 border border-indigo-500/30 hover:bg-indigo-900/10 hover:border-indigo-500 transition-all text-left flex items-center justify-between"
                             >
                                 <div className="flex items-center gap-4">
@@ -371,7 +372,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                     </div>
                 )}
 
-                {/* --- STEP 3: CYCLE SELECTION (Generic for both) --- */}
+                {/* --- STEP 3: CYCLE SELECTION --- */}
                 {step === 'pix_cycle' && (
                     <div className="p-8 flex flex-col h-full overflow-y-auto custom-scrollbar">
                         <div className="text-center mb-6">
@@ -414,28 +415,6 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                             {loading ? "Processando..." : "Já realizei o pagamento"}
                         </button>
                         <button onClick={() => setStep('pix_cycle')} className="text-slate-500 text-xs mt-4 hover:text-white">Cancelar</button>
-                    </div>
-                )}
-
-                {/* --- CARD WARN (Legacy from Plan Upgrade, reused for card flow hint) --- */}
-                {step === 'card_warn' && (
-                    <div className="p-8 text-center flex flex-col justify-center h-full">
-                        <div className="w-16 h-16 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-400 animate-pulse">
-                            <CreditCard size={32} />
-                        </div>
-                        <h3 className="text-2xl font-bold text-white mb-4">Redirecionando</h3>
-                        
-                        <p className="text-slate-300 text-sm mb-8 leading-relaxed">
-                            Você será levado para o checkout seguro da Kirvano para finalizar sua assinatura {selectedCycle === 'weekly' ? 'semanal' : selectedCycle === 'monthly' ? 'mensal' : 'anual'}.
-                        </p>
-
-                        <button 
-                            onClick={handleCardRedirect}
-                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2"
-                        >
-                            Ir para Pagamento <ArrowRight size={18} />
-                        </button>
-                        <button onClick={() => setStep('method')} className="text-slate-500 text-sm mt-4 hover:text-white">Voltar</button>
                     </div>
                 )}
 

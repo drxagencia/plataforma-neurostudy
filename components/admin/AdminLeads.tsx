@@ -50,8 +50,8 @@ const AdminLeads: React.FC = () => {
               firstTimeSetupDone: false
           });
 
-          // 3. Deletar da lista de Leads (marcar como processado/removido)
-          await DatabaseService.markLeadProcessed(lead.id);
+          // 3. Deletar permanentemente do banco
+          await DatabaseService.deleteLead(lead.id);
           
           alert(`Sucesso! Aluno criado com UID: ${uid}`);
           fetchLeads();
@@ -62,11 +62,17 @@ const AdminLeads: React.FC = () => {
       }
   };
 
-  const handleRejectLead = async (leadId: string) => {
-      if (!confirm("Tem certeza que deseja excluir esta solicitação? Isso não pode ser desfeito.")) return;
+  const handleRejectLead = async (lead: Lead) => {
+      if (!confirm("Isso irá abrir o WhatsApp e deletar a solicitação. Confirmar?")) return;
       setLoading(true);
       try {
-          await DatabaseService.markLeadProcessed(leadId);
+          // 1. Open WhatsApp
+          const phone = lead.contact.replace(/\D/g, '');
+          const message = encodeURIComponent(`Olá ${lead.name}, aqui é do suporte NeuroStudy. Vimos sua tentativa de inscrição no plano ${lead.planId}. Houve um problema com o comprovante ou dados. Poderia reenviar?`);
+          window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+
+          // 2. Delete request
+          await DatabaseService.deleteLead(lead.id);
           fetchLeads();
       } catch (e) {
           console.error(e);
@@ -148,10 +154,10 @@ const AdminLeads: React.FC = () => {
                                 <CheckCircle size={18} /> Aprovar Acesso
                             </button>
                             <button 
-                                onClick={() => handleRejectLead(lead.id)}
+                                onClick={() => handleRejectLead(lead)}
                                 className="px-6 py-3 bg-red-600/10 hover:bg-red-600/20 text-red-400 font-bold rounded-xl border border-red-500/20 flex items-center justify-center gap-2 transition-all"
                             >
-                                <Trash2 size={18} /> Rejeitar
+                                <Trash2 size={18} /> Rejeitar e Contatar
                             </button>
                         </div>
                     </div>
@@ -169,4 +175,3 @@ const AdminLeads: React.FC = () => {
 };
 
 export default AdminLeads;
-    
