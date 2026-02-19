@@ -41,6 +41,9 @@ const App: React.FC = () => {
   // XP Alert State
   const [xpNotification, setXpNotification] = useState<{ show: boolean, amount: number, type: string } | null>(null);
 
+  // DB Optimization: Buffer
+  const [unsavedStudyMinutes, setUnsavedStudyMinutes] = useState(0);
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
@@ -86,12 +89,23 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [showLanding]); 
 
-  // GLOBAL STUDY TIMER
+  // GLOBAL STUDY TIMER - OPTIMIZED BATCHING
   useEffect(() => {
       if (!user?.uid || showLanding) return;
 
       const timer = setInterval(() => {
-          DatabaseService.trackStudyTime(user.uid, 1);
+          // Increment Local Buffer
+          setUnsavedStudyMinutes(prev => {
+              const newValue = prev + 1;
+              // Auto Sync every 15 minutes
+              if (newValue >= 15) {
+                  DatabaseService.trackStudyTime(user.uid, newValue);
+                  return 0;
+              }
+              return newValue;
+          });
+
+          // Update UI instantly (Optimistic)
           setUser(currentUser => {
               if (!currentUser) return null;
               return {
@@ -122,6 +136,14 @@ const App: React.FC = () => {
       window.addEventListener('xp-gained', handleXpEvent);
       return () => window.removeEventListener('xp-gained', handleXpEvent);
   }, []);
+
+  const handleManualTimeSync = () => {
+      if (user?.uid && unsavedStudyMinutes > 0) {
+          DatabaseService.trackStudyTime(user.uid, unsavedStudyMinutes);
+          setUnsavedStudyMinutes(0);
+          // Optional: Add a simple toast or animation here if desired
+      }
+  };
 
   const handleOnboardingSubmit = async () => {
       if (whatsappInput.length < 10 || !user) return;
@@ -229,7 +251,7 @@ const App: React.FC = () => {
       <main className={`flex-1 relative overflow-y-auto transition-all duration-300 z-10 ${isMobile ? 'pb-24 p-4' : 'ml-64 p-8'}`} style={{ height: '100vh' }}>
         <div className="max-w-7xl mx-auto h-full">
             {/* PLAN FEATURES (Basic vs Advanced) */}
-            {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} />}
+            {currentView === 'dashboard' && <Dashboard user={user} onNavigate={setCurrentView} onManualSync={handleManualTimeSync} />}
             {currentView === 'redacao' && <Redacao user={user} onUpdateUser={u => setUser(u)} onShowUpgrade={() => handleShowUpgrade('plan')} />}
             {currentView === 'comunidade' && <Community user={user} onShowUpgrade={() => handleShowUpgrade('plan')} />}
             {currentView === 'simulados' && <Simulations user={user} onShowUpgrade={() => handleShowUpgrade('plan')} />}

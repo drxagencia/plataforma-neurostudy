@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, View, UserStatsMap } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
-import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3, Bot, Edit2, Check, CheckCircle } from 'lucide-react';
+import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3, Bot, Edit2, Check, CheckCircle, CloudUpload } from 'lucide-react';
 import { getRank, getNextRank } from '../constants';
 import UpgradeModal from './UpgradeModal';
 
@@ -54,9 +54,10 @@ const parseInlineStyles = (text: string) => {
 interface DashboardProps {
   user: UserProfile; 
   onNavigate: (view: View) => void;
+  onManualSync?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync }) => {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [currentRank, setCurrentRank] = useState(getRank(0));
@@ -73,6 +74,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
   // Goal State
   const [editingGoal, setEditingGoal] = useState(false);
   const [newGoal, setNewGoal] = useState(user.dailyGoal || 2);
+
+  // Sync State
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -142,6 +146,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
       if (newGoal <= 0) return;
       await DatabaseService.setDailyGoal(user.uid, newGoal);
       // Optimistic update handled by parent prop refresh usually, but UI might lag
+  };
+
+  const handleSyncClick = () => {
+      if (onManualSync && !isSyncing) {
+          setIsSyncing(true);
+          onManualSync();
+          setTimeout(() => setIsSyncing(false), 1000);
+      }
   };
 
   const handleGenerateTip = async () => {
@@ -309,7 +321,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate }) => {
                 </div>
                 
                 <div>
-                    <p className="text-slate-400 text-sm font-medium font-sans">Tempo Hoje</p>
+                    <div className="flex justify-between items-end">
+                        <p className="text-slate-400 text-sm font-medium font-sans">Tempo Hoje</p>
+                        <button onClick={handleSyncClick} className="p-1 hover:bg-white/10 rounded-full text-slate-500 hover:text-white transition-colors" title="Sincronizar Tempo">
+                            {isSyncing ? <Loader2 size={14} className="animate-spin"/> : <CloudUpload size={14} />}
+                        </button>
+                    </div>
                     <div className="flex items-baseline gap-2">
                         <p className="text-3xl font-bold text-white font-display">{formatTime(dailyMinutes)}</p>
                         {metGoal && <CheckCircle size={16} className="text-emerald-500 mb-1" />}

@@ -24,22 +24,7 @@ const Competitivo: React.FC<CompetitivoProps> = ({ user, onShowUpgrade }) => {
     try {
         setLoading(true);
         const data = await DatabaseService.getLeaderboard(period);
-        
-        // MOCK DATA GENERATION IF EMPTY (To prevent collapsed layout)
-        if (data.length === 0) {
-            const ghosts = Array.from({ length: 5 }).map((_, i) => ({
-                uid: `ghost_${i}`,
-                displayName: `Estudante ${i+1}`,
-                xp: (1000 - i*100),
-                plan: 'basic',
-                email: '',
-                isAdmin: false,
-                balance: 0
-            } as UserProfile));
-            setLeaderboard(ghosts);
-        } else {
-            setLeaderboard(data);
-        }
+        setLeaderboard(data);
     } catch (error) {
         console.error("Erro ao carregar ranking:", error);
         setLeaderboard([]);
@@ -115,81 +100,86 @@ const Competitivo: React.FC<CompetitivoProps> = ({ user, onShowUpgrade }) => {
         </div>
       </div>
 
-      {/* Podium */}
-      <div className="flex justify-center items-end gap-4 md:gap-8 min-h-[300px] py-8">
-          {/* 2nd Place */}
-          {top3[1] && (
-              <div className="flex flex-col items-center group w-1/3 max-w-[150px]">
-                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-slate-600 bg-slate-800 mb-3 overflow-hidden">
-                      {top3[1].photoURL ? <img src={top3[1].photoURL} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-xl font-bold">{top3[1].displayName.charAt(0)}</div>}
-                  </div>
-                  <div className="text-center mb-2">
-                      <p className="font-bold text-slate-300 text-sm truncate w-full">{top3[1].displayName.split(' ')[0]}</p>
-                      <p className="text-xs text-slate-500 font-mono">{top3[1].xp || 0} XP</p>
-                  </div>
-                  <div className="w-full h-32 bg-gradient-to-t from-slate-800 to-slate-700 rounded-t-2xl relative shadow-xl flex items-start justify-center pt-4">
-                      <span className="text-4xl font-black text-slate-500/50">2</span>
-                  </div>
-              </div>
-          )}
+      {leaderboard.length > 0 ? (
+          <>
+            {/* Podium */}
+            <div className="flex justify-center items-end gap-4 md:gap-8 min-h-[300px] py-8">
+                {/* 2nd Place */}
+                {top3[1] && (
+                    <div className="flex flex-col items-center group w-1/3 max-w-[150px]">
+                        <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-slate-600 bg-slate-800 mb-3 overflow-hidden">
+                            {top3[1].photoURL ? <img src={top3[1].photoURL} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-xl font-bold">{top3[1].displayName.charAt(0)}</div>}
+                        </div>
+                        <div className="text-center mb-2">
+                            <p className="font-bold text-slate-300 text-sm truncate w-full">{top3[1].displayName.split(' ')[0]}</p>
+                            <p className="text-xs text-slate-500 font-mono">{top3[1][period === 'weekly' ? 'weeklyXp' : 'xp'] || 0} XP</p>
+                        </div>
+                        <div className="w-full h-32 bg-gradient-to-t from-slate-800 to-slate-700 rounded-t-2xl relative shadow-xl flex items-start justify-center pt-4">
+                            <span className="text-4xl font-black text-slate-500/50">2</span>
+                        </div>
+                    </div>
+                )}
 
-          {/* 1st Place */}
-          {top3[0] && (
-              <div className="flex flex-col items-center group w-1/3 max-w-[180px] z-10 -mb-4">
-                  <Crown size={32} className="text-yellow-400 mb-2 animate-bounce" fill="currentColor" />
-                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-yellow-500 bg-yellow-900/20 mb-3 overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.3)]">
-                      {top3[0].photoURL ? <img src={top3[0].photoURL} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-yellow-500">{top3[0].displayName.charAt(0)}</div>}
-                  </div>
-                  <div className="text-center mb-2">
-                      <p className="font-bold text-yellow-400 text-base truncate w-full">{top3[0].displayName.split(' ')[0]}</p>
-                      <p className="text-xs text-yellow-600 font-mono font-bold">{top3[0].xp || 0} XP</p>
-                  </div>
-                  <div className="w-full h-40 bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-2xl relative shadow-2xl flex items-start justify-center pt-4 border-t border-yellow-400/50">
-                      <span className="text-5xl font-black text-yellow-900/50">1</span>
-                  </div>
-              </div>
-          )}
+                {/* 1st Place */}
+                {top3[0] && (
+                    <div className="flex flex-col items-center group w-1/3 max-w-[180px] z-10 -mb-4">
+                        <Crown size={32} className="text-yellow-400 mb-2 animate-bounce" fill="currentColor" />
+                        <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-yellow-500 bg-yellow-900/20 mb-3 overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.3)]">
+                            {top3[0].photoURL ? <img src={top3[0].photoURL} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-yellow-500">{top3[0].displayName.charAt(0)}</div>}
+                        </div>
+                        <div className="text-center mb-2">
+                            <p className="font-bold text-yellow-400 text-base truncate w-full">{top3[0].displayName.split(' ')[0]}</p>
+                            <p className="text-xs text-yellow-600 font-mono font-bold">{top3[0][period === 'weekly' ? 'weeklyXp' : 'xp'] || 0} XP</p>
+                        </div>
+                        <div className="w-full h-40 bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-2xl relative shadow-2xl flex items-start justify-center pt-4 border-t border-yellow-400/50">
+                            <span className="text-5xl font-black text-yellow-900/50">1</span>
+                        </div>
+                    </div>
+                )}
 
-          {/* 3rd Place */}
-          {top3[2] && (
-              <div className="flex flex-col items-center group w-1/3 max-w-[150px]">
-                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-orange-700 bg-orange-900/20 mb-3 overflow-hidden">
-                      {top3[2].photoURL ? <img src={top3[2].photoURL} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-xl font-bold text-orange-500">{top3[2].displayName.charAt(0)}</div>}
-                  </div>
-                  <div className="text-center mb-2">
-                      <p className="font-bold text-orange-400 text-sm truncate w-full">{top3[2].displayName.split(' ')[0]}</p>
-                      <p className="text-xs text-orange-600/70 font-mono">{top3[2].xp || 0} XP</p>
-                  </div>
-                  <div className="w-full h-24 bg-gradient-to-t from-orange-900 to-orange-800 rounded-t-2xl relative shadow-xl flex items-start justify-center pt-4">
-                      <span className="text-4xl font-black text-orange-950/50">3</span>
-                  </div>
-              </div>
-          )}
-      </div>
+                {/* 3rd Place */}
+                {top3[2] && (
+                    <div className="flex flex-col items-center group w-1/3 max-w-[150px]">
+                        <div className="w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-orange-700 bg-orange-900/20 mb-3 overflow-hidden">
+                            {top3[2].photoURL ? <img src={top3[2].photoURL} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-xl font-bold text-orange-500">{top3[2].displayName.charAt(0)}</div>}
+                        </div>
+                        <div className="text-center mb-2">
+                            <p className="font-bold text-orange-400 text-sm truncate w-full">{top3[2].displayName.split(' ')[0]}</p>
+                            <p className="text-xs text-orange-600/70 font-mono">{top3[2][period === 'weekly' ? 'weeklyXp' : 'xp'] || 0} XP</p>
+                        </div>
+                        <div className="w-full h-24 bg-gradient-to-t from-orange-900 to-orange-800 rounded-t-2xl relative shadow-xl flex items-start justify-center pt-4">
+                            <span className="text-4xl font-black text-orange-950/50">3</span>
+                        </div>
+                    </div>
+                )}
+            </div>
 
-      {/* List */}
-      <div className="bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-          {rest.map((user, index) => (
-              <div key={user.uid || index} className="flex items-center p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
-                  <div className="w-10 text-center font-bold text-slate-500 mr-4">#{index + 4}</div>
-                  <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-slate-400 mr-4 border border-white/5">
-                      {user.displayName?.charAt(0)}
-                  </div>
-                  <div className="flex-1">
-                      <p className="font-bold text-slate-300">{user.displayName}</p>
-                      <p className="text-xs text-slate-500">{user.plan === 'advanced' ? 'Membro VIP' : 'Estudante'}</p>
-                  </div>
-                  <div className="text-right">
-                      <p className="font-mono font-bold text-white">{user.xp || 0} XP</p>
-                  </div>
-              </div>
-          ))}
-          {rest.length === 0 && (
-              <div className="p-8 text-center text-slate-500 text-sm">
-                  Continue estudando para aparecer no ranking!
-              </div>
-          )}
-      </div>
+            {/* List */}
+            <div className="bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+                {rest.map((user, index) => (
+                    <div key={user.uid || index} className="flex items-center p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <div className="w-10 text-center font-bold text-slate-500 mr-4">#{index + 4}</div>
+                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-slate-400 mr-4 border border-white/5 overflow-hidden">
+                            {user.photoURL ? <img src={user.photoURL} className="w-full h-full object-cover"/> : user.displayName?.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                            <p className="font-bold text-slate-300">{user.displayName}</p>
+                            <p className="text-xs text-slate-500">{user.plan === 'advanced' ? 'Membro VIP' : 'Estudante'}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="font-mono font-bold text-white">{user[period === 'weekly' ? 'weeklyXp' : 'xp'] || 0} XP</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+          </>
+      ) : (
+          <div className="text-center py-20 bg-slate-900/20 rounded-3xl border border-white/5 border-dashed">
+              <Trophy size={48} className="mx-auto text-slate-600 mb-4 opacity-50" />
+              <h3 className="text-xl font-bold text-white mb-2">Ranking Vazio</h3>
+              <p className="text-slate-500">Seja o primeiro a pontuar nesta temporada!</p>
+          </div>
+      )}
     </div>
   );
 };
