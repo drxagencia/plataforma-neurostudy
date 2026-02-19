@@ -11,14 +11,17 @@ interface LandingPageProps {
   onStartGame: () => void;
 }
 
-// --- STARRY BACKGROUND COMPONENT ---
+// --- STARRY BACKGROUND COMPONENT (OPTIMIZED) ---
 const StarryBackground = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
+        // PERFORMANCE CHECK: Desativa animação em mobile (<768px) para carregamento instantâneo
+        if (window.innerWidth < 768) return;
+
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Otimização: alpha false
         if (!ctx) return;
 
         let width = window.innerWidth;
@@ -52,7 +55,7 @@ const StarryBackground = () => {
             scrollVelocity = Math.min(delta * 0.3, 20); 
             lastScrollY = currentScrollY;
         };
-        window.addEventListener('scroll', handleScroll);
+        window.addEventListener('scroll', handleScroll, { passive: true }); // Otimização: passive listener
 
         let animationFrame: number;
 
@@ -110,10 +113,11 @@ const StarryBackground = () => {
         };
     }, []);
 
+    // Canvas visível apenas em MD+ (Desktop) para economizar GPU no Mobile
     return (
         <canvas 
             ref={canvasRef} 
-            className="fixed inset-0 z-0 pointer-events-none"
+            className="fixed inset-0 z-0 pointer-events-none hidden md:block"
         />
     );
 };
@@ -186,7 +190,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
   useEffect(() => {
-    DatabaseService.getTrafficSettings().then(setConfig);
+    // Carregamento de configurações sem bloquear renderização
+    DatabaseService.getTrafficSettings().then(setConfig).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -194,7 +199,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
       if (pixCooldown > 0) {
           timer = setInterval(() => { setPixCooldown(prev => prev - 1); }, 1000);
       } else if (pixCooldown === 0 && hasClickedOnce) {
-          // Quando o contador chega a 0 e já foi clicado, exibe mensagem para tentar de novo
           setSubmitError("Confirmação pendente. Tente novamente.");
       }
       return () => clearInterval(timer);
@@ -246,15 +250,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
           return;
       }
       
-      // Lógica de "Fake Loading" para validação bancária (5 segundos)
       if (!hasClickedOnce) {
           setHasClickedOnce(true);
-          setPixCooldown(5); // Reduzido de 15s para 5s conforme solicitado
-          setSubmitError(null); // Limpa erro anterior para mostrar o contador
+          setPixCooldown(5); 
+          setSubmitError(null); 
           return;
       }
       
-      // Se estiver no cooldown, não faz nada
       if (pixCooldown > 0) return;
 
       setSubmitError(null);
@@ -311,8 +313,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
         .animate-shot { animation: enemyDeath 0.4s forwards; }
       `}</style>
 
-      {/* STARRY BACKGROUND CANVAS */}
+      {/* STARRY BACKGROUND CANVAS (Otimizado) */}
       <StarryBackground />
+
+      {/* Background Simples para Mobile (Fallback do Canvas) */}
+      <div className="fixed inset-0 z-[-1] bg-gradient-to-b from-black via-[#050505] to-black md:hidden" />
 
       {/* Overlay Decor (Nebula Globs) - Reduced opacity for subtle dark theme */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-20 mix-blend-screen">
@@ -377,7 +382,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                               <Play size={80} strokeWidth={1} />
                               <p className="font-black uppercase tracking-[0.5em] mt-4 text-xs md:text-base">Vídeo Exclusivo</p>
                           </div>
-                          <video src="/video.mp4" className="w-full h-full object-cover relative z-10" controls poster="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=2000" />
+                          {/* PERFORMANCE: Preload none para economizar dados no mobile até o play. Poster otimizado (w=1200) */}
+                          <video 
+                            src="/video.mp4" 
+                            className="w-full h-full object-cover relative z-10" 
+                            controls 
+                            preload="none"
+                            poster="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=1200" 
+                          />
                       </div>
                       <div className="p-6 md:p-10 bg-black/60 border-t border-white/5">
                           <FakeProgressBar onHalfTime={() => setShowEarlyOffer(true)} onFinish={() => setShowFinalOffer(true)} />
