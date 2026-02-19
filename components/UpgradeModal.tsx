@@ -68,12 +68,14 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose }) => {
         setLoading(true);
         try {
             const planLabel = selectedCycle === 'yearly' ? 'Anual' : 'Mensal';
+            // FIX: Pass '0' instead of undefined for quantity to prevent Firebase set() error
+            // FIX: Ensure displayName has a fallback
             await DatabaseService.createRechargeRequest(
                 user.uid,
-                user.displayName,
+                user.displayName || 'Aluno',
                 upgradeCost,
                 'BRL',
-                undefined,
+                0, 
                 `UPGRADE: Basic -> Advanced (${planLabel})`
             );
             setStep('success');
@@ -81,8 +83,9 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose }) => {
                 onClose();
                 window.location.reload(); 
             }, 3000);
-        } catch (e) {
-            alert("Erro ao confirmar.");
+        } catch (e: any) {
+            console.error("Upgrade Confirm Error:", e);
+            alert("Erro ao confirmar: " + (e.message || "Tente novamente."));
         } finally {
             setLoading(false);
         }

@@ -1,3 +1,4 @@
+
 import { 
   ref, 
   get, 
@@ -88,20 +89,40 @@ export const DatabaseService = {
   },
 
   async processXpAction(uid: string, actionType: keyof typeof XP_VALUES, customAmount?: number): Promise<void> {
-    const amount = customAmount !== undefined ? customAmount : XP_VALUES[actionType];
+    if (!uid) return;
+
+    // Calculate amount safely
+    let amount = 0;
+    if (customAmount !== undefined && typeof customAmount === 'number') {
+        amount = customAmount;
+    } else {
+        // Fallback to constants if custom amount not provided
+        amount = XP_VALUES[actionType] || 0;
+    }
+
+    // Safety check: Don't process non-positive XP
     if (amount <= 0) return;
 
-    await update(ref(database, `users/${uid}`), {
-      xp: increment(amount),
-      weeklyXp: increment(amount) 
-    });
+    try {
+        await update(ref(database, `users/${uid}`), {
+          xp: increment(amount),
+          weeklyXp: increment(amount) 
+        });
+    } catch (e) {
+        console.error("Failed to process XP action:", e);
+    }
   },
 
   async trackStudyTime(uid: string, minutes: number): Promise<void> {
-    await update(ref(database, `users/${uid}`), {
-      dailyStudyMinutes: increment(minutes),
-      hoursStudied: increment(minutes / 60)
-    });
+    if (!uid || minutes <= 0) return;
+    try {
+        await update(ref(database, `users/${uid}`), {
+          dailyStudyMinutes: increment(minutes),
+          hoursStudied: increment(minutes / 60)
+        });
+    } catch (e) {
+        console.error("Failed to track time:", e);
+    }
   },
 
   async getLeaderboard(period: 'weekly' | 'total'): Promise<UserProfile[]> {
