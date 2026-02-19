@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { PixService } from '../services/pixService';
 import { DatabaseService } from '../services/databaseService';
 import { KIRVANO_LINKS } from '../constants';
-import { X, Check, Copy, QrCode, Crown, Zap, ShieldCheck, ArrowRight, CreditCard, Repeat, AlertCircle, Sparkles, Rocket, BrainCircuit, Bot, Clock } from 'lucide-react';
+import { X, Check, Copy, QrCode, Crown, Zap, ShieldCheck, ArrowRight, CreditCard, Repeat, AlertCircle, Sparkles, Rocket, BrainCircuit, Bot, Clock, User } from 'lucide-react';
 
 interface UpgradeModalProps {
     user: UserProfile;
@@ -22,6 +21,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
     const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(false);
     const [upgradeCost, setUpgradeCost] = useState(0);
+    const [payerName, setPayerName] = useState('');
 
     // --- CONFIGURAÇÃO DE PREÇOS ---
     
@@ -93,6 +93,15 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
     };
 
     const handlePixConfirm = async () => {
+        if (!payerName.trim()) {
+            alert("Por favor, informe o nome do pagador para conferência.");
+            return;
+        }
+
+        if (!window.confirm(`CONFIRMAÇÃO:\n\nNome do Pagador: ${payerName}\nValor: R$ ${upgradeCost.toFixed(2)}\n\nVocê tem CERTEZA ABSOLUTA que o nome do pagador está 100% correto? Divergências podem atrasar a liberação.`)) {
+            return;
+        }
+
         setLoading(true);
         try {
             let planLabel = '';
@@ -104,9 +113,10 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                 planLabel = `UPGRADE: Basic -> Advanced (${cycleMap[selectedCycle]})`;
             }
 
+            // Using payerName as the display name for the transaction request to aid admin verification
             await DatabaseService.createRechargeRequest(
                 user.uid,
-                user.displayName || 'Aluno',
+                payerName.toUpperCase(), // Store Payer Name here for Admin visibility
                 upgradeCost,
                 'BRL',
                 0, 
@@ -180,7 +190,6 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 text-left">
-                {/* Benefits Items (Same as before) */}
                 <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 flex gap-3 items-start hover:border-yellow-500/30 transition-colors">
                     <div className="p-2 bg-yellow-500/20 rounded-lg text-yellow-400"><Rocket size={18}/></div>
                     <div>
@@ -207,7 +216,6 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
     );
 
     const renderAiCycles = () => {
-        // Only allow Annual if PIX is selected
         const isPix = paymentMethod === 'pix';
 
         return (
@@ -262,7 +270,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                     </div>
                 </div>
                 
-                {isPix && <p className="text-center text-xs text-yellow-500 mt-2">Pagamento via PIX disponível apenas para o plano Anual.</p>}
+                {isPix && <p className="text-center text-xs text-yellow-500 mt-2 font-bold bg-yellow-500/10 p-2 rounded-lg border border-yellow-500/20">Pagamento via PIX direto no nosso site apenas para o plano Anual.</p>}
             </div>
         );
     };
@@ -401,6 +409,19 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                             <button onClick={() => {navigator.clipboard.writeText(pixPayload); setCopied(true);}} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-white transition-colors">
                                 {copied ? <Check size={18} className="text-emerald-400"/> : <Copy size={18}/>}
                             </button>
+                        </div>
+
+                        <div className="bg-slate-800 p-4 rounded-xl border border-white/5 mb-6 text-left">
+                            <label className="text-[10px] text-slate-400 font-bold uppercase ml-1 flex items-center gap-1"><User size={12}/> Nome do Pagador (Obrigatório)</label>
+                            <input 
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm mt-1 focus:border-indigo-500 outline-none" 
+                                placeholder="Nome completo do titular da conta" 
+                                value={payerName}
+                                onChange={e => setPayerName(e.target.value)}
+                            />
+                            <p className="text-[10px] text-yellow-500 mt-2">
+                                * Essencial para conferência. Se o nome não bater, a liberação pode falhar.
+                            </p>
                         </div>
 
                         <div className="bg-emerald-900/20 border border-emerald-500/20 p-3 rounded-xl mb-6">
