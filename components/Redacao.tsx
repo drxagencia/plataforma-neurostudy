@@ -4,7 +4,7 @@ import { DatabaseService } from '../services/databaseService';
 import { PixService } from '../services/pixService';
 import { auth } from '../services/firebaseConfig';
 import { EssayCorrection, UserProfile } from '../types';
-import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight, Crown, CreditCard, Star, Repeat, Gift, Zap, ShieldCheck, Lock, User, Clock, Rocket, Target, FileCheck } from 'lucide-react';
+import { PenTool, CheckCircle, Wallet, Plus, Camera, Scan, FileText, X, AlertTriangle, QrCode, Copy, Check, UploadCloud, Loader2, Sparkles, TrendingDown, ArrowRight, AlertCircle, MessageSquareText, ThumbsUp, ThumbsDown, BookOpen, Layers, ChevronRight, Crown, CreditCard, Star, Repeat, Gift, Zap, ShieldCheck, Lock, User, Clock, Rocket, Target, FileCheck, ChevronDown, ChevronUp, ScanLine } from 'lucide-react';
 import { KIRVANO_LINKS } from '../constants';
 
 interface RedacaoProps {
@@ -112,11 +112,9 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
   const handleBuyPlan = (method: 'pix' | 'card') => {
       const price = PLAN_CONFIG[selectedPlanTier].prices[selectedCycle];
       
-      // External Checkout (Only for Monthly/Weekly usually, but sticking to prompt logic: External vs PIX)
-      // For simplified demo, Card redirects to a generic link, PIX generates code.
+      // External Checkout
       if (method === 'card') {
-          // Redirect to appropriate Kirvano link based on cycle/tier logic if available
-          // Using fallbacks from constants for now
+          // Fallback logic for demo
           window.open(KIRVANO_LINKS.essay_credits, '_blank'); 
           return;
       }
@@ -180,6 +178,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
       }
       if (!image || !theme || !auth.currentUser) return;
 
+      // START SCANNING ANIMATION
       setView('scanning');
 
       try {
@@ -293,17 +292,172 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
                   <h4 className="font-bold text-white text-lg">Finalizar Assinatura</h4>
                   <p className="text-slate-400 text-sm">Plano {PLAN_CONFIG[selectedPlanTier].name} ({selectedCycle === 'weekly' ? 'Semanal' : selectedCycle === 'monthly' ? 'Mensal' : 'Anual'})</p>
               </div>
+              
               <div className="flex gap-3 w-full md:w-auto">
-                  <button onClick={() => handleBuyPlan('pix')} className="flex-1 md:flex-none px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-900/20">
-                      <QrCode size={18}/> Pagar com PIX
-                  </button>
-                  <button onClick={() => handleBuyPlan('card')} className="flex-1 md:flex-none px-6 py-3 bg-white hover:bg-indigo-50 text-slate-900 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg">
-                      <CreditCard size={18}/> Cartão
-                  </button>
+                  {/* LÓGICA DE BOTÕES AJUSTADA: PIX APENAS PARA ANUAL */}
+                  {selectedCycle === 'yearly' ? (
+                      <>
+                          <button onClick={() => handleBuyPlan('pix')} className="flex-1 md:flex-none px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-900/20">
+                              <QrCode size={18}/> Pagar com PIX Direto
+                          </button>
+                          <button onClick={() => handleBuyPlan('card')} className="flex-1 md:flex-none px-6 py-3 bg-white hover:bg-indigo-50 text-slate-900 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg">
+                              <CreditCard size={18}/> Checkout / Cartão
+                          </button>
+                      </>
+                  ) : (
+                      <button onClick={() => handleBuyPlan('card')} className="w-full md:w-auto px-10 py-4 bg-white hover:bg-indigo-50 text-slate-900 rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg hover:scale-105">
+                          <CreditCard size={20}/> Adquirir Plano
+                      </button>
+                  )}
               </div>
           </div>
       </div>
   );
+
+  // --- VIEW: SCANNING ANIMATION (VISUAL AI PROCESSING) ---
+  if (view === 'scanning') {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-2xl mx-auto py-12 animate-in fade-in">
+              <div className="relative w-full max-w-md aspect-[3/4] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10 group">
+                  {/* Image Background */}
+                  {image && <img src={image} className="w-full h-full object-cover opacity-50 blur-sm" />}
+                  
+                  {/* Scan Line Animation */}
+                  <style>{`
+                    @keyframes scanMove {
+                        0% { top: 0%; opacity: 0; }
+                        10% { opacity: 1; }
+                        90% { opacity: 1; }
+                        100% { top: 100%; opacity: 0; }
+                    }
+                  `}</style>
+                  <div className="absolute left-0 w-full h-1 bg-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.8)] z-10 animate-[scanMove_3s_linear_infinite]" style={{ top: '0%' }} />
+                  
+                  {/* Overlay Info */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+                      <div className="w-20 h-20 bg-slate-950/80 backdrop-blur-md rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(34,211,238,0.2)]">
+                          <ScanLine size={40} className="text-cyan-400 animate-pulse" />
+                      </div>
+                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Analisando Redação...</h3>
+                      <p className="text-slate-400 text-sm animate-pulse">Verificando competências e estrutura</p>
+                  </div>
+              </div>
+              <p className="text-slate-500 text-xs mt-8 max-w-xs text-center">Isso pode levar alguns segundos. A IA está lendo seu manuscrito.</p>
+          </div>
+      );
+  }
+
+  // --- VIEW: RESULTS (DETAILED) ---
+  if (view === 'result' && currentResult) {
+      return (
+          <div className="max-w-4xl mx-auto pb-20 animate-in slide-in-from-bottom-8">
+              <div className="flex items-center gap-4 mb-8">
+                  <button onClick={() => setView('home')} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
+                      <ArrowRight className="rotate-180" size={24} />
+                  </button>
+                  <h2 className="text-2xl font-bold text-white">Relatório de Correção</h2>
+              </div>
+
+              {/* Score Header */}
+              <div className="bg-gradient-to-r from-slate-900 to-slate-900/50 border border-indigo-500/30 rounded-[2.5rem] p-8 md:p-12 text-center relative overflow-hidden mb-8 shadow-2xl">
+                  <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-600/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3" />
+                  
+                  <div className="relative z-10">
+                      <p className="text-indigo-400 font-bold uppercase tracking-widest text-xs mb-2">Nota Final</p>
+                      <div className="text-[6rem] md:text-[8rem] font-black text-white leading-none tracking-tighter drop-shadow-lg">
+                          {displayScore}
+                      </div>
+                      <div className="inline-flex items-center gap-2 mt-4 bg-white/5 border border-white/10 px-4 py-2 rounded-full">
+                          <span className="text-slate-300 text-sm font-medium">{currentResult.theme}</span>
+                      </div>
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  
+                  {/* Left Column: Feedback & Structure */}
+                  <div className="lg:col-span-2 space-y-8">
+                      {/* General Feedback */}
+                      <div className="glass-card p-8 rounded-3xl border-l-4 border-l-indigo-500">
+                          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Sparkles size={18} className="text-indigo-400"/> Parecer Geral</h3>
+                          <p className="text-slate-300 leading-relaxed text-sm md:text-base">{currentResult.feedback}</p>
+                      </div>
+
+                      {/* Competencies Accordion */}
+                      <div className="space-y-4">
+                          <h3 className="text-lg font-bold text-white mb-4 ml-2">Detalhamento por Competência</h3>
+                          {[1, 2, 3, 4, 5].map((num) => {
+                              const key = `c${num}` as keyof typeof currentResult.competencies;
+                              const score = currentResult.competencies[key];
+                              const details = currentResult.detailedCompetencies ? currentResult.detailedCompetencies[key] : "Sem detalhes.";
+                              const isExpanded = expandedCompetency === key;
+                              
+                              let colorClass = 'text-white';
+                              if (score >= 160) colorClass = 'text-emerald-400';
+                              else if (score >= 120) colorClass = 'text-yellow-400';
+                              else colorClass = 'text-red-400';
+
+                              return (
+                                  <div key={key} className={`bg-slate-900/50 border ${isExpanded ? 'border-indigo-500/50' : 'border-white/5'} rounded-2xl overflow-hidden transition-all duration-300`}>
+                                      <button 
+                                        onClick={() => setExpandedCompetency(isExpanded ? null : key)}
+                                        className="w-full p-5 flex items-center justify-between hover:bg-white/5 transition-colors"
+                                      >
+                                          <div className="flex items-center gap-4">
+                                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm bg-slate-800 ${isExpanded ? 'text-indigo-400' : 'text-slate-500'}`}>C{num}</div>
+                                              <span className="text-sm font-bold text-slate-300">Competência {num}</span>
+                                          </div>
+                                          <div className="flex items-center gap-4">
+                                              <span className={`text-xl font-black ${colorClass}`}>{score}</span>
+                                              {isExpanded ? <ChevronUp size={18} className="text-slate-500"/> : <ChevronDown size={18} className="text-slate-500"/>}
+                                          </div>
+                                      </button>
+                                      {isExpanded && (
+                                          <div className="p-5 pt-0 border-t border-white/5 bg-black/20 animate-in slide-in-from-top-2">
+                                              <p className="text-sm text-slate-400 leading-relaxed">{details}</p>
+                                          </div>
+                                      )}
+                                  </div>
+                              )
+                          })}
+                      </div>
+                  </div>
+
+                  {/* Right Column: Tips & Stats */}
+                  <div className="space-y-6">
+                      <div className="glass-card p-6 rounded-3xl border border-white/10">
+                          <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-4 flex items-center gap-2"><ThumbsUp size={14}/> Pontos Fortes</h4>
+                          <ul className="space-y-3">
+                              {currentResult.strengths?.map((s, i) => (
+                                  <li key={i} className="flex gap-3 text-sm text-slate-300">
+                                      <CheckCircle size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                                      {s}
+                                  </li>
+                              ))}
+                          </ul>
+                      </div>
+
+                      <div className="glass-card p-6 rounded-3xl border border-white/10">
+                          <h4 className="text-xs font-black text-red-400 uppercase tracking-widest mb-4 flex items-center gap-2"><AlertTriangle size={14}/> A Melhorar</h4>
+                          <ul className="space-y-3">
+                              {currentResult.weaknesses?.map((w, i) => (
+                                  <li key={i} className="flex gap-3 text-sm text-slate-300">
+                                      <TrendingDown size={16} className="text-red-500 shrink-0 mt-0.5" />
+                                      {w}
+                                  </li>
+                              ))}
+                          </ul>
+                      </div>
+
+                      <div className="bg-indigo-900/20 border border-indigo-500/20 p-6 rounded-3xl">
+                          <h4 className="text-xs font-black text-indigo-300 uppercase tracking-widest mb-3 flex items-center gap-2"><Zap size={14}/> Dica Estrutural</h4>
+                          <p className="text-sm text-indigo-100 font-medium italic">"{currentResult.structuralTips}"</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      );
+  }
 
   // --- VIEW: UPLOAD ---
   if (view === 'upload') {
@@ -410,7 +564,7 @@ const Redacao: React.FC<RedacaoProps> = ({ user, onUpdateUser, onShowUpgrade }) 
                       <label className="text-[10px] text-slate-500 font-bold uppercase ml-1 flex items-center gap-1"><User size={12}/> Nome do Pagador (Obrigatório)</label>
                       <input 
                           className="w-full bg-transparent border-b border-slate-700 py-2 text-white text-sm outline-none focus:border-indigo-500" 
-                          placeholder="Nome completo do titular" 
+                          placeholder="Nome completo do titular da conta" 
                           value={payerName}
                           onChange={e => setPayerName(e.target.value)}
                       />
