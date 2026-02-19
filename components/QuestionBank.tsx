@@ -204,10 +204,10 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
   const handleExplain = async () => {
       // Validar acesso IA Ilimitada
       const hasValidExpiry = user?.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now();
-      const isAiActive = 
-        user?.plan === 'admin' || 
-        user?.ia_ilimitada === true || 
-        user?.ia_ilimitada === "true" ||
+      
+      const isAiActive = user?.ia_ilimitada === 'expirado' ? false :
+        (user?.plan === 'admin') || 
+        (user?.ia_ilimitada === true || user?.ia_ilimitada === "true") ||
         hasValidExpiry;
 
       if (!isAiActive) {
@@ -239,7 +239,13 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
               const u = await DatabaseService.getUserProfile(auth.currentUser.uid);
               if (u) onUpdateUser(u);
           }
-      } catch (e: any) { alert(e.message); } finally { setIsExplaining(false); }
+      } catch (e: any) { 
+          if (e.message && e.message.includes('expirou')) {
+              onShowUpgrade?.();
+          } else {
+              alert(e.message); 
+          }
+      } finally { setIsExplaining(false); }
   };
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" /></div>;

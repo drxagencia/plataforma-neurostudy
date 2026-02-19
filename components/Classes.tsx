@@ -245,10 +245,11 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser, onSho
       
       // Validar acesso IA Ilimitada
       const hasValidExpiry = user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now();
-      const isAiActive = 
-        user.plan === 'admin' || 
-        user.ia_ilimitada === true || 
-        user.ia_ilimitada === "true" ||
+      
+      // Force False if 'expirado'
+      const isAiActive = user.ia_ilimitada === 'expirado' ? false :
+        (user.plan === 'admin') || 
+        (user.ia_ilimitada === true || user.ia_ilimitada === "true") ||
         hasValidExpiry;
 
       if (!isAiActive) {
@@ -286,7 +287,11 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser, onSho
           await updateBalanceLocally();
           if(auth.currentUser) DatabaseService.processXpAction(auth.currentUser.uid, 'AI_CHAT_MESSAGE');
       } catch (e: any) {
-          setTutorHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: "Erro de conexão com o NeuroTutor. Verifique se sua API Key está configurada." }]);
+          if (e.message && e.message.includes('expirou')) {
+              onShowUpgrade?.();
+          } else {
+              setTutorHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: "Erro de conexão com o NeuroTutor. Verifique se sua API Key está configurada." }]);
+          }
       } finally {
           setTutorLoading(false);
       }

@@ -40,13 +40,29 @@ export default async function handler(req: any, res: any) {
     const user = userSnap.val();
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
+    // --- CHECK FOR EXPIRATION LOGIC ---
+    // Verifica se a data de expiração existe e se já passou
+    if (user.aiUnlimitedExpiry) {
+        const expiryDate = new Date(user.aiUnlimitedExpiry).getTime();
+        const now = Date.now();
+        
+        // Se expirou e ainda não está marcado como "expirado" (e não é admin/permanente)
+        if (expiryDate < now && user.ia_ilimitada !== 'expirado' && user.plan !== 'admin' && user.ia_ilimitada !== true && user.ia_ilimitada !== "true") {
+            // Atualiza no banco para "expirado"
+            await userRef.update({ ia_ilimitada: 'expirado' });
+            // Atualiza objeto local para bloquear a requisição atual
+            user.ia_ilimitada = 'expirado';
+        }
+    }
+
     // CHECK FOR UNLIMITED AI ACCESS
-    // Regra: Admin OU Flag ia_ilimitada "true" OU Data de validade no futuro
+    // Regra: Admin OU Flag ia_ilimitada "true" (permanente) OU Data de validade no futuro
+    // Se "expirado", hasUnlimitedAi deve ser FALSE
     const hasUnlimitedAi = 
         user.plan === 'admin' || 
         user.ia_ilimitada === true || 
         user.ia_ilimitada === "true" || 
-        (user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now());
+        (user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now() && user.ia_ilimitada !== 'expirado');
 
     // CÁLCULO DE CONSUMO COM MULTIPLICADOR 50X (Used only if not unlimited)
     const baseCost = 0.002;
@@ -102,9 +118,15 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ text: response.choices[0].message.content });
     }
 
-    // Validação de saldo (SOMENTE SE NÃO TIVER IA ILIMITADA E NÃO FOR SUPORTE)
-    if (mode !== 'support' && !hasUnlimitedAi && user.balance < calculatedCost) {
-        return res.status(402).json({ error: 'Saldo insuficiente na NeuroAI. Faça upgrade para IA Ilimitada.' });
+    // Se estiver "expirado" ou sem saldo, bloqueia
+    if (mode !== 'support' && !hasUnlimitedAi) {
+        if (user.ia_ilimitada === 'expirado') {
+             // Retorna status especial para o front saber que expirou
+             return res.status(403).json({ error: 'PLAN_EXPIRED', message: 'Seu plano de IA Ilimitada expirou.' });
+        }
+        if (user.balance < calculatedCost) {
+            return res.status(402).json({ error: 'Saldo insuficiente na NeuroAI. Faça upgrade para IA Ilimitada.' });
+        }
     }
 
     const sysMsg = systemOverride || "Você é a NeuroAI, tutora focado no ENEM.";

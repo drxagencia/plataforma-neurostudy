@@ -54,7 +54,8 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
     ? new Date(user.aiUnlimitedExpiry).getTime() > Date.now() 
     : false;
 
-  const isAiActive = 
+  // Se 'expirado', forçar false
+  const isAiActive = user.ia_ilimitada === 'expirado' ? false :
     (user.plan === 'admin') || 
     (user.ia_ilimitada === true || user.ia_ilimitada === "true") ||
     hasValidExpiry;
@@ -124,7 +125,18 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
         if (updatedUser) onUpdateUser(updatedUser);
       }
     } catch (error: any) {
-        alert(error.message || "Erro ao consultar a IA.");
+        // Se a API retornar que o plano expirou, o front deve reagir
+        if (error.message && error.message.includes('expirou')) {
+             onUpdateUser({ ...user, ia_ilimitada: 'expirado' }); // Força atualização local
+             const upsellMessage: ChatMessage = {
+                id: (Date.now() + 1).toString(),
+                role: 'ai',
+                content: "UPSELL_TRIGGER"
+            };
+            setMessages(prev => [...prev, upsellMessage]);
+        } else {
+            alert(error.message || "Erro ao consultar a IA.");
+        }
     } finally {
       setLoading(false);
     }
@@ -193,12 +205,15 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
                         
                         <div className="flex items-center gap-3 mb-4">
                             <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-400"><Lock size={18} /></div>
-                            <h4 className="font-bold text-white text-lg uppercase tracking-wide">Resposta Bloqueada</h4>
+                            <h4 className="font-bold text-white text-lg uppercase tracking-wide">
+                                {user.ia_ilimitada === 'expirado' ? 'Plano Expirado' : 'Resposta Bloqueada'}
+                            </h4>
                         </div>
                         
                         <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                            Eu tenho a resposta exata para sua dúvida, incluindo exemplos práticos. 
-                            Escolha um plano de <strong>IA Ilimitada</strong> para continuar:
+                            {user.ia_ilimitada === 'expirado' 
+                                ? "Seu período de IA Ilimitada chegou ao fim. Renove agora para continuar aprendendo sem limites."
+                                : "Eu tenho a resposta exata para sua dúvida, incluindo exemplos práticos. Escolha um plano de IA Ilimitada para continuar:"}
                         </p>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
