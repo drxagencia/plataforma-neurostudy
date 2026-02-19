@@ -204,7 +204,11 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
   const handleExplain = async () => {
       // Validar acesso IA Ilimitada
       const hasValidExpiry = user?.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now();
-      const isAiActive = user?.plan === 'admin' || hasValidExpiry;
+      const isAiActive = 
+        user?.plan === 'admin' || 
+        user?.ia_ilimitada === true || 
+        user?.ia_ilimitada === "true" ||
+        hasValidExpiry;
 
       if (!isAiActive) {
           onShowUpgrade?.();

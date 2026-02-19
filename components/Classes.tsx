@@ -245,7 +245,11 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser, onSho
       
       // Validar acesso IA Ilimitada
       const hasValidExpiry = user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now();
-      const isAiActive = user.plan === 'admin' || hasValidExpiry;
+      const isAiActive = 
+        user.plan === 'admin' || 
+        user.ia_ilimitada === true || 
+        user.ia_ilimitada === "true" ||
+        hasValidExpiry;
 
       if (!isAiActive) {
           onShowUpgrade?.();

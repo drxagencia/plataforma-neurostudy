@@ -41,8 +41,12 @@ export default async function handler(req: any, res: any) {
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
     // CHECK FOR UNLIMITED AI ACCESS
-    // Checks if expiration date exists AND is in the future
-    const hasUnlimitedAi = (user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now()) || user.plan === 'admin';
+    // Regra: Admin OU Flag ia_ilimitada "true" OU Data de validade no futuro
+    const hasUnlimitedAi = 
+        user.plan === 'admin' || 
+        user.ia_ilimitada === true || 
+        user.ia_ilimitada === "true" || 
+        (user.aiUnlimitedExpiry && new Date(user.aiUnlimitedExpiry).getTime() > Date.now());
 
     // CÁLCULO DE CONSUMO COM MULTIPLICADOR 50X (Used only if not unlimited)
     const baseCost = 0.002;
@@ -55,33 +59,33 @@ export default async function handler(req: any, res: any) {
       if (credits <= 0) return res.status(402).json({ error: 'Sem créditos de redação.' });
       
       const promptSistema = `
-      Você é um Corretor Oficial do ENEM sênior, conhecido por ser técnico e extremamente rigoroso.
+      Você é um Corretor Oficial do ENEM experiente. 
+      Sua correção deve ser **técnica, justa e pedagógica**, similar à banca oficial.
       
-      REGRAS RÍGIDAS DE PONTUAÇÃO (IMPORTANTE):
+      DIRETRIZES DE CORREÇÃO (IMPORTANTE):
+      1. Seja exigente com a estrutura, mas **não puna excessivamente** erros gramaticais isolados se eles não prejudicarem a compreensão.
+      2. Valorize bons argumentos e repertório sociocultural produtivo. Se o texto for bom, dê notas altas (acima de 900).
+      3. Notas baixas (abaixo de 600) apenas para fugas ao tema ou textos muito ruins.
+      4. Se o texto merecer 1000, DÊ 1000.
+      
+      REGRAS RÍGIDAS DE PONTUAÇÃO:
       1. Atribua nota de 0 a 200 para CADA competência (C1 a C5).
-      2. AS NOTAS DEVEM SER OBRIGATORIAMENTE MÚLTIPLOS DE 20 (Ex: 0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200). NUNCA atribua notas quebradas como 15, 125, 130 ou 105.
+      2. AS NOTAS DEVEM SER OBRIGATORIAMENTE MÚLTIPLOS DE 20 (Ex: 0, 20, 40... 160, 180, 200).
       3. A nota total deve ser a soma exata das competências.
       
-      CRITÉRIOS OBRIGATÓRIOS:
-      C1 (Norma Culta): Desconte pontos a cada erro de crase, concordância e ortografia. Seja chato com vírgulas.
-      C2 (Tema/Tipo): Verifique se há tese explícita e estrutura dissertativa-argumentativa completa.
-      C3 (Argumentação): O aluno defende o ponto de vista? O repertório é produtivo e legitimado?
-      C4 (Coesão): Exija conectivos variados entre parágrafos e intra-parágrafos. Penalize repetições de palavras.
-      C5 (Proposta): Deve conter AGENTE, AÇÃO, MEIO/MODO, EFEITO e DETALHAMENTO. Se faltar um, desconte 40 pontos.
-
       SAÍDA ESPERADA (JSON):
       Retorne APENAS um JSON com este formato exato:
       {
-        "c1": number, "c1_analysis": "Análise detalhada do porquê desta nota na C1 (aponte erros específicos se houver)",
-        "c2": number, "c2_analysis": "Análise detalhada da C2 (estrutura e tema)",
-        "c3": number, "c3_analysis": "Análise detalhada da C3 (projeto de texto e argumentação)",
-        "c4": number, "c4_analysis": "Análise detalhada da C4 (conectivos e fluidez)",
-        "c5": number, "c5_analysis": "Análise detalhada da C5 (presença dos 5 elementos)",
+        "c1": number, "c1_analysis": "Análise C1 (Norma Culta)",
+        "c2": number, "c2_analysis": "Análise C2 (Tema/Tipo)",
+        "c3": number, "c3_analysis": "Análise C3 (Argumentação)",
+        "c4": number, "c4_analysis": "Análise C4 (Coesão)",
+        "c5": number, "c5_analysis": "Análise C5 (Proposta)",
         "score_total": number,
-        "general_feedback": "Resumo geral motivador mas realista sobre o desempenho",
-        "structural_tips": "Uma dica prática e avançada para melhorar a estrutura na próxima",
-        "strengths": ["Ponto forte 1", "Ponto forte 2", "Ponto forte 3"],
-        "weaknesses": ["Ponto fraco 1 (prioridade)", "Ponto fraco 2"]
+        "general_feedback": "Feedback construtivo e motivador",
+        "structural_tips": "Dica prática para evoluir",
+        "strengths": ["Ponto forte 1", "Ponto forte 2"],
+        "weaknesses": ["Ponto a melhorar 1", "Ponto a melhorar 2"]
       }
       `;
 

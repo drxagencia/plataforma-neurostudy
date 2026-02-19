@@ -28,6 +28,7 @@ const AdminUsers: React.FC = () => {
     setLoading(true);
     try {
         const data = await DatabaseService.getAllUsers();
+        // Ordena por gasto total para mostrar clientes mais valiosos primeiro
         setAllUsers(data.sort((a,b) => (b.totalSpent || 0) - (a.totalSpent || 0)));
     } catch (e) {
         console.error(e);
@@ -55,6 +56,7 @@ const AdminUsers: React.FC = () => {
       if (!confirm("Confirmar alterações nos dados do usuário?")) return;
 
       try {
+          // Garante que o UID está correto antes de salvar
           await DatabaseService.saveUserProfile(selectedUser.uid, formData);
           alert("Dados atualizados com sucesso!");
           setSelectedUser(null);
@@ -66,7 +68,8 @@ const AdminUsers: React.FC = () => {
 
   const filteredUsers = allUsers.filter(u => 
       u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.uid.includes(searchTerm)
   );
 
   const formatDateForInput = (isoDate?: string | number) => {
@@ -110,7 +113,7 @@ const AdminUsers: React.FC = () => {
                                 <td className="p-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400">
-                                            {user.displayName.charAt(0)}
+                                            {user.displayName?.charAt(0) || '?'}
                                         </div>
                                         <div>
                                             <p className="font-bold text-white text-sm">{user.displayName}</p>
@@ -155,7 +158,7 @@ const AdminUsers: React.FC = () => {
                     <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900/50">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-xl font-bold text-white shadow-lg">
-                                {selectedUser.displayName.charAt(0)}
+                                {selectedUser.displayName?.charAt(0) || '?'}
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold text-white">{selectedUser.displayName}</h3>
@@ -263,7 +266,7 @@ const AdminUsers: React.FC = () => {
                             <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
                                 <Zap size={14}/> Outros Recursos
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="bg-slate-900/50 p-5 rounded-2xl border border-white/5">
                                     <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">Saldo IA (R$)</label>
                                     <input 
@@ -282,6 +285,18 @@ const AdminUsers: React.FC = () => {
                                         onChange={e => setFormData({...formData, aiUnlimitedExpiry: e.target.value})}
                                         className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white text-sm"
                                     />
+                                </div>
+                                <div className="bg-slate-900/50 p-5 rounded-2xl border border-white/5">
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">IA Ilimitada (Flag)</label>
+                                    <select 
+                                        value={formData.ia_ilimitada ? "true" : "false"}
+                                        onChange={e => setFormData({...formData, ia_ilimitada: e.target.value === "true"})}
+                                        className="w-full bg-black border border-slate-700 rounded-lg p-2 text-white text-sm outline-none focus:border-indigo-500"
+                                    >
+                                        <option value="false">Não</option>
+                                        <option value="true">Sim (Permanente)</option>
+                                    </select>
+                                    <p className="text-[9px] text-slate-500 mt-1">"Sim" ignora a data de vencimento.</p>
                                 </div>
                             </div>
                         </div>

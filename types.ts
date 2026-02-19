@@ -35,6 +35,7 @@ export interface UserProfile extends User {
   
   // Feature Specific Expiries
   aiUnlimitedExpiry?: string; 
+  ia_ilimitada?: boolean | string; // Flag manual/permanente
   
   // Essay System
   essayPlanType?: EssayPlanType; // NEW: Controls the tier (Basic/Medium/Advanced)

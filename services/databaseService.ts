@@ -66,13 +66,25 @@ export const DatabaseService = {
   },
 
   async saveUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
+    if (!uid) {
+        console.error("Tentativa de salvar usuário sem UID:", data);
+        throw new Error("UID inválido");
+    }
     await update(ref(database, `users/${uid}`), data);
   },
 
   async getAllUsers(): Promise<UserProfile[]> {
     const snap = await get(ref(database, 'users'));
     if (!snap.exists()) return [];
-    return Object.values(snap.val());
+    
+    // CORREÇÃO BUG ADMIN UNDEFINED:
+    // Mapeia as chaves (UIDs) para dentro do objeto de usuário.
+    // Isso previne que usuários criados sem a propriedade 'uid' explícita causem problemas no Admin.
+    const usersObj = snap.val();
+    return Object.keys(usersObj).map(key => ({
+        ...usersObj[key],
+        uid: key 
+    }));
   },
 
   async updateOnboarding(uid: string, whatsapp: string): Promise<void> {
@@ -136,10 +148,6 @@ export const DatabaseService = {
 
   async getLeaderboard(period: 'weekly' | 'total'): Promise<UserProfile[]> {
     try {
-        // CORREÇÃO COMPETITIVO:
-        // Buscamos os usuários ordenados pelo campo correto.
-        // Se orderByChild falhar (falta de index), pegamos os últimos 50 (limitToLast) e ordenamos manualmente no cliente.
-        // Isso garante que SEMPRE apareça alguém se houver dados.
         const field = period === 'weekly' ? 'weeklyXp' : 'xp';
         const q = query(ref(database, 'users'), orderByChild(field), limitToLast(50));
         
@@ -149,13 +157,11 @@ export const DatabaseService = {
         const users: UserProfile[] = [];
         snap.forEach(child => { 
             const u = child.val();
-            // Garante que o objeto tenha o campo para ordenação, senão trata como 0
             if (typeof u[field] === 'undefined') u[field] = 0;
-            users.push(u); 
+            // Ensure UID logic here too
+            users.push({ ...u, uid: child.key }); 
         });
 
-        // Ordenação manual JavaScript para garantir consistência (Decrescente)
-        // Isso corrige o problema de "não mostra ninguém" se a query retornar fora de ordem ou se índices falharem
         return users.sort((a, b) => (b[field] || 0) - (a[field] || 0));
     } catch (e) {
         console.error("Leaderboard error:", e);
@@ -222,26 +228,20 @@ export const DatabaseService = {
   },
 
   async getQuestions(category: string, subject: string, topic: string, subtopic?: string): Promise<Question[]> {
-    // Map category name to DB key (handle 'military' vs 'militar')
     const dbCategory = category === 'military' ? 'militar' : category;
-    
-    // Hierarchy: questions/{category}/{subject}/{topic}/{subtopic}/{id}
     const basePath = `questions/${dbCategory}/${subject}/${topic}`;
 
     if (subtopic) {
-        // Fetch specific subtopic
         const snap = await get(ref(database, `${basePath}/${subtopic}`));
         if (!snap.exists()) return [];
         return Object.values(snap.val());
     } else {
-        // Fetch ALL subtopics under this topic
         const snap = await get(ref(database, basePath));
         if (!snap.exists()) return [];
         
         const subtopicsObj = snap.val();
         let allQuestions: Question[] = [];
         
-        // Iterate over subtopics
         Object.values(subtopicsObj).forEach((subContent: any) => {
             if (subContent && typeof subContent === 'object') {
                 const questionsInSub = Object.values(subContent) as Question[];
@@ -273,31 +273,21 @@ export const DatabaseService = {
   },
 
   async getQuestionsByIds(ids: string[]): Promise<Question[]> {
-      // Recursive deep search helper
       const findQuestionDeep = async (currentPath: string, targetId: string): Promise<Question | null> => {
           const snap = await get(ref(database, currentPath));
           if (!snap.exists()) return null;
           
           const val = snap.val();
           
-          // Case 1: Found the question directly
           if (val.id === targetId) return val as Question;
           
-          // Case 2: It's a folder, search children
           if (typeof val === 'object') {
-              // Optimization: If the key matches targetId, we found it (assuming structure id: data)
               if (val[targetId]) return val[targetId] as Question;
 
               const keys = Object.keys(val);
               for (const key of keys) {
-                  // Skip primitive values
                   if (typeof val[key] !== 'object') continue;
-                  
-                  // If child has 'id' property matching target, return it
                   if (val[key].id === targetId) return val[key] as Question;
-                  
-                  // Else recurse if it looks like a folder (not a question leaf yet)
-                  // Heuristic: questions usually have 'text' and 'correctAnswer'. If not, recurse.
                   if (!val[key].text) {
                       const found = await findQuestionDeep(`${currentPath}/${key}`, targetId);
                       if (found) return found;
@@ -306,20 +296,10 @@ export const DatabaseService = {
           }
           return null;
       };
-
-      // Execution strategy:
-      // Since a full DB scan for each ID is expensive, we'll assume a structure or try specific paths if possible.
-      // However, given the prompt constraints and lack of flat index, we must scan 'questions' root.
-      // To optimize, we fetch 'questions' once (or per category) and scan in memory if dataset is small,
-      // OR we implement the recursive search properly.
-      // For this solution, let's try to fetch specific paths if we knew them, otherwise do a broad search.
-      // Better approach for stability: Scan questions/regular and questions/militar.
       
       const promises = ids.map(async (id) => {
-          // Try regular first
           let q = await findQuestionDeep('questions/regular', id);
           if (q) return q;
-          // Try militar
           q = await findQuestionDeep('questions/militar', id);
           return q;
       });
@@ -347,12 +327,8 @@ export const DatabaseService = {
   },
 
   async saveQuestion(category: string, subjectId: string, topic: string, subtopic: string, id: string, data: Question): Promise<void> {
-      // Save deep for navigation
       const dbCategory = category === 'military' ? 'militar' : category;
       await set(ref(database, `questions/${dbCategory}/${subjectId}/${topic}/${subtopic}/${id}`), data);
-      
-      // OPTIONAL: Save flat for ID lookup if needed by Simulations
-      // await set(ref(database, `questions/${id}`), data);
   },
 
   // --- COMMUNITY ---
@@ -440,7 +416,6 @@ export const DatabaseService = {
       await set(newRef, { ...lead, id: newRef.key });
   },
 
-  // MODIFIED: Delete lead instead of just marking as processed
   async deleteLead(leadId: string): Promise<void> {
       await remove(ref(database, `leads/${leadId}`));
   },
@@ -466,7 +441,6 @@ export const DatabaseService = {
   },
 
   async processRecharge(reqId: string, status: 'approved' | 'rejected'): Promise<void> {
-      // 1. If approved, execute logic
       if (status === 'approved') {
           const snap = await get(ref(database, `recharge_requests/${reqId}`));
           if (snap.exists()) {
@@ -484,11 +458,9 @@ export const DatabaseService = {
                   let creditsToAdd = 0;
                   let daysToAdd = 0;
 
-                  // Identify Plan Tier
                   if (label.includes('médio') || label.includes('medio')) planType = 'medium';
                   else if (label.includes('avançado') || label.includes('advanced')) planType = 'advanced';
                   
-                  // Identify Cycle & Calculate Total Credits (Bulk Addition)
                   const creditsPerWeek = planType === 'basic' ? 1 : planType === 'medium' ? 2 : 4;
                   
                   if (label.includes('semanal')) {
@@ -496,13 +468,12 @@ export const DatabaseService = {
                       creditsToAdd = creditsPerWeek * 1; 
                   } else if (label.includes('mensal')) {
                       daysToAdd = 30;
-                      creditsToAdd = creditsPerWeek * 4; // Approx 4 weeks
+                      creditsToAdd = creditsPerWeek * 4;
                   } else if (label.includes('anual')) {
                       daysToAdd = 365;
-                      creditsToAdd = creditsPerWeek * 52; // 52 weeks
+                      creditsToAdd = creditsPerWeek * 52;
                   }
 
-                  // Update Plan Expiry
                   const userSnap = await get(ref(database, `users/${userId}`));
                   const user = userSnap.val() as UserProfile;
                   const now = Date.now();
@@ -521,12 +492,10 @@ export const DatabaseService = {
                       updates.essayCredits = increment(req.quantityCredits);
                   } 
                   else if (req.currencyType === 'BRL') {
-                      // PLAN UPGRADE: Basic -> Advanced
                       if (req.planLabel?.includes('UPGRADE')) {
                           updates.plan = 'advanced';
                       }
 
-                      // AI UNLIMITED: Update Expiry
                       if (req.planLabel?.includes('IA Ilimitada')) {
                           const userSnap = await get(ref(database, `users/${userId}`));
                           const user = userSnap.val() as UserProfile;
@@ -548,10 +517,8 @@ export const DatabaseService = {
                   }
               }
 
-              // Apply Updates
               await update(ref(database, `users/${userId}`), updates);
 
-              // Log Transaction
               const tRef = push(ref(database, `user_transactions/${userId}`));
               await set(tRef, {
                   id: tRef.key,
@@ -564,7 +531,6 @@ export const DatabaseService = {
           }
       }
 
-      // 2. ALWAYS DELETE THE REQUEST FROM DATABASE (Clean up)
       await remove(ref(database, `recharge_requests/${reqId}`));
   },
 

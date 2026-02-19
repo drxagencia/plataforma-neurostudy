@@ -46,25 +46,22 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
 
   // --- AUTOMATIC CHECK: AI UNLIMITED EXPIRATION ---
   useEffect(() => {
-      // Logic: If user has a date, check if it's past. If past, we rely on the 'isAiActive' calculation below 
-      // which will naturally be false. 
-      // Note: We don't strictly need to write 'false' to the DB every 2 days because the check 
-      // 'getTime() > Date.now()' ensures access is revoked immediately upon expiration.
-      // The API also checks this.
+      // Logic handled via isAiActive calculation and API backend check
   }, [user]);
 
   // Check Subscription Status or Advanced Plan
-  // Update: Only grant access if expiry is valid. 
-  // 'Advanced' plan allows access, but 'aiUnlimitedExpiry' is the specific key.
   const hasValidExpiry = user.aiUnlimitedExpiry 
     ? new Date(user.aiUnlimitedExpiry).getTime() > Date.now() 
     : false;
 
-  const isAiActive = (user.plan === 'admin') || hasValidExpiry;
+  const isAiActive = 
+    (user.plan === 'admin') || 
+    (user.ia_ilimitada === true || user.ia_ilimitada === "true") ||
+    hasValidExpiry;
 
   const expiryDate = user.aiUnlimitedExpiry 
     ? new Date(user.aiUnlimitedExpiry).toLocaleDateString() 
-    : null;
+    : (user.ia_ilimitada ? 'Ilimitado' : null);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -150,7 +147,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
             <div className="text-right">
               <p className="text-[10px] text-slate-500 uppercase font-bold">Status Assinatura</p>
               <p className={`text-sm font-bold flex items-center justify-end gap-1 ${isAiActive ? 'text-emerald-400' : 'text-slate-300'}`}>
-                  {isAiActive ? <><Check size={14}/> Ativo até {expiryDate}</> : 'Acesso Limitado'}
+                  {isAiActive ? <><Check size={14}/> {expiryDate === 'Ilimitado' ? 'Vitalício' : `Ativo até ${expiryDate}`}</> : 'Acesso Limitado'}
               </p>
             </div>
             {!isAiActive && (
