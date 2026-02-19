@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, View, UserStatsMap } from '../types';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
-import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3, Bot, Edit2, Check, CheckCircle, CloudUpload } from 'lucide-react';
+import { Clock, Target, TrendingUp, Trophy, Loader2, Sparkles, ArrowRight, Zap, Lock, AlertTriangle, EyeOff, BarChart3, Bot, Edit2, Check, CheckCircle, UploadCloud } from 'lucide-react';
 import { getRank, getNextRank } from '../constants';
 import UpgradeModal from './UpgradeModal';
 
@@ -324,7 +324,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
                     <div className="flex justify-between items-end">
                         <p className="text-slate-400 text-sm font-medium font-sans">Tempo Hoje</p>
                         <button onClick={handleSyncClick} className="p-1 hover:bg-white/10 rounded-full text-slate-500 hover:text-white transition-colors" title="Sincronizar Tempo">
-                            {isSyncing ? <Loader2 size={14} className="animate-spin"/> : <CloudUpload size={14} />}
+                            {isSyncing ? <Loader2 size={14} className="animate-spin"/> : <UploadCloud size={14} />}
                         </button>
                     </div>
                     <div className="flex items-baseline gap-2">
