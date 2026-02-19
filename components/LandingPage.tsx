@@ -11,17 +11,14 @@ interface LandingPageProps {
   onStartGame: () => void;
 }
 
-// --- STARRY BACKGROUND COMPONENT (OPTIMIZED) ---
+// --- STARRY BACKGROUND COMPONENT ---
 const StarryBackground = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
-        // PERFORMANCE CHECK: Desativa animação em mobile (<768px) para carregamento instantâneo
-        if (window.innerWidth < 768) return;
-
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const ctx = canvas.getContext('2d', { alpha: false }); // Otimização: alpha false
+        const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
         let width = window.innerWidth;
@@ -55,7 +52,7 @@ const StarryBackground = () => {
             scrollVelocity = Math.min(delta * 0.3, 20); 
             lastScrollY = currentScrollY;
         };
-        window.addEventListener('scroll', handleScroll, { passive: true }); // Otimização: passive listener
+        window.addEventListener('scroll', handleScroll);
 
         let animationFrame: number;
 
@@ -113,11 +110,10 @@ const StarryBackground = () => {
         };
     }, []);
 
-    // Canvas visível apenas em MD+ (Desktop) para economizar GPU no Mobile
     return (
         <canvas 
             ref={canvasRef} 
-            className="fixed inset-0 z-0 pointer-events-none hidden md:block"
+            className="fixed inset-0 z-0 pointer-events-none"
         />
     );
 };
@@ -313,11 +309,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
         .animate-shot { animation: enemyDeath 0.4s forwards; }
       `}</style>
 
-      {/* STARRY BACKGROUND CANVAS (Otimizado) */}
+      {/* STARRY BACKGROUND CANVAS (Restaurado) */}
       <StarryBackground />
-
-      {/* Background Simples para Mobile (Fallback do Canvas) */}
-      <div className="fixed inset-0 z-[-1] bg-gradient-to-b from-black via-[#050505] to-black md:hidden" />
 
       {/* Overlay Decor (Nebula Globs) - Reduced opacity for subtle dark theme */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-20 mix-blend-screen">
@@ -369,7 +362,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                           </div>
                       ))}
                   </div>
-                  <button onClick={() => scrollToSection(vslRef)} className="w-full md:w-auto px-10 py-5 bg-indigo-600/90 text-white font-black text-lg md:text-xl rounded-2xl flex items-center justify-center gap-4 mx-auto hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-900/20 hover:scale-105">ASSISTIR ARMA SECRETA <ArrowRight/></button>
+                  {/* Button Colors: Dark Indigo */}
+                  <button onClick={() => scrollToSection(vslRef)} className="w-full md:w-auto px-10 py-5 bg-slate-900/80 border border-indigo-500/30 text-indigo-100 font-black text-lg md:text-xl rounded-2xl flex items-center justify-center gap-4 mx-auto hover:bg-indigo-900/30 transition-all shadow-xl shadow-indigo-900/10 hover:scale-105">ASSISTIR ARMA SECRETA <ArrowRight/></button>
               </div>
           </section>
 
@@ -397,7 +391,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                   </div>
                   <div className="mt-12 text-center h-24">
                       {(showFinalOffer || showEarlyOffer) && (
-                          <button onClick={handleRevealOffer} className="w-full md:w-auto px-10 py-6 md:px-20 md:py-8 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xl md:text-3xl rounded-[2rem] shadow-[0_0_50px_rgba(16,185,129,0.2)] animate-in slide-in-from-bottom-4 flex items-center justify-center gap-4 mx-auto uppercase italic tracking-tighter hover:scale-105 transition-transform">
+                          // Button Colors: Dark Emerald/Teal Gradient
+                          <button onClick={handleRevealOffer} className="w-full md:w-auto px-10 py-6 md:px-20 md:py-8 bg-gradient-to-r from-emerald-900/80 to-teal-900/80 border border-emerald-500/30 hover:from-emerald-900 hover:to-teal-900 text-emerald-100 font-black text-xl md:text-3xl rounded-[2rem] shadow-[0_0_50px_rgba(16,185,129,0.1)] animate-in slide-in-from-bottom-4 flex items-center justify-center gap-4 mx-auto uppercase italic tracking-tighter hover:scale-105 transition-transform">
                              <Rocket size={28}/> Revelar Oferta VIP
                           </button>
                       )}
@@ -450,10 +445,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
 
                                   {selectedPlan === p && (
                                       <div className="space-y-4 animate-in fade-in zoom-in-95">
-                                          <button onClick={() => handleCheckout(p as any, 'pix')} className="w-full bg-emerald-600 py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-3 hover:scale-[1.02]">
+                                          {/* Button Colors: Dark Emerald for PIX, Dark Slate for Card */}
+                                          <button onClick={() => handleCheckout(p as any, 'pix')} className="w-full bg-emerald-950/40 border border-emerald-500/30 py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-900/60 text-emerald-400 transition-all shadow-xl shadow-emerald-900/10 flex items-center justify-center gap-3 hover:scale-[1.02]">
                                               <QrCode size={20}/> Pagar via PIX
                                           </button>
-                                          <button onClick={() => handleCheckout(p as any, 'card')} className="w-full bg-white text-black py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-3 hover:scale-[1.02]">
+                                          <button onClick={() => handleCheckout(p as any, 'card')} className="w-full bg-slate-900/60 border border-white/10 text-slate-300 py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-3 hover:scale-[1.02]">
                                               <CreditCard size={20}/> Pagar via Cartão
                                           </button>
                                       </div>
@@ -519,10 +515,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartGame }) => {
                                 ) : null}
                             </div>
                             
+                            {/* Button Colors: Dark Emerald */}
                             <button 
                                 onClick={handleConfirmPix} 
                                 disabled={pixCooldown > 0}
-                                className={`w-full py-6 md:py-7 rounded-3xl font-black text-sm shadow-xl transition-all flex items-center justify-center gap-4 uppercase tracking-[0.2em] italic ${pixCooldown > 0 ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white hover:scale-105'}`}
+                                className={`w-full py-6 md:py-7 rounded-3xl font-black text-sm shadow-xl transition-all flex items-center justify-center gap-4 uppercase tracking-[0.2em] italic ${pixCooldown > 0 ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-emerald-900 border border-emerald-500/50 hover:bg-emerald-800 text-emerald-100 hover:scale-105'}`}
                             >
                                 {pixCooldown > 0 ? 'AGUARDE...' : <><CheckCircle size={22}/> JÁ FIZ O PAGAMENTO</>}
                             </button>
