@@ -54,11 +54,43 @@ export default async function handler(req: any, res: any) {
       const credits = user.essayCredits || 0;
       if (credits <= 0) return res.status(402).json({ error: 'Sem créditos de redação.' });
       
+      const promptSistema = `
+      Você é um Corretor Oficial do ENEM sênior, conhecido por ser técnico e justo. Sua tarefa é corrigir a redação com base nas 5 Competências (0 a 200 pontos cada).
+      
+      DIRETRIZES DE NOTA (SEJA RIGOROSO):
+      - Nota 1000: Apenas para textos impecáveis, com tese forte, repertório sociocultural produtivo, coesão perfeita e proposta de intervenção completíssima. (Nota: 960-1000).
+      - Nota Alta (900+): Textos excelentes mas com 1 ou 2 desvios leves (ex: uma vírgula, uma repetição).
+      - Nota Média (700-800): Textos bons, mas com lacunas argumentativas, repertório não legitimado ou falhas de coesão.
+      - Nota Baixa (<600): Tangenciamento do tema, estrutura confusa, muitos erros gramaticais ou proposta nula.
+
+      CRITÉRIOS OBRIGATÓRIOS:
+      C1 (Norma Culta): Desconte pontos por crase, concordância e ortografia.
+      C2 (Tema/Tipo): Verifique se há tese explícita e estrutura dissertativa-argumentativa.
+      C3 (Argumentação): O aluno defende o ponto de vista? O repertório é produtivo?
+      C4 (Coesão): Exija conectivos variados entre parágrafos e intra-parágrafos. Penalize repetições.
+      C5 (Proposta): Deve conter AGENTE, AÇÃO, MEIO/MODO, EFEITO e DETALHAMENTO. Se faltar um, não dê 200.
+
+      SAÍDA ESPERADA (JSON):
+      Retorne APENAS um JSON com este formato:
+      {
+        "c1": number, "c1_analysis": "string curta",
+        "c2": number, "c2_analysis": "string curta",
+        "c3": number, "c3_analysis": "string curta",
+        "c4": number, "c4_analysis": "string curta",
+        "c5": number, "c5_analysis": "string curta",
+        "score_total": number,
+        "general_feedback": "Resumo geral motivador mas realista",
+        "structural_tips": "Dica prática para melhorar (ex: 'Use mais conectivos como 'Ademais'')",
+        "strengths": ["Ponto forte 1", "Ponto forte 2"],
+        "weaknesses": ["Ponto fraco 1", "Ponto fraco 2"]
+      }
+      `;
+
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "Você é um corretor oficial do ENEM. Retorne JSON: c1, c2, c3, c4, c5 (0-200), score_total, general_feedback, structural_tips." },
-          { role: "user", content: [{ type: "text", text: `Tema: ${message}` }, { type: "image_url", image_url: { url: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}` } }] }
+          { role: "system", content: promptSistema },
+          { role: "user", content: [{ type: "text", text: `Tema da Redação: ${message}` }, { type: "image_url", image_url: { url: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}` } }] }
         ],
         response_format: { type: "json_object" }
       });

@@ -203,7 +203,8 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
 
               {/* Subject Breakdown */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {subjects.map(([subject, stats]) => {
+                  {subjects.map(([subject, rawStats]) => {
+                      const stats = rawStats as { correct: number, total: number };
                       const subjPerc = Math.round((stats.correct / stats.total) * 100);
                       return (
                           <div key={subject} className="glass-card p-6 rounded-3xl border border-white/5">

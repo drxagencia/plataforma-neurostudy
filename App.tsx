@@ -22,7 +22,7 @@ import { View, UserProfile } from './types';
 import { mapUser } from './services/authService';
 import { DatabaseService } from './services/databaseService'; 
 import { auth } from './services/firebaseConfig';
-import { Smartphone, CheckCircle, Loader2 } from 'lucide-react';
+import { Smartphone, CheckCircle, Loader2, Trophy } from 'lucide-react';
 
 const App: React.FC = () => {
   const [showLanding, setShowLanding] = useState(() => window.location.search.includes('page=lp'));
@@ -37,6 +37,9 @@ const App: React.FC = () => {
   // Global Upgrade Modal State
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeMode, setUpgradeMode] = useState<'plan' | 'ai'>('plan');
+
+  // XP Alert State
+  const [xpNotification, setXpNotification] = useState<{ show: boolean, amount: number, type: string } | null>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -102,6 +105,24 @@ const App: React.FC = () => {
       return () => clearInterval(timer);
   }, [user?.uid, showLanding]);
 
+  // XP Notification Listener
+  useEffect(() => {
+      const handleXpEvent = (event: any) => {
+          const { amount, type } = event.detail;
+          if (amount <= 0) return;
+          
+          setXpNotification({ show: true, amount, type });
+          
+          // Auto hide after 3s
+          setTimeout(() => {
+              setXpNotification(null);
+          }, 3000);
+      };
+
+      window.addEventListener('xp-gained', handleXpEvent);
+      return () => window.removeEventListener('xp-gained', handleXpEvent);
+  }, []);
+
   const handleOnboardingSubmit = async () => {
       if (whatsappInput.length < 10 || !user) return;
       setOnboardingLoading(true);
@@ -138,6 +159,22 @@ const App: React.FC = () => {
   return (
     <div className="flex min-h-screen text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30">
       
+      {/* XP NOTIFICATION TOAST */}
+      {xpNotification && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-top-4 fade-in duration-300">
+              <div className="bg-slate-900/90 backdrop-blur-md border border-indigo-500/50 px-6 py-3 rounded-full shadow-[0_0_30px_rgba(79,70,229,0.4)] flex items-center gap-3">
+                  <div className="bg-indigo-600 rounded-full p-1.5 animate-bounce">
+                      <Trophy size={16} className="text-white" />
+                  </div>
+                  <div>
+                      <p className="text-sm font-black text-white uppercase tracking-wider">
+                          +{xpNotification.amount} XP
+                      </p>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Global Upgrade Modal */}
       {showUpgradeModal && <UpgradeModal user={user} onClose={() => setShowUpgradeModal(false)} mode={upgradeMode} />}
 

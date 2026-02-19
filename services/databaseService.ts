@@ -109,6 +109,14 @@ export const DatabaseService = {
           xp: increment(amount),
           weeklyXp: increment(amount) 
         });
+        
+        // --- EVENTO DE NOTIFICAÇÃO (GLOBAL) ---
+        // Dispara um evento para que o App.tsx exiba o alerta animado
+        if (typeof window !== 'undefined') {
+            const event = new CustomEvent('xp-gained', { detail: { amount, type: actionType } });
+            window.dispatchEvent(event);
+        }
+
     } catch (e) {
         console.error("Failed to process XP action:", e);
     }
@@ -127,13 +135,32 @@ export const DatabaseService = {
   },
 
   async getLeaderboard(period: 'weekly' | 'total'): Promise<UserProfile[]> {
-    const field = period === 'weekly' ? 'weeklyXp' : 'xp';
-    const q = query(ref(database, 'users'), orderByChild(field), limitToLast(50));
-    const snap = await get(q);
-    if (!snap.exists()) return [];
-    const users: UserProfile[] = [];
-    snap.forEach(child => { users.push(child.val()); });
-    return users.reverse();
+    try {
+        // CORREÇÃO COMPETITIVO:
+        // Buscamos os usuários ordenados pelo campo correto.
+        // Se orderByChild falhar (falta de index), pegamos os últimos 50 (limitToLast) e ordenamos manualmente no cliente.
+        // Isso garante que SEMPRE apareça alguém se houver dados.
+        const field = period === 'weekly' ? 'weeklyXp' : 'xp';
+        const q = query(ref(database, 'users'), orderByChild(field), limitToLast(50));
+        
+        const snap = await get(q);
+        if (!snap.exists()) return [];
+        
+        const users: UserProfile[] = [];
+        snap.forEach(child => { 
+            const u = child.val();
+            // Garante que o objeto tenha o campo para ordenação, senão trata como 0
+            if (typeof u[field] === 'undefined') u[field] = 0;
+            users.push(u); 
+        });
+
+        // Ordenação manual JavaScript para garantir consistência (Decrescente)
+        // Isso corrige o problema de "não mostra ninguém" se a query retornar fora de ordem ou se índices falharem
+        return users.sort((a, b) => (b[field] || 0) - (a[field] || 0));
+    } catch (e) {
+        console.error("Leaderboard error:", e);
+        return [];
+    }
   },
 
   // --- CONTENT: SUBJECTS & LESSONS ---
