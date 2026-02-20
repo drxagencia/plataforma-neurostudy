@@ -7,7 +7,7 @@ import {
   Users, 
   Settings, 
   LogOut,
-  BookOpen,
+  BookOpen, 
   ShieldAlert,
   Trophy,
   Bot,
