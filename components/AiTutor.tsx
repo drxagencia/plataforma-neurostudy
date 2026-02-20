@@ -240,7 +240,7 @@ const AiTutor: React.FC<AiTutorProps> = ({ user, onUpdateUser, onShowUpgrade }) 
                             {/* PLANO ANUAL */}
                             <a href={KIRVANO_LINKS.ai_yearly} target="_blank" rel="noopener noreferrer" className="flex flex-col p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-emerald-500/50 transition-all text-center group/card">
                                 <div className="text-xs text-slate-400 font-bold uppercase mb-1">Anual</div>
-                                <div className="text-xl font-black text-white mb-1">R$ 49,90</div>
+                                <div className="text-xl font-black text-white mb-1">R$ 47,90</div>
                                 <div className="text-[10px] text-emerald-400 font-bold">Melhor Valor</div>
                             </a>
                         </div>

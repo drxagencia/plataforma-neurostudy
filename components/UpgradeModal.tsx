@@ -35,7 +35,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
     const AI_PRICES = {
         weekly: 9.90,
         monthly: 19.90,
-        yearly: 49.90
+        yearly: 47.90
     };
 
     const isCurrentYearly = user.billingCycle === 'yearly';
@@ -265,7 +265,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ user, onClose, mode = 'plan
                         </div>
                     </div>
                     <div className="text-right">
-                        <p className="text-xl font-black text-white">R$ 49,90</p>
+                        <p className="text-xl font-black text-white">R$ 47,90</p>
                         <p className="text-[10px] text-emerald-400 font-bold">Economize 80%</p>
                     </div>
                 </div>
