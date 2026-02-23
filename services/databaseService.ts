@@ -48,18 +48,45 @@ export const DatabaseService = {
     const snap = await get(ref(database, `users/${uid}`));
     if (snap.exists()) {
       const data = snap.val();
+      const today = new Date().toISOString().split('T')[0];
+      let needsUpdate = false;
+      const updates: any = {};
+
+      if (data.lastStudyDate !== today) {
+          data.dailyStudyMinutes = 0;
+          data.lastStudyDate = today;
+          updates.dailyStudyMinutes = 0;
+          updates.lastStudyDate = today;
+          needsUpdate = true;
+      }
+
       // Ensure daily counters exist to prevent UI bugs
-      if (typeof data.dailyStudyMinutes === 'undefined') data.dailyStudyMinutes = 0;
-      if (typeof data.hoursStudied === 'undefined') data.hoursStudied = 0;
+      if (typeof data.dailyStudyMinutes === 'undefined') {
+          data.dailyStudyMinutes = 0;
+          updates.dailyStudyMinutes = 0;
+          needsUpdate = true;
+      }
+      if (typeof data.hoursStudied === 'undefined') {
+          data.hoursStudied = 0;
+          updates.hoursStudied = 0;
+          needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+          await update(ref(database, `users/${uid}`), updates);
+      }
+
       return data;
     }
+    const today = new Date().toISOString().split('T')[0];
     const newUser = { 
         ...defaultData, 
         uid, 
         balance: 0, 
         xp: 0,
         dailyStudyMinutes: 0,
-        hoursStudied: 0
+        hoursStudied: 0,
+        lastStudyDate: today
     };
     await set(ref(database, `users/${uid}`), newUser);
     return newUser as UserProfile;
@@ -137,10 +164,21 @@ export const DatabaseService = {
   async trackStudyTime(uid: string, minutes: number): Promise<void> {
     if (!uid || minutes <= 0) return;
     try {
-        await update(ref(database, `users/${uid}`), {
-          dailyStudyMinutes: increment(minutes),
-          hoursStudied: increment(minutes / 60)
-        });
+        const today = new Date().toISOString().split('T')[0];
+        const snap = await get(ref(database, `users/${uid}`));
+        if (snap.exists()) {
+            const data = snap.val();
+            const updates: any = {
+                hoursStudied: increment(minutes / 60)
+            };
+            if (data.lastStudyDate !== today) {
+                updates.dailyStudyMinutes = minutes;
+                updates.lastStudyDate = today;
+            } else {
+                updates.dailyStudyMinutes = increment(minutes);
+            }
+            await update(ref(database, `users/${uid}`), updates);
+        }
     } catch (e) {
         console.error("Failed to track time:", e);
     }

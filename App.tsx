@@ -108,10 +108,15 @@ const App: React.FC = () => {
           // Update UI instantly (Optimistic)
           setUser(currentUser => {
               if (!currentUser) return null;
+              
+              const today = new Date().toISOString().split('T')[0];
+              const isNewDay = currentUser.lastStudyDate !== today;
+
               return {
                   ...currentUser,
-                  dailyStudyMinutes: (currentUser.dailyStudyMinutes || 0) + 1,
-                  hoursStudied: (currentUser.hoursStudied || 0) + (1/60)
+                  dailyStudyMinutes: isNewDay ? 1 : (currentUser.dailyStudyMinutes || 0) + 1,
+                  hoursStudied: (currentUser.hoursStudied || 0) + (1/60),
+                  lastStudyDate: today
               };
           });
       }, 60000); 

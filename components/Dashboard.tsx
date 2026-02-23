@@ -368,30 +368,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
                 <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{user.questionsAnswered || 0}</p>
                 <p className="text-xs text-slate-500 font-medium font-sans">Total acumulado</p>
             </div>
-
-            {/* Login Streak */}
-            <div className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 group">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
-                    <Zap className="text-purple-400" />
-                  </div>
-                </div>
-                <p className="text-slate-400 text-sm font-medium font-sans">Sequência</p>
-                <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{user.loginStreak || 0} Dias</p>
-                <p className="text-xs text-slate-500 font-medium font-sans">Sem perder o foco</p>
-            </div>
-
-            {/* Community Likes */}
-            <div className="glass-card p-6 rounded-2xl hover:bg-slate-800/50 transition-all duration-300 group">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors border border-white/5">
-                    <TrendingUp className="text-yellow-400" />
-                  </div>
-                </div>
-                <p className="text-slate-400 text-sm font-medium font-sans">Likes Dados</p>
-                <p className="text-3xl font-bold text-white mt-1 mb-1 font-display">{user.dailyLikesGiven || 0}/5</p>
-                <p className="text-xs text-slate-500 font-medium font-sans">Hoje</p>
-            </div>
           </div>
 
           {/* ADVANCED RADAR (BLURRED FOR BASIC) */}
