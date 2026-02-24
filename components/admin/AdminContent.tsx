@@ -397,6 +397,7 @@ const AdminContent: React.FC = () => {
                                 <select className="w-full bg-black border border-zinc-800 rounded-xl p-4 text-white outline-none focus:border-indigo-500" value={lessonForm.type} onChange={e => setLessonForm({...lessonForm, type: e.target.value as any})}>
                                     <option value="video">🎥 Aula em Vídeo</option>
                                     <option value="exercise_block">📝 Bloco de Exercícios</option>
+                                    <option value="simulation_block">🎯 Bloco de Simulado</option>
                                 </select>
                             </div>
                             <div>
@@ -429,11 +430,11 @@ const AdminContent: React.FC = () => {
                             </div>
                         )}
 
-                        {/* CONFIG SPECIFIC: EXERCISE BLOCK */}
-                        {lessonForm.type === 'exercise_block' && (
-                            <div className="space-y-4 p-6 bg-emerald-900/10 border border-emerald-500/20 rounded-2xl">
-                                <h4 className="text-emerald-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2"><FileQuestion size={14}/> Configuração do Filtro</h4>
-                                <p className="text-xs text-slate-400">Quando o aluno clicar neste bloco, ele será levado ao Banco de Questões com estes filtros aplicados automaticamente.</p>
+                        {/* CONFIG SPECIFIC: EXERCISE BLOCK OR SIMULATION BLOCK */}
+                        {(lessonForm.type === 'exercise_block' || lessonForm.type === 'simulation_block') && (
+                            <div className={`space-y-4 p-6 border rounded-2xl ${lessonForm.type === 'exercise_block' ? 'bg-emerald-900/10 border-emerald-500/20' : 'bg-purple-900/10 border-purple-500/20'}`}>
+                                <h4 className={`${lessonForm.type === 'exercise_block' ? 'text-emerald-400' : 'text-purple-400'} text-xs font-bold uppercase tracking-widest flex items-center gap-2`}><FileQuestion size={14}/> Configuração do Filtro</h4>
+                                <p className="text-xs text-slate-400">Quando o aluno clicar neste bloco, ele será levado ao {lessonForm.type === 'exercise_block' ? 'Banco de Questões' : 'Painel de Simulados'} com estes filtros aplicados automaticamente.</p>
                                 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div><label className="text-[10px] text-slate-500 uppercase ml-1">Matéria (ID)</label><input disabled value={selectedSub?.id} className="w-full bg-black/50 border border-white/5 rounded-xl p-3 text-slate-400 text-sm" /></div>
@@ -441,9 +442,9 @@ const AdminContent: React.FC = () => {
                                 </div>
                                 
                                 <div>
-                                    <label className="text-[10px] text-emerald-500 font-bold uppercase ml-1">Sub-tópicos (Filtro Específico)</label>
+                                    <label className={`text-[10px] font-bold uppercase ml-1 ${lessonForm.type === 'exercise_block' ? 'text-emerald-500' : 'text-purple-500'}`}>Sub-tópicos (Filtro Específico)</label>
                                     <input 
-                                        className="w-full bg-black border border-emerald-500/30 rounded-xl p-3 text-white text-sm placeholder:text-slate-600" 
+                                        className={`w-full bg-black border rounded-xl p-3 text-white text-sm placeholder:text-slate-600 ${lessonForm.type === 'exercise_block' ? 'border-emerald-500/30' : 'border-purple-500/30'}`} 
                                         placeholder="Ex: MRU, Queda Livre (separados por vírgula)"
                                         value={lessonForm.exerciseFilters?.subtopics?.join(', ') || ''}
                                         onChange={e => {

@@ -202,6 +202,9 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser, onSho
       if (lesson.type === 'exercise_block' && lesson.exerciseFilters) {
           sessionStorage.setItem('qb_filters', JSON.stringify(lesson.exerciseFilters));
           onNavigate('questoes');
+      } else if (lesson.type === 'simulation_block' && lesson.exerciseFilters) {
+          sessionStorage.setItem('sim_filters', JSON.stringify(lesson.exerciseFilters));
+          onNavigate('simulados');
       } else {
           setSelectedLesson(lesson);
           setShowSmartPanel(false);
@@ -465,22 +468,23 @@ const Classes: React.FC<ClassesProps> = ({ onNavigate, user, onUpdateUser, onSho
                               {topicLessons.map((l, idx) => {
                                   const isActive = selectedLesson.id === l.id || selectedLesson.title === l.title;
                                   const isBlock = l.type === 'exercise_block';
+                                  const isSimBlock = l.type === 'simulation_block';
                                   const isDone = l.id && completedLessons.has(l.id);
 
                                   return (
-                                    <button key={idx} onClick={() => handleLessonClick(l)} className={`w-full p-3 rounded-xl flex items-start gap-3 text-left transition-all duration-200 group relative overflow-hidden ${isActive ? 'bg-indigo-600/10 border border-indigo-500/20' : isBlock ? 'bg-indigo-500/5 border border-indigo-500/10 hover:bg-indigo-500/10' : 'hover:bg-white/5 border border-transparent'}`}>
+                                    <button key={idx} onClick={() => handleLessonClick(l)} className={`w-full p-3 rounded-xl flex items-start gap-3 text-left transition-all duration-200 group relative overflow-hidden ${isActive ? 'bg-indigo-600/10 border border-indigo-500/20' : (isBlock || isSimBlock) ? 'bg-indigo-500/5 border border-indigo-500/10 hover:bg-indigo-500/10' : 'hover:bg-white/5 border border-transparent'}`}>
                                         {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-l-xl" />}
                                         <div className="relative mt-1">
-                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : isActive ? 'bg-indigo-500 border-indigo-500 text-white' : isBlock ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 group-hover:border-slate-500'}`}>
-                                                {isDone ? <CheckCircle size={12} fill="currentColor" /> : isActive ? <Play size={10} fill="currentColor"/> : isBlock ? <FileText size={10}/> : idx + 1}
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : isActive ? 'bg-indigo-500 border-indigo-500 text-white' : (isBlock || isSimBlock) ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 group-hover:border-slate-500'}`}>
+                                                {isDone ? <CheckCircle size={12} fill="currentColor" /> : isActive ? <Play size={10} fill="currentColor"/> : isBlock ? <FileText size={10}/> : isSimBlock ? <Layers size={10}/> : idx + 1}
                                             </div>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className={`font-medium text-sm leading-snug ${isActive ? 'text-indigo-200' : isBlock ? 'text-emerald-200' : isDone ? 'text-emerald-400 line-through decoration-emerald-500/50' : 'text-slate-300 group-hover:text-white'}`}>
+                                            <p className={`font-medium text-sm leading-snug ${isActive ? 'text-indigo-200' : isBlock ? 'text-emerald-200' : isSimBlock ? 'text-purple-300' : isDone ? 'text-emerald-400 line-through decoration-emerald-500/50' : 'text-slate-300 group-hover:text-white'}`}>
                                                 {l.title}
                                             </p>
                                             <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                                {!isBlock && (
+                                                {(!isBlock && !isSimBlock) && (
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 ${isActive ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500'}`}>
                                                         <Clock size={10} /> {l.duration}
                                                     </span>

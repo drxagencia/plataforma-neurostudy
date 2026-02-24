@@ -105,7 +105,7 @@ export interface LessonMaterial {
 export interface Lesson {
   id?: string;
   title: string;
-  type: 'video' | 'exercise_block';
+  type: 'video' | 'exercise_block' | 'simulation_block';
   videoUrl?: string;
   duration?: string;
   materials?: LessonMaterial[];

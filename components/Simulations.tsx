@@ -2,8 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { DatabaseService } from '../services/databaseService';
 import { AiService } from '../services/aiService';
-import { Simulation, Question, SimulationResult, View, UserProfile } from '../types';
-import { Timer, FileText, ChevronRight, Loader2, Trophy, Clock, CheckCircle, AlertTriangle, ArrowRight, XCircle, ArrowLeft, BrainCircuit, Zap, Target, Lock, Crown, List, BarChart3, LayoutGrid } from 'lucide-react';
+import { Simulation, Question, SimulationResult, View, UserProfile, Subject } from '../types';
+import { Timer, FileText, ChevronRight, Loader2, Trophy, Clock, CheckCircle, AlertTriangle, ArrowRight, XCircle, ArrowLeft, BrainCircuit, Zap, Target, Lock, Crown, List, BarChart3, LayoutGrid, Settings } from 'lucide-react';
 import { auth } from '../services/firebaseConfig';
 
 interface SimulationsProps {
@@ -31,12 +31,61 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPlan, setAiPlan] = useState<{analysis: string, recommendations: {subjectId: string, topicName: string, reason: string}[]} | null>(null);
 
+  // Custom Simulation State
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [topics, setTopics] = useState<Record<string, string[]>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>('regular');
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [selectedSubTopic, setSelectedSubTopic] = useState<string>('');
+  const [subTopicsList, setSubTopicsList] = useState<string[]>([]);
+  const [multiSubtopicsFilter, setMultiSubtopicsFilter] = useState<string[]>([]);
+  const [customQuestionCount, setCustomQuestionCount] = useState<number>(10);
+
   const isBasic = user?.plan === 'basic';
 
   useEffect(() => {
     fetchSimulations();
     fetchHistory();
+    fetchFilterData();
   }, [user?.uid]);
+
+  const fetchFilterData = async () => {
+      const [subs, tops] = await Promise.all([
+          DatabaseService.getSubjects(),
+          DatabaseService.getTopics()
+      ]);
+      setSubjects(subs);
+      setTopics(tops);
+  };
+
+  useEffect(() => {
+      const fetchSubtopics = async () => {
+          if (selectedCategory && selectedSubject && selectedTopic) {
+              const subs = await DatabaseService.getAvailableSubtopics(selectedCategory, selectedSubject, selectedTopic);
+              setSubTopicsList(subs);
+          } else {
+              setSubTopicsList([]);
+          }
+      };
+      fetchSubtopics();
+  }, [selectedCategory, selectedSubject, selectedTopic]);
+
+  useEffect(() => {
+      const pendingFilters = sessionStorage.getItem('sim_filters');
+      if (pendingFilters) {
+          try {
+              const filters = JSON.parse(pendingFilters);
+              setSelectedCategory(filters.category || 'regular');
+              setSelectedSubject(filters.subject || '');
+              setSelectedTopic(filters.topic || '');
+              if (filters.subtopics && Array.isArray(filters.subtopics)) setMultiSubtopicsFilter(filters.subtopics);
+              setIsCustomizing(true);
+              sessionStorage.removeItem('sim_filters');
+          } catch (e) { console.error(e); }
+      }
+  }, []);
 
   const fetchSimulations = async () => {
     const data = await DatabaseService.getSimulations();
@@ -65,6 +114,64 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
       }, 1000);
       return () => clearInterval(interval);
   }, [activeSim, timeLeft, result]);
+
+  const startCustomSimulation = async () => {
+      if (isBasic) {
+          if (onShowUpgrade) onShowUpgrade();
+          else alert("Recurso exclusivo Advanced");
+          return;
+      }
+
+      if (!selectedSubject || !selectedTopic) {
+          alert("Selecione pelo menos uma Matéria e um Tópico.");
+          return;
+      }
+
+      setLoading(true);
+      try {
+          let fetched: Question[] = [];
+          if (multiSubtopicsFilter.length > 0) {
+              fetched = await DatabaseService.getQuestionsFromSubtopics(selectedCategory, selectedSubject, selectedTopic, multiSubtopicsFilter);
+          } else {
+              fetched = await DatabaseService.getQuestions(selectedCategory, selectedSubject, selectedTopic, selectedSubTopic || undefined);
+          }
+
+          if (fetched.length === 0) {
+              alert("Nenhuma questão encontrada para os filtros selecionados.");
+              setLoading(false);
+              return;
+          }
+
+          // Shuffle and limit
+          const shuffled = fetched.sort(() => 0.5 - Math.random());
+          const selectedQuestions = shuffled.slice(0, customQuestionCount);
+
+          const sim: Simulation = {
+              id: 'custom-' + Date.now(),
+              title: 'Simulado Personalizado',
+              description: `${selectedSubject} - ${selectedTopic}`,
+              type: 'custom',
+              status: 'open',
+              durationMinutes: selectedQuestions.length * 3, // 3 mins per question
+              questionIds: selectedQuestions.map(q => q.id!)
+          };
+
+          setQuestions(selectedQuestions);
+          setActiveSim(sim);
+          setCurrentIndex(0);
+          setAnswers({});
+          setTimeLeft(sim.durationMinutes * 60);
+          setResult(null);
+          setAiPlan(null); 
+          setShowQuestionMap(false);
+          setIsCustomizing(false);
+      } catch (e) {
+          console.error(e);
+          alert("Erro ao gerar simulado personalizado.");
+      } finally {
+          setLoading(false);
+      }
+  };
 
   const startSimulation = async (sim: Simulation) => {
       if (isBasic) {
@@ -340,7 +447,95 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
           <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">Simulados</h2>
           <p className="text-slate-400">Pratique com provas oficiais e acompanhe sua evolução.</p>
         </div>
+        <button 
+            onClick={() => setIsCustomizing(!isCustomizing)}
+            className={`px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2 ${isCustomizing ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+        >
+            <Settings size={20} /> Personalizar Simulado
+        </button>
       </div>
+
+      {isCustomizing && (
+          <div className="glass-card p-6 md:p-8 rounded-[2.5rem] border border-indigo-500/30 animate-in slide-in-from-top-4">
+              <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                  <Target className="text-indigo-400" /> Configurar Simulado
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Categoria</label>
+                      <select className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
+                          <option value="regular">Regular (ENEM/Vestibular)</option>
+                          <option value="military">Militar (ESA/ESPCEX)</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Matéria</label>
+                      <select 
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" 
+                          value={selectedSubject} 
+                          onChange={e => { setSelectedSubject(e.target.value); setSelectedTopic(''); setSelectedSubTopic(''); setMultiSubtopicsFilter([]); }}
+                      >
+                          <option value="">Selecione...</option>
+                          {subjects.filter(s => s.category === selectedCategory).map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Tópico</label>
+                      <select 
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" 
+                          value={selectedTopic} 
+                          onChange={e => { setSelectedTopic(e.target.value); setSelectedSubTopic(''); setMultiSubtopicsFilter([]); }}
+                          disabled={!selectedSubject}
+                      >
+                          <option value="">Todos os Tópicos</option>
+                          {(topics[selectedSubject] || []).map(t => (
+                              <option key={t} value={t}>{t}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Subtópico</label>
+                      <select 
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" 
+                          value={multiSubtopicsFilter.length > 0 ? 'multi' : selectedSubTopic} 
+                          onChange={e => { setSelectedSubTopic(e.target.value); setMultiSubtopicsFilter([]); }}
+                          disabled={!selectedTopic || (subTopicsList.length === 0 && multiSubtopicsFilter.length === 0)}
+                      >
+                          {multiSubtopicsFilter.length > 0 && <option value="multi">Múltiplos ({multiSubtopicsFilter.length})</option>}
+                          <option value="">Todos os Subtópicos</option>
+                          {subTopicsList.map(st => (
+                              <option key={st} value={st}>{st}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Nº de Questões</label>
+                      <select 
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" 
+                          value={customQuestionCount} 
+                          onChange={e => setCustomQuestionCount(Number(e.target.value))}
+                      >
+                          <option value={5}>5 Questões</option>
+                          <option value={10}>10 Questões</option>
+                          <option value={20}>20 Questões</option>
+                          <option value={45}>45 Questões</option>
+                          <option value={90}>90 Questões</option>
+                      </select>
+                  </div>
+              </div>
+              <div className="flex justify-end">
+                  <button 
+                      onClick={startCustomSimulation}
+                      disabled={!selectedSubject || !selectedTopic}
+                      className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2"
+                  >
+                      <Zap size={20} /> Gerar Simulado
+                  </button>
+              </div>
+          </div>
+      )}
 
       {simulations.length > 0 ? (
         <div className="space-y-12">
