@@ -48,7 +48,7 @@ export const DatabaseService = {
     const snap = await get(ref(database, `users/${uid}`));
     if (snap.exists()) {
       const data = snap.val();
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       let needsUpdate = false;
       const updates: any = {};
 
@@ -78,7 +78,7 @@ export const DatabaseService = {
 
       return data;
     }
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
     const newUser = { 
         ...defaultData, 
         uid, 
@@ -164,7 +164,7 @@ export const DatabaseService = {
   async trackStudyTime(uid: string, minutes: number): Promise<void> {
     if (!uid || minutes <= 0) return;
     try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA');
         const snap = await get(ref(database, `users/${uid}`));
         if (snap.exists()) {
             const data = snap.val();

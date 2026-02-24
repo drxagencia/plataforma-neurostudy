@@ -32,7 +32,6 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
   const [aiPlan, setAiPlan] = useState<{analysis: string, recommendations: {subjectId: string, topicName: string, reason: string}[]} | null>(null);
 
   // Custom Simulation State
-  const [isCustomizing, setIsCustomizing] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Record<string, string[]>>({});
   const [selectedCategory, setSelectedCategory] = useState<string>('regular');
@@ -81,7 +80,6 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
               setSelectedSubject(filters.subject || '');
               setSelectedTopic(filters.topic || '');
               if (filters.subtopics && Array.isArray(filters.subtopics)) setMultiSubtopicsFilter(filters.subtopics);
-              setIsCustomizing(true);
               sessionStorage.removeItem('sim_filters');
           } catch (e) { console.error(e); }
       }
@@ -164,7 +162,6 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
           setResult(null);
           setAiPlan(null); 
           setShowQuestionMap(false);
-          setIsCustomizing(false);
       } catch (e) {
           console.error(e);
           alert("Erro ao gerar simulado personalizado.");
@@ -447,20 +444,13 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
           <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">Simulados</h2>
           <p className="text-slate-400">Pratique com provas oficiais e acompanhe sua evolução.</p>
         </div>
-        <button 
-            onClick={() => setIsCustomizing(!isCustomizing)}
-            className={`px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2 ${isCustomizing ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-        >
-            <Settings size={20} /> Iniciar simulado
-        </button>
       </div>
 
-      {isCustomizing && (
-          <div className="glass-card p-6 md:p-8 rounded-[2.5rem] border border-indigo-500/30 animate-in slide-in-from-top-4">
-              <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                  <Target className="text-indigo-400" /> Configurar Simulado
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="glass-card p-6 md:p-8 rounded-[2.5rem] border border-indigo-500/30 animate-in slide-in-from-top-4">
+          <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+              <Target className="text-indigo-400" /> Iniciar Simulado
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                   <div>
                       <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Categoria</label>
                       <select className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
@@ -573,12 +563,10 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
                   </button>
               </div>
           </div>
-      )}
 
-      {simulations.length > 0 ? (
-        <div className="space-y-12">
-            {/* Featured Simulation */}
-            {featured && (
+      <div className="space-y-12">
+          {/* Featured Simulation */}
+          {featured && (
                 <div className="relative w-full rounded-[2.5rem] overflow-hidden glass-card p-8 md:p-12 group transition-all duration-500 border border-indigo-500/20 shadow-2xl hover:shadow-indigo-500/10">
                     <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3" />
                     
@@ -647,44 +635,36 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
                 </div>
             )}
 
-            {/* HISTORY SECTION */}
-            {history.length > 0 && (
-                <div className="pt-8 border-t border-white/5">
-                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><BarChart3 size={20} className="text-slate-500"/> Seu Histórico</h3>
-                    <div className="glass-card rounded-[2rem] overflow-hidden border border-white/5">
-                        {history.slice(0, 5).map((h, i) => {
-                            const simTitle = simulations.find(s => s.id === h.simulationId)?.title || 'Simulado Removido';
-                            const perc = Math.round((h.score / h.totalQuestions) * 100);
-                            return (
-                                <div key={i} className="p-5 border-b border-white/5 flex items-center justify-between hover:bg-white/5 transition-colors">
-                                    <div>
-                                        <p className="font-bold text-white text-sm">{simTitle}</p>
-                                        <p className="text-[10px] text-slate-500">{new Date(h.timestamp).toLocaleDateString()}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className={`text-lg font-black ${perc >= 70 ? 'text-emerald-400' : 'text-slate-300'}`}>{perc}%</p>
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase">{h.score}/{h.totalQuestions} Acertos</p>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                        {history.length > 5 && (
-                            <div className="p-4 text-center text-xs text-slate-500 font-bold uppercase cursor-pointer hover:text-white transition-colors">
-                                Ver todo o histórico
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </div>
-      ) : (
-          <div className="flex flex-col items-center justify-center py-20 bg-slate-900/20 rounded-3xl border border-white/5 border-dashed">
-              <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6">
-                 <FileText size={40} className="text-slate-600 opacity-50" />
+          {/* HISTORY SECTION */}
+          {history.length > 0 && (
+              <div className="pt-8 border-t border-white/5">
+                  <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><BarChart3 size={20} className="text-slate-500"/> Seu Histórico</h3>
+                  <div className="glass-card rounded-[2rem] overflow-hidden border border-white/5">
+                      {history.slice(0, 5).map((h, i) => {
+                          const simTitle = simulations.find(s => s.id === h.simulationId)?.title || 'Simulado Personalizado';
+                          const perc = Math.round((h.score / h.totalQuestions) * 100);
+                          return (
+                              <div key={i} className="p-5 border-b border-white/5 flex items-center justify-between hover:bg-white/5 transition-colors">
+                                  <div>
+                                      <p className="font-bold text-white text-sm">{simTitle}</p>
+                                      <p className="text-[10px] text-slate-500">{new Date(h.timestamp).toLocaleDateString()}</p>
+                                  </div>
+                                  <div className="text-right">
+                                      <p className={`text-lg font-black ${perc >= 70 ? 'text-emerald-400' : 'text-slate-300'}`}>{perc}%</p>
+                                      <p className="text-[10px] text-slate-500 font-bold uppercase">{h.score}/{h.totalQuestions} Acertos</p>
+                                  </div>
+                              </div>
+                          )
+                      })}
+                      {history.length > 5 && (
+                          <div className="p-4 text-center text-xs text-slate-500 font-bold uppercase cursor-pointer hover:text-white transition-colors">
+                              Ver todo o histórico
+                          </div>
+                      )}
+                  </div>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Nenhum simulado disponível</h3>
-          </div>
-      )}
+          )}
+      </div>
     </div>
   );
 };

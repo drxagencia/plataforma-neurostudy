@@ -109,7 +109,7 @@ const App: React.FC = () => {
           setUser(currentUser => {
               if (!currentUser) return null;
               
-              const today = new Date().toISOString().split('T')[0];
+              const today = new Date().toLocaleDateString('en-CA');
               const isNewDay = currentUser.lastStudyDate !== today;
 
               return {
