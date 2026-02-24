@@ -451,7 +451,7 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
             onClick={() => setIsCustomizing(!isCustomizing)}
             className={`px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2 ${isCustomizing ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
         >
-            <Settings size={20} /> Personalizar Simulado
+            <Settings size={20} /> Iniciar simulado
         </button>
       </div>
 
@@ -497,18 +497,56 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
                   </div>
                   <div>
                       <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Subtópico</label>
-                      <select 
-                          className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" 
-                          value={multiSubtopicsFilter.length > 0 ? 'multi' : selectedSubTopic} 
-                          onChange={e => { setSelectedSubTopic(e.target.value); setMultiSubtopicsFilter([]); }}
-                          disabled={!selectedTopic || (subTopicsList.length === 0 && multiSubtopicsFilter.length === 0)}
-                      >
-                          {multiSubtopicsFilter.length > 0 && <option value="multi">Múltiplos ({multiSubtopicsFilter.length})</option>}
-                          <option value="">Todos os Subtópicos</option>
-                          {subTopicsList.map(st => (
-                              <option key={st} value={st}>{st}</option>
-                          ))}
-                      </select>
+                      <div className="relative">
+                          <button 
+                              className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500 text-left flex justify-between items-center"
+                              disabled={!selectedTopic || subTopicsList.length === 0}
+                              onClick={(e) => {
+                                  e.preventDefault();
+                                  const selectEl = e.currentTarget.nextElementSibling as HTMLSelectElement;
+                                  if (selectEl) {
+                                      selectEl.style.display = selectEl.style.display === 'block' ? 'none' : 'block';
+                                  }
+                              }}
+                          >
+                              <span className="truncate">
+                                  {multiSubtopicsFilter.length > 0 
+                                      ? `${multiSubtopicsFilter.length} selecionado(s)` 
+                                      : 'Todos os Subtópicos'}
+                              </span>
+                              <ChevronRight size={16} className="rotate-90 text-slate-500" />
+                          </button>
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/10 rounded-xl overflow-hidden z-10 hidden shadow-xl">
+                              <div className="max-h-48 overflow-y-auto p-2 custom-scrollbar">
+                                  <label className="flex items-center gap-2 p-2 hover:bg-slate-700 rounded-lg cursor-pointer text-sm text-white">
+                                      <input 
+                                          type="checkbox" 
+                                          checked={multiSubtopicsFilter.length === 0}
+                                          onChange={() => setMultiSubtopicsFilter([])}
+                                          className="rounded border-slate-600 text-indigo-500 focus:ring-indigo-500 bg-slate-900"
+                                      />
+                                      Todos os Subtópicos
+                                  </label>
+                                  {subTopicsList.map(st => (
+                                      <label key={st} className="flex items-center gap-2 p-2 hover:bg-slate-700 rounded-lg cursor-pointer text-sm text-white">
+                                          <input 
+                                              type="checkbox" 
+                                              checked={multiSubtopicsFilter.includes(st)}
+                                              onChange={(e) => {
+                                                  if (e.target.checked) {
+                                                      setMultiSubtopicsFilter(prev => [...prev, st]);
+                                                  } else {
+                                                      setMultiSubtopicsFilter(prev => prev.filter(s => s !== st));
+                                                  }
+                                              }}
+                                              className="rounded border-slate-600 text-indigo-500 focus:ring-indigo-500 bg-slate-900"
+                                          />
+                                          {st}
+                                      </label>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
                   </div>
                   <div>
                       <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Nº de Questões</label>
