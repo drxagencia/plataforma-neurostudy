@@ -269,7 +269,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
         {/* Filter Panel */}
         {isFilterOpen && (
             <div className="glass-card p-6 rounded-3xl border-indigo-500/20 animate-in slide-in-from-top-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                     <div>
                         <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Categoria</label>
                         <select className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
@@ -282,7 +282,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
                         <select 
                             className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" 
                             value={selectedSubject} 
-                            onChange={e => { setSelectedSubject(e.target.value); setSelectedTopic(''); }}
+                            onChange={e => { setSelectedSubject(e.target.value); setSelectedTopic(''); setSelectedSubTopic(''); setMultiSubtopicsFilter([]); }}
                         >
                             <option value="">Selecione...</option>
                             {subjects.filter(s => s.category === selectedCategory).map(s => (
@@ -295,7 +295,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
                         <select 
                             className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" 
                             value={selectedTopic} 
-                            onChange={e => setSelectedTopic(e.target.value)}
+                            onChange={e => { setSelectedTopic(e.target.value); setSelectedSubTopic(''); setMultiSubtopicsFilter([]); }}
                             disabled={!selectedSubject}
                         >
                             <option value="">Todos os Tópicos</option>
@@ -304,10 +304,25 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
                             ))}
                         </select>
                     </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Subtópico</label>
+                        <select 
+                            className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-indigo-500" 
+                            value={multiSubtopicsFilter.length > 0 ? 'multi' : selectedSubTopic} 
+                            onChange={e => { setSelectedSubTopic(e.target.value); setMultiSubtopicsFilter([]); }}
+                            disabled={!selectedTopic || (subTopicsList.length === 0 && multiSubtopicsFilter.length === 0)}
+                        >
+                            {multiSubtopicsFilter.length > 0 && <option value="multi">Múltiplos ({multiSubtopicsFilter.length})</option>}
+                            <option value="">Todos os Subtópicos</option>
+                            {subTopicsList.map(st => (
+                                <option key={st} value={st}>{st}</option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="flex items-end">
                         <label className="flex items-center gap-2 cursor-pointer bg-slate-900 border border-white/10 p-3 rounded-xl w-full hover:bg-slate-800 transition-colors">
                             <input type="checkbox" checked={showUnansweredOnly} onChange={e => setShowUnansweredOnly(e.target.checked)} className="rounded border-slate-600 text-indigo-600 focus:ring-indigo-500"/>
-                            <span className="text-sm font-bold text-slate-300">Apenas Não Respondidas</span>
+                            <span className="text-sm font-bold text-slate-300">Não Respondidas</span>
                         </label>
                     </div>
                 </div>

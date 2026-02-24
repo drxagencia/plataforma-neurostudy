@@ -310,7 +310,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* STATS GRID */}
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             
