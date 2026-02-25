@@ -230,7 +230,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onNavigate, onManualSync })
   }
 
   const isBasic = user.plan === 'basic';
-  const dailyMinutes = user.dailyStudyMinutes || 0;
+  
+  // FIX: Ensure visual reset if date mismatches, even if DB hasn't synced yet
+  const today = new Date().toLocaleDateString('en-CA');
+  const isDateCorrect = user.lastStudyDate === today;
+  const dailyMinutes = isDateCorrect ? (user.dailyStudyMinutes || 0) : 0;
+  
   const dailyGoalMinutes = (user.dailyGoal || 2) * 60;
   const goalProgress = Math.min((dailyMinutes / dailyGoalMinutes) * 100, 100);
   const metGoal = dailyMinutes >= dailyGoalMinutes;

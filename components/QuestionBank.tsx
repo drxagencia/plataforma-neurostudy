@@ -360,21 +360,21 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
                 {/* Question Card */}
                 <div className="glass-card p-8 rounded-3xl border border-white/10 relative overflow-hidden">
                     <span className="inline-block px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
-                        {questions[currentIndex].subtopic || questions[currentIndex].topic}
+                        {questions[currentIndex]?.subtopic || questions[currentIndex]?.topic || 'Geral'}
                     </span>
                     
                     <p className="text-lg md:text-xl text-white font-medium leading-relaxed mb-6 whitespace-pre-wrap">
-                        {questions[currentIndex].text}
+                        {questions[currentIndex]?.text || 'Carregando questão...'}
                     </p>
                     
-                    {questions[currentIndex].imageUrl && (
+                    {questions[currentIndex]?.imageUrl && (
                         <div className="mb-8 rounded-2xl overflow-hidden border border-white/10 bg-black/50">
                             <img src={questions[currentIndex].imageUrl} className="w-full max-h-[400px] object-contain" alt="Questão" />
                         </div>
                     )}
 
                     <div className="space-y-3">
-                        {questions[currentIndex].options.map((opt, idx) => {
+                        {questions[currentIndex]?.options?.map((opt, idx) => {
                             const qId = questions[currentIndex].id || `q-${currentIndex}`;
                             const isAnswered = qId && answeredMap[qId];
                             const isSelected = isAnswered && answeredMap[qId].selectedOption === idx;
