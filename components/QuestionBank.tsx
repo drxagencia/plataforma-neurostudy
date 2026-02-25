@@ -359,6 +359,12 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
 
                 {/* Question Card */}
                 <div className="glass-card p-8 rounded-3xl border border-white/10 relative overflow-hidden">
+                    {!questions[currentIndex] ? (
+                        <div className="flex justify-center items-center py-20 text-slate-500">
+                            <Loader2 className="animate-spin mr-2" /> Carregando questão...
+                        </div>
+                    ) : (
+                    <>
                     <span className="inline-block px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
                         {questions[currentIndex]?.subtopic || questions[currentIndex]?.topic || 'Geral'}
                     </span>
@@ -438,7 +444,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
                     <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="flex gap-3">
                             {/* Always show Explanation button if answered, regardless of correctness */}
-                            {questions[currentIndex].id && answeredMap[questions[currentIndex].id!] && (
+                            {questions[currentIndex]?.id && answeredMap[questions[currentIndex].id!] && (
                                 <button 
                                     onClick={handleExplain}
                                     disabled={isExplaining}
@@ -476,6 +482,8 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
                              </h4>
                              <ProfessionalMarkdown text={aiExplanation} />
                         </div>
+                    )}
+                    </>
                     )}
                 </div>
             </div>
