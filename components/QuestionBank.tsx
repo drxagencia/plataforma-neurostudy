@@ -105,6 +105,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
   const [userSelection, setUserSelection] = useState<number | null>(null);
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [isExplaining, setIsExplaining] = useState(false);
+  const [eliminatedOptions, setEliminatedOptions] = useState<Record<string, number[]>>({});
 
   useEffect(() => {
     const initData = async () => {
@@ -374,36 +375,61 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ onUpdateUser, user, onShowU
 
                     <div className="space-y-3">
                         {questions[currentIndex].options.map((opt, idx) => {
-                            const qId = questions[currentIndex].id;
+                            const qId = questions[currentIndex].id || `q-${currentIndex}`;
                             const isAnswered = qId && answeredMap[qId];
                             const isSelected = isAnswered && answeredMap[qId].selectedOption === idx;
                             const isCorrect = questions[currentIndex].correctAnswer === idx;
+                            const isEliminated = eliminatedOptions[qId]?.includes(idx);
                             
                             let btnClass = "bg-slate-900/50 border-white/5 hover:bg-slate-800 text-slate-300";
                             if (isAnswered) {
                                 if (isCorrect) btnClass = "bg-emerald-900/20 border-emerald-500/50 text-white";
                                 else if (isSelected) btnClass = "bg-red-900/20 border-red-500/50 text-white";
                                 else btnClass = "bg-slate-900/30 border-transparent text-slate-500 opacity-50";
+                            } else if (isEliminated) {
+                                btnClass = "bg-red-900/10 border-red-500/20 text-slate-500 opacity-60";
                             }
 
                             return (
-                                <button
-                                    key={idx}
-                                    onClick={() => handleAnswerSubmit(idx)}
-                                    disabled={!!isAnswered}
-                                    className={`w-full p-4 rounded-xl border text-left transition-all flex items-center gap-4 group ${btnClass}`}
-                                >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border ${
-                                        isAnswered && isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' : 
-                                        isAnswered && isSelected ? 'bg-red-500 border-red-500 text-white' : 
-                                        'bg-slate-800 border-slate-700 text-slate-400 group-hover:border-indigo-500 group-hover:text-white'
-                                    }`}>
-                                        {String.fromCharCode(65+idx)}
-                                    </div>
-                                    <span className="flex-1">{opt}</span>
-                                    {isAnswered && isCorrect && <CheckCircle size={20} className="text-emerald-500" />}
-                                    {isAnswered && isSelected && !isCorrect && <XCircle size={20} className="text-red-500" />}
-                                </button>
+                                <div key={idx} className="relative group/option">
+                                    <button
+                                        onClick={() => handleAnswerSubmit(idx)}
+                                        disabled={!!isAnswered || isEliminated}
+                                        className={`w-full p-4 rounded-xl border text-left transition-all flex items-center gap-4 group ${btnClass}`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                                            isAnswered && isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' : 
+                                            isAnswered && isSelected ? 'bg-red-500 border-red-500 text-white' : 
+                                            isEliminated ? 'bg-red-900/20 border-red-500/30 text-red-700 line-through' :
+                                            'bg-slate-800 border-slate-700 text-slate-400 group-hover:border-indigo-500 group-hover:text-white'
+                                        }`}>
+                                            {String.fromCharCode(65+idx)}
+                                        </div>
+                                        <span className={`flex-1 ${isEliminated ? 'line-through decoration-red-500/50' : ''}`}>{opt}</span>
+                                        {isAnswered && isCorrect && <CheckCircle size={20} className="text-emerald-500" />}
+                                        {isAnswered && isSelected && !isCorrect && <XCircle size={20} className="text-red-500" />}
+                                    </button>
+                                    
+                                    {!isAnswered && (
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEliminatedOptions(prev => {
+                                                    const current = prev[qId] || [];
+                                                    if (current.includes(idx)) {
+                                                        return { ...prev, [qId]: current.filter(i => i !== idx) };
+                                                    } else {
+                                                        return { ...prev, [qId]: [...current, idx] };
+                                                    }
+                                                });
+                                            }}
+                                            className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-red-500/20 transition-colors ${isEliminated ? 'text-red-500 bg-red-500/10' : 'text-slate-600 opacity-0 group-hover/option:opacity-100'}`}
+                                            title={isEliminated ? "Restaurar alternativa" : "Eliminar alternativa"}
+                                        >
+                                            <EyeOff size={16} />
+                                        </button>
+                                    )}
+                                </div>
                             );
                         })}
                     </div>

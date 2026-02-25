@@ -23,6 +23,7 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
   const [answers, setAnswers] = useState<Record<number, number>>({}); 
   const [timeLeft, setTimeLeft] = useState(0); 
   const [showQuestionMap, setShowQuestionMap] = useState(false); // Mobile toggle
+  const [eliminatedOptions, setEliminatedOptions] = useState<Record<number, number[]>>({});
   
   // Results State
   const [result, setResult] = useState<SimulationResult | null>(null);
@@ -367,19 +368,56 @@ const Simulations: React.FC<SimulationsProps> = ({ user, onShowUpgrade }) => {
                       </div>
 
                       <div className="space-y-3">
-                          {currentQ.options.map((opt, idx) => (
-                              <button 
-                                key={idx} 
-                                onClick={() => handleAnswer(idx)} 
-                                className={`w-full p-5 rounded-2xl text-left border transition-all flex items-center gap-4 group ${answers[currentIndex] === idx ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.2)]' : 'bg-slate-900/40 border-white/5 text-slate-300 hover:bg-slate-800 hover:border-white/20'}`}
-                              >
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border ${answers[currentIndex] === idx ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-600 text-slate-500 group-hover:border-slate-400'}`}>
-                                      {String.fromCharCode(65+idx)}
+                          {currentQ.options.map((opt, idx) => {
+                              const isEliminated = eliminatedOptions[currentIndex]?.includes(idx);
+                              const isSelected = answers[currentIndex] === idx;
+
+                              let btnClass = isSelected 
+                                  ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.2)]' 
+                                  : 'bg-slate-900/40 border-white/5 text-slate-300 hover:bg-slate-800 hover:border-white/20';
+                              
+                              if (isEliminated && !isSelected) {
+                                  btnClass = "bg-red-900/10 border-red-500/20 text-slate-500 opacity-60";
+                              }
+
+                              return (
+                                  <div key={idx} className="relative group/option">
+                                      <button 
+                                          onClick={() => handleAnswer(idx)} 
+                                          disabled={isEliminated}
+                                          className={`w-full p-5 rounded-2xl text-left border transition-all flex items-center gap-4 group ${btnClass}`}
+                                      >
+                                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                                              isSelected ? 'bg-indigo-600 border-indigo-500 text-white' : 
+                                              isEliminated ? 'bg-red-900/20 border-red-500/30 text-red-700 line-through' :
+                                              'bg-slate-800 border-slate-600 text-slate-500 group-hover:border-slate-400'
+                                          }`}>
+                                              {String.fromCharCode(65+idx)}
+                                          </div>
+                                          <span className={`flex-1 text-sm md:text-base ${isEliminated ? 'line-through decoration-red-500/50' : ''}`}>{opt}</span>
+                                          {isSelected && <CheckCircle size={20} className="text-indigo-400" />}
+                                      </button>
+
+                                      <button 
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              setEliminatedOptions(prev => {
+                                                  const current = prev[currentIndex] || [];
+                                                  if (current.includes(idx)) {
+                                                      return { ...prev, [currentIndex]: current.filter(i => i !== idx) };
+                                                  } else {
+                                                      return { ...prev, [currentIndex]: [...current, idx] };
+                                                  }
+                                              });
+                                          }}
+                                          className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-red-500/20 transition-colors ${isEliminated ? 'text-red-500 bg-red-500/10' : 'text-slate-600 opacity-0 group-hover/option:opacity-100'}`}
+                                          title={isEliminated ? "Restaurar alternativa" : "Eliminar alternativa"}
+                                      >
+                                          <XCircle size={16} />
+                                      </button>
                                   </div>
-                                  <span className="flex-1 text-sm md:text-base">{opt}</span>
-                                  {answers[currentIndex] === idx && <CheckCircle size={20} className="text-indigo-400" />}
-                              </button>
-                          ))}
+                              );
+                          })}
                       </div>
                   </div>
 
